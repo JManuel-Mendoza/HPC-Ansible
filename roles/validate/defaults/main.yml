@@ -1,0 +1,15 @@
+---
+validate_nfs: true
+validate_llm: true
+
+# Montaje esperado en workers (si usas NFS)
+validate_nfs_mount_path: "/mnt/llm-project"
+
+# Export esperado en master (si usas NFS)
+validate_nfs_export_path: "/export/llm-project"
+
+#Mejoras
+#validate_strict: true
+#validate_report: true
+#validate_report_dir: "./reports"
+#validate_report_filename: "cluster_validate.yml"

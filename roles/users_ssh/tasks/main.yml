@@ -1,0 +1,12 @@
+---
+- name: Endurecer sshd_config
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^{{ item.key }}\\s+"
+    line: "{{ item.key }} {{ item.value }}"
+    state: present
+  loop:
+    - { key: "Port", value: "{{ ssh_port }}" }
+    - { key: "PermitRootLogin", value: "{{ ssh_permit_root_login }}" }
+    - { key: "PasswordAuthentication", value: "{{ ssh_password_authentication }}" }
+  notify: Restart sshd

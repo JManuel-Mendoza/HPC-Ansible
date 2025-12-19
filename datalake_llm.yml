@@ -1,0 +1,181 @@
+---
+- name: Datalake para entrenamiento de modelos LLM
+  hosts: all
+  become: yes
+
+  vars:
+    minio_root_user: "admin"
+    minio_root_password: "SuperPass123"
+    minio_buckets:
+      - raw
+      - processed
+      - refined
+      - trusted
+      - training
+    opensearch_version: "2.12.0"
+
+  tasks:
+
+  # -------------------------------------------------------
+  # 1. Instalación dependencias base
+  # -------------------------------------------------------
+  - name: Instalar paquetes esenciales
+    apt:
+      name:
+        - python3
+        - python3-pip
+        - docker.io
+        - docker-compose
+        - unzip
+        - git
+      state: present
+      update_cache: yes
+
+  - name: Instalar librerías Python esenciales para LLM ETLs
+    pip:
+      name:
+        - pandas
+        - numpy
+        - unidecode
+        - pdfplumber
+        - pypdf
+        - langdetect
+        - sentencepiece
+        - transformers
+        - opensearch-py
+
+  # -------------------------------------------------------
+  # 2. Instalar MinIO
+  # -------------------------------------------------------
+  - name: Crear carpeta MinIO
+    file:
+      path: /opt/minio
+      state: directory
+
+  - name: Descargar MinIO server
+    get_url:
+      url: "https://dl.min.io/server/minio/release/linux-amd64/minio"
+      dest: /usr/local/bin/minio
+      mode: '0755'
+
+  - name: Descargar MinIO client (mc)
+    get_url:
+      url: "https://dl.min.io/client/mc/release/linux-amd64/mc"
+      dest: /usr/local/bin/mc
+      mode: '0755'
+
+  - name: Crear servicio systemd para MinIO
+    copy:
+      dest: /etc/systemd/system/minio.service
+      content: |
+        [Unit]
+        Description=MinIO Object Storage
+        Wants=network-online.target
+        After=network-online.target
+
+        [Service]
+        User=root
+        ExecStart=/usr/local/bin/minio server /opt/minio --console-address ":9001"
+        Environment="MINIO_ROOT_USER={{ minio_root_user }}"
+        Environment="MINIO_ROOT_PASSWORD={{ minio_root_password }}"
+        Restart=always
+        LimitNOFILE=65536
+
+        [Install]
+        WantedBy=multi-user.target
+
+  - name: Iniciar y habilitar MinIO
+    systemd:
+      name: minio
+      enabled: yes
+      state: started
+
+  # -------------------------------------------------------
+  # 3. Crear buckets
+  # -------------------------------------------------------
+  - name: Esperar MinIO antes de usar mc
+    wait_for:
+      port: 9000
+      delay: 5
+
+  - name: Configurar alias de mc
+    shell: "mc alias set local http://127.0.0.1:9000 {{ minio_root_user }} {{ minio_root_password }}"
+
+  - name: Crear buckets para datalake
+    shell: "mc mb local/{{ item }} || true"
+    loop: "{{ minio_buckets }}"
+
+  # -------------------------------------------------------
+  # 4. Instalar OpenSearch para indexación + embeddings
+  # -------------------------------------------------------
+  - name: Crear carpeta OpenSearch
+    file:
+      path: /opt/opensearch
+      state: directory
+
+  - name: Crear docker-compose para OpenSearch
+    copy:
+      dest: /opt/opensearch/docker-compose.yml
+      content: |
+        version: '3'
+        services:
+          opensearch:
+            image: opensearchproject/opensearch:{{ opensearch_version }}
+            environment:
+              - discovery.type=single-node
+              - plugins.security.disabled=true
+              - bootstrap.memory_lock=true
+            ulimits:
+              memlock:
+                soft: -1
+                hard: -1
+            ports:
+              - "9200:9200"
+              - "9600:9600"
+            volumes:
+              - osdata:/usr/share/opensearch/data
+
+        volumes:
+          osdata:
+
+  - name: Iniciar OpenSearch
+    shell: "cd /opt/opensearch && docker-compose up -d"
+
+  # -------------------------------------------------------
+  # 5. Instalar Argo Workflows (ETLs automáticas)
+  # -------------------------------------------------------
+  - name: Instalar kubectl
+    apt:
+      name: kubectl
+      state: present
+
+  - name: Instalar kind (Kubernetes local)
+    get_url:
+      url: "https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64"
+      dest: /usr/local/bin/kind
+      mode: '0755'
+
+  - name: Crear cluster Kubernetes
+    shell: kind create cluster --name datalake || true
+
+  - name: Instalar Argo Workflows
+    shell: |
+      kubectl create namespace argo || true
+      kubectl apply -n argo -f https://raw.githubusercontent.com/argoproj/argo-workflows/stable/manifests/install.yaml
+
+  # -------------------------------------------------------
+  # 6. Instalar DVC para versionamiento de datasets
+  # -------------------------------------------------------
+  - name: Instalar DVC
+    pip:
+      name:
+        - dvc[s3]
+
+  - name: Configurar DVC remoto MinIO
+    shell: |
+      dvc init || true
+      dvc remote add -d minio s3://training
+      dvc remote modify minio endpointurl http://127.0.0.1:9000
+      dvc remote modify minio access_key_id {{ minio_root_user }}
+      dvc remote modify minio secret_access_key {{ minio_root_password }}
+

@@ -1,0 +1,66 @@
+---
+- name: Ensure /data and /scratch mount at boot (no automount)
+  hosts: hpc_master:workers
+  become: true
+  gather_facts: false
+
+  vars:
+    part_data: "/dev/sda1"
+    part_scratch: "/dev/sda2"
+    mp_data: "/data"
+    mp_scratch: "/scratch"
+
+    # Montaje en arranque (sin automount).
+    # Nota: si quitas "nofail", el nodo puede entrar en emergency mode si el disco no está listo.
+    fstab_opts_boot: "defaults,x-systemd.device-timeout=10"
+
+  tasks:
+    - name: Ensure mount points exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ mp_data }}"
+        - "{{ mp_scratch }}"
+
+    - name: Get UUID for /data partition
+      ansible.builtin.command: "blkid -s UUID -o value {{ part_data }}"
+      register: uuid_data
+      changed_when: false
+
+    - name: Get UUID for /scratch partition
+      ansible.builtin.command: "blkid -s UUID -o value {{ part_scratch }}"
+      register: uuid_scratch
+      changed_when: false
+
+    # 1) Escribe/actualiza fstab SIN x-systemd.automount y asegura que quede persistente
+    # 2) Monta inmediatamente (state: mounted)
+    - name: Mount /data at boot and now
+      ansible.posix.mount:
+        path: "{{ mp_data }}"
+        src: "UUID={{ uuid_data.stdout }}"
+        fstype: xfs
+        opts: "{{ fstab_opts_boot }}"
+        state: mounted
+
+    - name: Mount /scratch at boot and now
+      ansible.posix.mount:
+        path: "{{ mp_scratch }}"
+        src: "UUID={{ uuid_scratch.stdout }}"
+        fstype: xfs
+        opts: "{{ fstab_opts_boot }}"
+        state: mounted
+
+    - name: Reload systemd units
+      ansible.builtin.command: "systemctl daemon-reload"
+      changed_when: false
+
+    - name: Validate mounts
+      ansible.builtin.command: "df -h {{ mp_data }} {{ mp_scratch }}"
+      register: df_out
+      changed_when: false
+
+    - name: Print df output
+      ansible.builtin.debug:
+        var: df_out.stdout_lines

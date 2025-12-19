@@ -1,0 +1,22 @@
+---
+- name: Actualizar caché de paquetes
+  ansible.builtin.dnf:
+    update_cache: true
+
+- name: Instalar paquetes base
+  ansible.builtin.dnf:
+    name: "{{ common_packages }}"
+    state: present
+
+- name: Instalar chrony si aplica
+  ansible.builtin.dnf:
+    name: chrony
+    state: present
+  when: enable_chrony | bool
+
+- name: Habilitar chronyd si aplica
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: true
+  when: enable_chrony | bool

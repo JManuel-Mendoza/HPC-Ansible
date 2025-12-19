@@ -1,0 +1,40 @@
+- name: Desbloquear SSH en workers (volver a permitir acceso normal)
+  hosts: worker1,worker2,worker3,worker4
+  become: yes
+
+  vars:
+    master_internal_ips:
+      worker1: "192.168.34.1"
+      worker2: "192.168.34.17"
+      worker3: "192.168.34.33"
+      worker4: "192.168.34.49"
+
+  tasks:
+    - name: Instalar firewalld si no está
+      ansible.builtin.package:
+        name: firewalld
+        state: present
+
+    - name: Habilitar y arrancar firewalld
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Obtener IP interna del master para este worker
+      ansible.builtin.set_fact:
+        my_master_ip: "{{ master_internal_ips[inventory_hostname] }}"
+
+    - name: Eliminar regla que permitía SSH solo desde el master
+      ansible.builtin.shell: >
+        firewall-cmd --permanent --remove-rich-rule='rule family="ipv4"
+        source address="{{ my_master_ip }}/32" service name="ssh" accept' || true
+      changed_when: true
+
+    - name: Volver a habilitar servicio ssh global en la zona por defecto
+      ansible.builtin.shell: firewall-cmd --permanent --add-service=ssh
+      changed_when: true
+
+    - name: Recargar firewalld
+      ansible.builtin.shell: firewall-cmd --reload
+      changed_when: true

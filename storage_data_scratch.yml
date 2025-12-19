@@ -1,0 +1,176 @@
+---
+- name: Rebuild /dev/sda into /data and /scratch (XFS) with safe fstab
+  hosts: hpc_master:workers
+  become: true
+  gather_facts: true
+
+  vars:
+    data_disk: "/dev/sda"
+    part_data: "/dev/sda1"
+    part_scratch: "/dev/sda2"
+    mp_data: "/data"
+    mp_scratch: "/scratch"
+
+    # Opciones seguras para evitar bloqueos de arranque
+    fstab_opts: "defaults,nofail,x-systemd.automount,x-systemd.device-timeout=10"
+
+    # Barrera de seguridad: debe estar en true para permitir destrucción
+    wipe_confirm: true
+
+    # Umbral de seguridad: solo operar si el disco es >= 3000 GB (~4TB)
+    min_disk_size_gb: 3000
+
+  pre_tasks:
+    - name: Fail if wipe_confirm is not true
+      ansible.builtin.fail:
+        msg: "DESTRUCTIVO: este playbook borra {{ data_disk }}. Define wipe_confirm: true para continuar."
+      when: not wipe_confirm | bool
+
+    - name: Ensure disk exists
+      ansible.builtin.stat:
+        path: "{{ data_disk }}"
+      register: disk_stat
+
+    - name: Fail if disk does not exist
+      ansible.builtin.fail:
+        msg: "No existe {{ data_disk }} en este nodo. Verifica el nombre del disco con lsblk."
+      when: not disk_stat.stat.exists
+
+    - name: Get disk size (bytes) using lsblk
+      ansible.builtin.command: "lsblk -b -dn -o SIZE {{ data_disk }}"
+      register: disk_size_bytes
+      changed_when: false
+
+    - name: Compute disk size GB
+      ansible.builtin.set_fact:
+        disk_size_gb: "{{ (disk_size_bytes.stdout | int / 1073741824) | float }}"
+
+    - name: Fail if disk is smaller than expected (safety check)
+      ansible.builtin.fail:
+        msg: "Seguridad: {{ data_disk }} mide {{ disk_size_gb | round(1) }} GB (< {{ min_disk_size_gb }} GB). Abortando."
+      when: (disk_size_gb | float) < (min_disk_size_gb | float)
+
+    - name: Find root source
+      ansible.builtin.command: "findmnt -n -o SOURCE /"
+      register: root_src
+      changed_when: false
+
+    - name: Abort if root filesystem uses the target disk
+      ansible.builtin.fail:
+        msg: "Seguridad: la raíz (/) está en {{ root_src.stdout }}. No se tocará {{ data_disk }}."
+      when: root_src.stdout is search("sda")
+
+  tasks:
+    - name: Ensure mount points exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ mp_data }}"
+        - "{{ mp_scratch }}"
+
+    - name: Unmount /data if mounted (ignore if not)
+      ansible.posix.mount:
+        path: "{{ mp_data }}"
+        state: unmounted
+      failed_when: false
+
+    - name: Unmount /scratch if mounted (ignore if not)
+      ansible.posix.mount:
+        path: "{{ mp_scratch }}"
+        state: unmounted
+      failed_when: false
+
+    - name: Comment any existing /data fstab entries (avoid conflicts)
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^(?!#)(.*\s+/data\s+.*)$'
+        replace: '# \1'
+
+    - name: Comment any existing /scratch fstab entries (avoid conflicts)
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^(?!#)(.*\s+/scratch\s+.*)$'
+        replace: '# \1'
+
+    - name: Wipe filesystem signatures from the whole disk (destructive)
+      ansible.builtin.command: "wipefs -a {{ data_disk }}"
+      register: wipefs_out
+      changed_when: wipefs_out.rc == 0
+
+    - name: Create GPT label on disk
+      ansible.builtin.command: "parted -s {{ data_disk }} mklabel gpt"
+      changed_when: true
+
+    - name: Create /data partition (0% - 50%)
+      ansible.builtin.command: "parted -s {{ data_disk }} mkpart data xfs 0% 50%"
+      changed_when: true
+
+    - name: Create /scratch partition (50% - 100%)
+      ansible.builtin.command: "parted -s {{ data_disk }} mkpart scratch xfs 50% 100%"
+      changed_when: true
+
+    - name: Inform kernel of partition changes
+      ansible.builtin.command: "partprobe {{ data_disk }}"
+      changed_when: false
+      failed_when: false
+
+    - name: Create XFS filesystem on /data partition
+      community.general.filesystem:
+        fstype: xfs
+        dev: "{{ part_data }}"
+        force: true
+
+    - name: Create XFS filesystem on /scratch partition
+      community.general.filesystem:
+        fstype: xfs
+        dev: "{{ part_scratch }}"
+        force: true
+
+    - name: Get UUID for /data partition
+      ansible.builtin.command: "blkid -s UUID -o value {{ part_data }}"
+      register: uuid_data
+      changed_when: false
+
+    - name: Get UUID for /scratch partition
+      ansible.builtin.command: "blkid -s UUID -o value {{ part_scratch }}"
+      register: uuid_scratch
+      changed_when: false
+
+    - name: Add /data entry to fstab (safe automount)
+      ansible.posix.mount:
+        path: "{{ mp_data }}"
+        src: "UUID={{ uuid_data.stdout }}"
+        fstype: xfs
+        opts: "{{ fstab_opts }}"
+        state: present
+
+    - name: Add /scratch entry to fstab (safe automount)
+      ansible.posix.mount:
+        path: "{{ mp_scratch }}"
+        src: "UUID={{ uuid_scratch.stdout }}"
+        fstype: xfs
+        opts: "{{ fstab_opts }}"
+        state: present
+
+    - name: Reload systemd to acknowledge automount entries
+      ansible.builtin.command: "systemctl daemon-reload"
+      changed_when: false
+
+    - name: Trigger automount /data (validation)
+      ansible.builtin.command: "ls {{ mp_data }}"
+      changed_when: false
+      
+    - name: Trigger automounts /scratch (validation)
+      ansible.builtin.command: "ls {{ mp_scratch }}"
+      changed_when: false
+      
+    - name: Show final df for /data and /scratch
+      ansible.builtin.command: "df -h {{ mp_data }} {{ mp_scratch }}"
+      register: df_out
+      changed_when: false
+
+    - name: Print df output
+      ansible.builtin.debug:
+        var: df_out.stdout_lines

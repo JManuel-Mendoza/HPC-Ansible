@@ -1,0 +1,85 @@
+---
+- name: Preparar entorno LLM en master y workers
+  hosts: hpc_master:workers    # grupos de tu inventario
+  become: true
+
+  vars:
+    llm_env_path: /opt/llm-env
+    python_bin: /usr/bin/python3    # Python 3.9 de Rocky
+
+  tasks:
+    - name: Instalar paquetes de sistema necesarios
+      package:
+        name:
+          - python3
+          - python3-pip
+          - python3-devel
+          - gcc
+          - gcc-c++
+          - make
+          - git
+          - tmux
+          - htop
+        state: present
+
+    - name: Crear directorio del entorno LLM
+      file:
+        path: "{{ llm_env_path }}"
+        state: directory
+        owner: sistemas
+        group: sistemas
+        mode: "0755"
+
+    - name: Crear virtualenv si no existe
+      command:
+        cmd: "{{ python_bin }} -m venv {{ llm_env_path }}"
+        creates: "{{ llm_env_path }}/bin/activate"
+
+    - name: Actualizar pip dentro del entorno
+      command:
+        cmd: "{{ llm_env_path }}/bin/pip install --upgrade pip"
+
+    # ---- PyTorch (CUDA 11.8) con versiones fijas ----
+    - name: Instalar PyTorch + torchvision + torchaudio (CUDA 11.8)
+      command:
+        cmd: >
+          {{ llm_env_path }}/bin/pip install
+          torch==2.2.2
+          torchvision==0.17.2
+          torchaudio==2.2.2
+          --index-url https://download.pytorch.org/whl/cu118
+
+    # ---- Resto del stack LLM con versiones fijas ----
+    - name: Crear requirements del entorno LLM
+      copy:
+        dest: "{{ llm_env_path }}/requirements-llm.txt"
+        owner: sistemas
+        group: sistemas
+        mode: "0644"
+        content: |
+          # Hugging Face y utilidades principales
+          transformers==4.45.1
+          datasets==3.1.0
+          accelerate==1.10.1
+          peft==0.17.1
+          huggingface-hub==1.2.1
+          sentencepiece==0.2.0
+
+          # Métricas y logging
+          evaluate==0.4.3
+          tensorboard==2.17.0
+          tqdm==4.66.5
+
+          # Si más adelante quieres cuantización 4-bit/8-bit, puedes añadir:
+          # bitsandbytes==0.43.3
+
+    - name: Instalar librerías LLM desde requirements
+      command:
+        cmd: "{{ llm_env_path }}/bin/pip install -r {{ llm_env_path }}/requirements-llm.txt"
+
+    - name: Verificar que se pueden importar las librerías principales
+      command:
+        cmd: >
+          {{ llm_env_path }}/bin/python -c
+          'import torch, transformers, datasets, accelerate, peft;
+          print("LLM stack OK")'

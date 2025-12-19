@@ -1,0 +1,18 @@
+---
+- name: Asegurar firewalld instalado
+  ansible.builtin.dnf:
+    name: firewalld
+    state: present
+
+- name: Habilitar firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Permitir SSH
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: true
+    state: enabled
+    immediate: true

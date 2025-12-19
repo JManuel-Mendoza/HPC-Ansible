@@ -1,0 +1,25 @@
+---
+- name: Instalar nfs-utils
+  ansible.builtin.dnf:
+    name: nfs-utils
+    state: present
+
+- name: Asegurar directorios exportados existen
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ nfs_exports }}"
+
+- name: Configurar /etc/exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: /etc/exports
+    mode: "0644"
+  notify: Reload exports
+
+- name: Habilitar y arrancar nfs-server
+  ansible.builtin.service:
+    name: nfs-server
+    state: started
+    enabled: true

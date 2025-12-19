@@ -1,0 +1,27 @@
+- name: Configurar enlace punto a punto entre worker1 y worker2
+  hosts: worker1,worker2
+  become: yes
+
+  vars:
+    w1_if: "enp3s0f3"        # cambia estos nombres según tu ip a
+    w2_if: "enp3s0f3"
+    w1_ip: "192.168.34.65/30"
+    w2_ip: "192.168.34.66/30"
+
+  tasks:
+
+    - name: Configurar interfaz en worker1
+      when: inventory_hostname == "worker1"
+      ansible.builtin.shell: |
+        nmcli con delete w1-w2 || true
+        nmcli con add type ethernet ifname {{ w1_if }} con-name w1-w2 \
+          ipv4.addresses {{ w1_ip }} ipv4.method manual
+      changed_when: true
+
+    - name: Configurar interfaz en worker2
+      when: inventory_hostname == "worker2"
+      ansible.builtin.shell: |
+        nmcli con delete w2-w1 || true
+        nmcli con add type ethernet ifname {{ w2_if }} con-name w2-w1 \
+          ipv4.addresses {{ w2_ip }} ipv4.method manual
+      changed_when: true

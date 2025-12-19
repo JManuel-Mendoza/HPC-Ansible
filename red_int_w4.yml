@@ -1,0 +1,31 @@
+- name: Configurar red interna punto a punto entre master y worker4
+  hosts:
+    - master
+    - worker4
+  become: yes
+
+  vars:
+    master_if: "enp3s0f0"
+    master_ip: "10.10.4.1/30"
+
+    worker4_if: "enp3s0f0"
+    worker4_ip: "10.10.4.2/30"
+
+  tasks:
+    - name: Configurar interfaz interna en el master para worker4
+      when: inventory_hostname == "master"
+      ansible.builtin.shell: |
+        nmcli con show int-worker4 >/dev/null 2>&1 || \
+        nmcli con add type ethernet ifname {{ master_if }} con-name int-worker4 \
+          ipv4.method manual ipv4.addresses {{ master_ip }} ipv6.method ignore
+        nmcli con mod int-worker4 ipv4.addresses {{ master_ip }}
+        nmcli con up int-worker4
+
+    - name: Configurar interfaz interna en worker4
+      when: inventory_hostname == "worker4"
+      ansible.builtin.shell: |
+        nmcli con show int-master >/dev/null 2>&1 || \
+        nmcli con add type ethernet ifname {{ worker4_if }} con-name int-master \
+          ipv4.method manual ipv4.addresses {{ worker4_ip }} ipv6.method ignore
+        nmcli con mod int-master ipv4.addresses {{ worker4_ip }}
+        nmcli con up int-master

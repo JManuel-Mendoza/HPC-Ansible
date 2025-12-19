@@ -1,0 +1,6 @@
+nfs_mounts:
+  - src: "master:/export/llm-project"
+    path: /mnt/llm-project
+    fstype: nfs
+    opts: "_netdev,nofail,x-systemd.device-timeout=10"
+

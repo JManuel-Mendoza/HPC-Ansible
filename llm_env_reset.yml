@@ -1,0 +1,24 @@
+---
+- name: Resetear entorno LLM y dejarlo en blanco
+  hosts: all          # master, worker1, worker2
+  become: true
+
+  vars:
+    llm_env_path: /opt/llm-env
+
+  tasks:
+    - name: Asegurar que no haya procesos usando el entorno (best effort)
+      ansible.builtin.shell: |
+        fuser -km {{ llm_env_path }} || true
+      ignore_errors: true
+
+    - name: Borrar el entorno virtual LLM
+      ansible.builtin.file:
+        path: "{{ llm_env_path }}"
+        state: absent
+
+    - name: Limpiar caché de pip del entorno (por si quedó algo)
+      ansible.builtin.file:
+        path: /root/.cache/pip
+        state: absent
+      ignore_errors: true

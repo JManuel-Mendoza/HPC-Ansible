@@ -1,0 +1,23 @@
+- name: Configuración base de todos los nodos
+  hosts: all
+  become: yes
+  tasks:
+    - name: Habilitar el repositorio EPEL
+      dnf:
+        name: epel-release
+        state: present
+
+    - name: Actualizar todos los paquetes
+      dnf:
+        name: "*"
+        state: latest
+
+    - name: Instalar herramientas de monitoreo base
+      dnf:
+        name:
+          - htop
+          - iftop
+          - nload
+          - bmon
+        state: present
+

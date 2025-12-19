@@ -1,0 +1,95 @@
+---
+- name: Validate | Show hostname and OS
+  ansible.builtin.command: "uname -a"
+  register: uname_out
+  changed_when: false
+  tags: ["validate"]
+
+- name: Validate | Print uname
+  ansible.builtin.debug:
+    var: uname_out.stdout
+  tags: ["validate"]
+
+- name: Validate | Ping master from all nodes (DNS/hosts)
+  ansible.builtin.command: "ping -c 1 -W 1 master"
+  register: ping_master
+  changed_when: false
+  failed_when: false
+  tags: ["validate", "validate_network"]
+
+- name: Validate | Print ping result (informational)
+  ansible.builtin.debug:
+    msg: "ping master rc={{ ping_master.rc }}"
+  tags: ["validate", "validate_network"]
+
+# --- NFS checks ---
+- name: Validate | Check NFS server active (master only)
+  ansible.builtin.command: "systemctl is-active nfs-server"
+  register: nfs_server_active
+  changed_when: false
+  failed_when: false
+  when: validate_nfs | bool and ('hpc_master' in group_names)
+  tags: ["validate", "validate_nfs"]
+
+- name: Validate | Print NFS server status
+  ansible.builtin.debug:
+    msg: "nfs-server is-active={{ nfs_server_active.stdout | default('unknown') }}"
+  when: validate_nfs | bool and ('hpc_master' in group_names)
+  tags: ["validate", "validate_nfs"]
+
+- name: Validate | Check exports file contains expected export (master only)
+  ansible.builtin.command: "grep -E '^{{ validate_nfs_export_path }}\\s' /etc/exports"
+  register: exports_grep
+  changed_when: false
+  failed_when: false
+  when: validate_nfs | bool and ('hpc_master' in group_names)
+  tags: ["validate", "validate_nfs"]
+
+- name: Validate | Print exports check
+  ansible.builtin.debug:
+    msg: "exports contains {{ validate_nfs_export_path }}: {{ (exports_grep.rc == 0) | ternary('yes','no') }}"
+  when: validate_nfs | bool and ('hpc_master' in group_names)
+  tags: ["validate", "validate_nfs"]
+
+- name: Validate | Check NFS mount present (workers)
+  ansible.builtin.command: "findmnt -n {{ validate_nfs_mount_path }}"
+  register: findmnt_out
+  changed_when: false
+  failed_when: false
+  when: validate_nfs | bool and ('workers' in group_names)
+  tags: ["validate", "validate_nfs"]
+
+- name: Validate | Print findmnt (workers)
+  ansible.builtin.debug:
+    msg: "findmnt {{ validate_nfs_mount_path }} rc={{ findmnt_out.rc }}"
+  when: validate_nfs | bool and ('workers' in group_names)
+  tags: ["validate", "validate_nfs"]
+
+# --- LLM env checks ---
+- name: Validate | Python version
+  ansible.builtin.command: "python3 --version"
+  register: pyver
+  changed_when: false
+  failed_when: false
+  when: validate_llm | bool
+  tags: ["validate", "validate_llm"]
+
+- name: Validate | Print Python version
+  ansible.builtin.debug:
+    var: pyver.stdout
+  when: validate_llm | bool
+  tags: ["validate", "validate_llm"]
+
+- name: Validate | Check pip packages (torch, transformers)
+  ansible.builtin.command: "python3 -c \"import torch, transformers; print('torch', torch.__version__); print('transformers', transformers.__version__)\""
+  register: llm_pkgs
+  changed_when: false
+  failed_when: false
+  when: validate_llm | bool
+  tags: ["validate", "validate_llm"]
+
+- name: Validate | Print LLM package versions
+  ansible.builtin.debug:
+    var: llm_pkgs.stdout_lines
+  when: validate_llm | bool
+  tags: ["validate", "validate_llm"]

@@ -1,0 +1,20 @@
+common_packages:
+  - git
+  - curl
+  - wget
+  - vim
+  - rsync
+  - tar
+  - unzip
+  - htop
+
+enable_chrony: true
+
+ssh_port: 22
+ssh_permit_root_login: "no"
+ssh_password_authentication: "no"
+
+llm_python_packages:
+  - numpy
+  - torch
+  - transformers

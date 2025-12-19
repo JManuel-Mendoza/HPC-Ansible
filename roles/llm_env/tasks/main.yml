@@ -1,0 +1,12 @@
+---
+- name: Instalar Python y pip
+  ansible.builtin.dnf:
+    name:
+      - python3
+      - python3-pip
+    state: present
+
+- name: Instalar paquetes Python para LLM
+  ansible.builtin.pip:
+    name: "{{ llm_python_packages }}"
+    state: present

@@ -1,0 +1,83 @@
+- name: Configurar red interna del cluster
+  hosts: all
+  become: yes
+  vars:
+    # Interfaces internas
+    master_to_worker1_if: "enp3s0f1"
+    master_to_worker2_if: "enp3s0f2"
+    worker_if: "eno1"
+
+  tasks:
+    ########################################################
+    # 1) MASTER: configurar enlaces punto-a-punto
+    ########################################################
+    - name: Configurar enlace master <-> worker1 (master lado)
+      when: inventory_hostname == "master"
+      ansible.builtin.shell: |
+        nmcli con show link-worker1 >/dev/null 2>&1 || \
+        nmcli con add type ethernet ifname {{ master_to_worker1_if }} con-name link-worker1 ipv4.method manual ipv4.addresses 10.10.1.1/30 ipv6.method ignore
+        nmcli con up link-worker1
+      args:
+        warn: false
+
+    - name: Configurar enlace master <-> worker2 (master lado)
+      when: inventory_hostname == "master"
+      ansible.builtin.shell: |
+        nmcli con show link-worker2 >/dev/null 2>&1 || \
+        nmcli con add type ethernet ifname {{ master_to_worker2_if }} con-name link-worker2 ipv4.method manual ipv4.addresses 10.10.2.1/30 ipv6.method ignore
+        nmcli con up link-worker2
+      args:
+        warn: false
+
+    ########################################################
+    # 2) WORKERS: configurar enlace hacia el master
+    ########################################################
+    - name: Borrar conexión automática vieja (si existe) en workers
+      when: inventory_hostname in ["worker1", "worker2"]
+      ansible.builtin.shell: |
+        nmcli con show "Wired connection 1" >/dev/null 2>&1 && \
+        nmcli con down "Wired connection 1" && \
+        nmcli con delete "Wired connection 1" || true
+      args:
+        warn: false
+
+    - name: Configurar enlace interno en worker1
+      when: inventory_hostname == "worker1"
+      ansible.builtin.shell: |
+        nmcli con show master-link >/dev/null 2>&1 || \
+        nmcli con add type ethernet ifname {{ worker_if }} con-name master-link \
+          ipv4.method manual ipv4.addresses 10.10.1.2/30 \
+          ipv4.gateway 10.10.1.1 ipv4.dns 8.8.8.8 ipv6.method ignore
+        nmcli con up master-link
+      args:
+        warn: false
+
+    - name: Configurar enlace interno en worker2
+      when: inventory_hostname == "worker2"
+      ansible.builtin.shell: |
+        nmcli con show master-link >/dev/null 2>&1 || \
+        nmcli con add type ethernet ifname {{ worker_if }} con-name master-link \
+          ipv4.method manual ipv4.addresses 10.10.2.2/30 \
+          ipv4.gateway 10.10.2.1 ipv4.dns 8.8.8.8 ipv6.method ignore
+        nmcli con up master-link
+      args:
+        warn: false
+
+    ########################################################
+    # 3) MASTER: habilitar forwarding + NAT (opcional)
+    ########################################################
+    - name: Habilitar IP forwarding en master
+      when: inventory_hostname == "master"
+      ansible.builtin.shell: |
+        echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-ipforward.conf
+        sysctl --system
+      args:
+        warn: false
+
+    - name: Habilitar masquerade (NAT) en interfaz externa del master
+      when: inventory_hostname == "master"
+      ansible.builtin.shell: |
+        firewall-cmd --permanent --zone=public --add-masquerade
+        firewall-cmd --reload
+      args:
+        warn: false
