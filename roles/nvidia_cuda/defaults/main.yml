@@ -1,0 +1,10 @@
+---
+nvidia_cuda_enabled: true
+nvidia_cuda_repo_file: "/etc/yum.repos.d/cuda-rhel9.repo"
+nvidia_cuda_repo_url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo"
+
+nvidia_cuda_toolkit_pkg: "cuda-toolkit-12-4"
+nvidia_cuda_driver_pkg: "cuda-drivers"
+
+# Si true, reinicia el nodo cuando se instalen drivers o se cambie initramfs
+nvidia_cuda_auto_reboot: false

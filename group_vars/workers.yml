@@ -1,6 +1,6 @@
+# Montaje NFS del proyecto LLM (workers)
 nfs_mounts:
-  - src: "master:/export/llm-project"
-    path: /mnt/llm-project
+  - src: "master:{{ llm_nfs_export_dir }}"
+    path: "{{ llm_nfs_mount_dir }}"
     fstype: nfs
-    opts: "_netdev,nofail,x-systemd.device-timeout=10"
-
+    opts: "_netdev,nofail,x-systemd.device-timeout=10,rw,hard,intr"

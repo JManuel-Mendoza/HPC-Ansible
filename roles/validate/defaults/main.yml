@@ -1,15 +1,11 @@
 ---
 validate_nfs: true
+validate_cuda: true
 validate_llm: true
 
-# Montaje esperado en workers (si usas NFS)
-validate_nfs_mount_path: "/mnt/llm-project"
+validate_nfs_mount_path: "{{ llm_nfs_mount_dir | default('/mnt/llm-project') }}"
+validate_nfs_export_path: "{{ llm_nfs_export_dir | default('/export/llm-project') }}"
 
-# Export esperado en master (si usas NFS)
-validate_nfs_export_path: "/export/llm-project"
-
-#Mejoras
-#validate_strict: true
-#validate_report: true
-#validate_report_dir: "./reports"
-#validate_report_filename: "cluster_validate.yml"
+llm_micromamba_root: "/opt/micromamba"
+llm_micromamba_bin: "/opt/micromamba/bin/micromamba"
+llm_env_name: "llm"

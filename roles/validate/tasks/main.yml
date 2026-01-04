@@ -1,95 +1,66 @@
 ---
 - name: Validate | Show hostname and OS
-  ansible.builtin.command: "uname -a"
+  ansible.builtin.command: uname -a
   register: uname_out
   changed_when: false
-  tags: ["validate"]
 
 - name: Validate | Print uname
   ansible.builtin.debug:
     var: uname_out.stdout
-  tags: ["validate"]
 
-- name: Validate | Ping master from all nodes (DNS/hosts)
-  ansible.builtin.command: "ping -c 1 -W 1 master"
-  register: ping_master
+- name: Validate | Check SSH password auth effective config (sshd -T)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    sshd -T | egrep -i 'passwordauthentication|usepam|kbdinteractiveauthentication|port|permitrootlogin'
+  args:
+    executable: /bin/bash
+  register: sshd_t
   changed_when: false
-  failed_when: false
-  tags: ["validate", "validate_network"]
 
-- name: Validate | Print ping result (informational)
+- name: Validate | Print sshd -T relevant lines
   ansible.builtin.debug:
-    msg: "ping master rc={{ ping_master.rc }}"
-  tags: ["validate", "validate_network"]
+    var: sshd_t.stdout_lines
 
-# --- NFS checks ---
-- name: Validate | Check NFS server active (master only)
-  ansible.builtin.command: "systemctl is-active nfs-server"
-  register: nfs_server_active
+- name: Validate | NFS export exists on master
+  ansible.builtin.stat:
+    path: "{{ validate_nfs_export_path }}"
+  register: st_export
+  when: validate_nfs | bool and inventory_hostname in groups.get('hpc_master', [])
+
+- name: Validate | Fail if NFS export dir missing on master
+  ansible.builtin.fail:
+    msg: "NFS export path missing on master: {{ validate_nfs_export_path }}"
+  when: validate_nfs | bool and inventory_hostname in groups.get('hpc_master', []) and not st_export.stat.exists
+
+- name: Validate | NFS mount exists on workers
+  ansible.builtin.stat:
+    path: "{{ validate_nfs_mount_path }}"
+  register: st_mount
+  when: validate_nfs | bool and inventory_hostname in groups.get('workers', [])
+
+- name: Validate | Fail if NFS mount dir missing on worker
+  ansible.builtin.fail:
+    msg: "NFS mount path missing on worker: {{ validate_nfs_mount_path }}"
+  when: validate_nfs | bool and inventory_hostname in groups.get('workers', []) and not st_mount.stat.exists
+
+- name: Validate | Check nvidia-smi
+  ansible.builtin.command: nvidia-smi -L
+  register: nvsmi
   changed_when: false
-  failed_when: false
-  when: validate_nfs | bool and ('hpc_master' in group_names)
-  tags: ["validate", "validate_nfs"]
+  failed_when: validate_cuda | bool and (nvsmi.rc != 0)
 
-- name: Validate | Print NFS server status
+- name: Validate | Print nvidia-smi
   ansible.builtin.debug:
-    msg: "nfs-server is-active={{ nfs_server_active.stdout | default('unknown') }}"
-  when: validate_nfs | bool and ('hpc_master' in group_names)
-  tags: ["validate", "validate_nfs"]
+    var: nvsmi.stdout_lines
 
-- name: Validate | Check exports file contains expected export (master only)
-  ansible.builtin.command: "grep -E '^{{ validate_nfs_export_path }}\\s' /etc/exports"
-  register: exports_grep
+- name: Validate | Check Torch CUDA inside micromamba env
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
+    python -c "import torch; print(torch.__version__); print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"
+  register: torch_cuda
   changed_when: false
-  failed_when: false
-  when: validate_nfs | bool and ('hpc_master' in group_names)
-  tags: ["validate", "validate_nfs"]
+  failed_when: validate_llm | bool and ('cuda True' not in torch_cuda.stdout)
 
-- name: Validate | Print exports check
+- name: Validate | Print Torch CUDA check
   ansible.builtin.debug:
-    msg: "exports contains {{ validate_nfs_export_path }}: {{ (exports_grep.rc == 0) | ternary('yes','no') }}"
-  when: validate_nfs | bool and ('hpc_master' in group_names)
-  tags: ["validate", "validate_nfs"]
-
-- name: Validate | Check NFS mount present (workers)
-  ansible.builtin.command: "findmnt -n {{ validate_nfs_mount_path }}"
-  register: findmnt_out
-  changed_when: false
-  failed_when: false
-  when: validate_nfs | bool and ('workers' in group_names)
-  tags: ["validate", "validate_nfs"]
-
-- name: Validate | Print findmnt (workers)
-  ansible.builtin.debug:
-    msg: "findmnt {{ validate_nfs_mount_path }} rc={{ findmnt_out.rc }}"
-  when: validate_nfs | bool and ('workers' in group_names)
-  tags: ["validate", "validate_nfs"]
-
-# --- LLM env checks ---
-- name: Validate | Python version
-  ansible.builtin.command: "python3 --version"
-  register: pyver
-  changed_when: false
-  failed_when: false
-  when: validate_llm | bool
-  tags: ["validate", "validate_llm"]
-
-- name: Validate | Print Python version
-  ansible.builtin.debug:
-    var: pyver.stdout
-  when: validate_llm | bool
-  tags: ["validate", "validate_llm"]
-
-- name: Validate | Check pip packages (torch, transformers)
-  ansible.builtin.command: "python3 -c \"import torch, transformers; print('torch', torch.__version__); print('transformers', transformers.__version__)\""
-  register: llm_pkgs
-  changed_when: false
-  failed_when: false
-  when: validate_llm | bool
-  tags: ["validate", "validate_llm"]
-
-- name: Validate | Print LLM package versions
-  ansible.builtin.debug:
-    var: llm_pkgs.stdout_lines
-  when: validate_llm | bool
-  tags: ["validate", "validate_llm"]
+    var: torch_cuda.stdout_lines

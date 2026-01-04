@@ -1,19 +1,4 @@
-#nfs_exports:
-#  - path: /export/llm-project
-#    clients: "192.168.34.0/24(rw,sync,no_subtree_check)"
-
----
-nfs_export_path: /export/llm-project
-
-# AJUSTA a tu red interna real
-nfs_allowed_cidr: "192.168.34.0/24"
-
-# opciones export
-nfs_export_opts: "rw,sync,no_subtree_check,no_root_squash"
-
-# firewall services
-nfs_firewalld_services:
-  - nfs
-  - rpc-bind
-  - mountd
-
+# Export NFS del proyecto LLM (master)
+nfs_exports:
+  - path: "{{ llm_nfs_export_dir }}"
+    clients: "{{ llm_internal_cidr }}(rw,sync,no_subtree_check,root_squash)"

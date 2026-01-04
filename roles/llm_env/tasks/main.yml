@@ -1,12 +1,91 @@
 ---
-- name: Instalar Python y pip
+- name: LLM Env | Ensure base packages
   ansible.builtin.dnf:
     name:
-      - python3
-      - python3-pip
+      - bzip2
+      - tar
+      - curl
+      - ca-certificates
     state: present
+    update_cache: true
 
-- name: Instalar paquetes Python para LLM
-  ansible.builtin.pip:
-    name: "{{ llm_python_packages }}"
-    state: present
+- name: LLM Env | Ensure micromamba root exists
+  ansible.builtin.file:
+    path: "{{ llm_micromamba_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: LLM Env | Download micromamba (latest)
+  ansible.builtin.get_url:
+    url: "https://micro.mamba.pm/api/micromamba/linux-64/latest"
+    dest: "/tmp/micromamba.tar.bz2"
+    mode: "0644"
+
+- name: LLM Env | Extract micromamba
+  ansible.builtin.unarchive:
+    src: "/tmp/micromamba.tar.bz2"
+    dest: "{{ llm_micromamba_root }}"
+    remote_src: true
+    creates: "{{ llm_micromamba_root }}/bin/micromamba"
+
+- name: LLM Env | Ensure micromamba profile
+  ansible.builtin.copy:
+    dest: /etc/profile.d/micromamba.sh
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (llm_env role)
+      export MAMBA_ROOT_PREFIX="{{ llm_micromamba_root }}"
+      export PATH="{{ llm_micromamba_root }}/bin:$PATH"
+
+- name: LLM Env | Check if env exists
+  ansible.builtin.stat:
+    path: "{{ llm_micromamba_root }}/envs/{{ llm_env_name }}"
+  register: _env_stat
+
+- name: LLM Env | Create env (first time)
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} create -y -n {{ llm_env_name }}
+    {% for c in llm_conda_channels %} -c {{ c }}{% endfor %}
+    {% for p in llm_conda_packages %} {{ p }}{% endfor %}
+  when: not _env_stat.stat.exists
+  register: _mamba_create
+  changed_when: true
+
+- name: LLM Env | Install/update conda packages in existing env
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} install -y -n {{ llm_env_name }}
+    {% for c in llm_conda_channels %} -c {{ c }}{% endfor %}
+    {% for p in llm_conda_packages %} {{ p }}{% endfor %}
+  when: _env_stat.stat.exists
+  register: _mamba_install
+  changed_when: true
+
+- name: LLM Env | Install pip packages inside env
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
+    python -m pip install --upgrade {% for p in llm_pip_packages %} {{ p }}{% endfor %}
+  when: llm_pip_packages | length > 0
+  register: _pip_install
+  changed_when: true
+
+- name: LLM Env | Drop env check helper
+  ansible.builtin.copy:
+    dest: "{{ llm_micromamba_root }}/bin/llm-env-check"
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      export MAMBA_ROOT_PREFIX="{{ llm_micromamba_root }}"
+      exec "{{ llm_micromamba_bin }}" run -n "{{ llm_env_name }}" python - <<'PY'
+      import sys
+      import torch
+      print("python:", sys.version.replace("\n"," "))
+      print("torch:", torch.__version__)
+      print("cuda_available:", torch.cuda.is_available())
+      if torch.cuda.is_available():
+          print("cuda_device:", torch.cuda.get_device_name(0))
+      PY

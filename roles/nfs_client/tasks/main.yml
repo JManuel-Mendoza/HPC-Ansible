@@ -1,26 +1,23 @@
 ---
-- name: Instalar nfs-utils
+- name: NFS Client | Install packages
   ansible.builtin.dnf:
-    name: nfs-utils
+    name:
+      - nfs-utils
     state: present
+    update_cache: true
 
-- name: Asegurar puntos de montaje existen
+- name: NFS Client | Ensure mount points exist
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
-    mode: "0755"
+    mode: "0775"
   loop: "{{ nfs_mounts }}"
 
-- name: Declarar montajes NFS en fstab
-  ansible.posix.mount:
+- name: NFS Client | Ensure NFS mounts present and mounted
+  ansible.builtin.mount:
     path: "{{ item.path }}"
     src: "{{ item.src }}"
     fstype: "{{ item.fstype }}"
     opts: "{{ item.opts }}"
-    state: present
+    state: mounted
   loop: "{{ nfs_mounts }}"
-
-- name: Probar montaje (mount -a)
-  ansible.builtin.command: "mount -a"
-  changed_when: false
-  failed_when: false

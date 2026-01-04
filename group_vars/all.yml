@@ -7,14 +7,87 @@ common_packages:
   - tar
   - unzip
   - htop
+  - tmux
+  - jq
 
 enable_chrony: true
 
+# =====================
+# SSH (password habilitado)
+# =====================
 ssh_port: 22
 ssh_permit_root_login: "no"
-ssh_password_authentication: "no"
+ssh_password_authentication: "yes"
+ssh_pubkey_authentication: "yes"
+ssh_use_pam: "yes"
+ssh_kbdinteractive_authentication: "yes"
 
-llm_python_packages:
-  - numpy
-  - torch
-  - transformers
+# Opcional: restringir por grupos (vacío = sin restricción)
+ssh_allow_groups: []
+
+# =====================
+# NFS / rutas del proyecto LLM
+# =====================
+llm_internal_cidr: "192.168.34.0/24"
+llm_nfs_export_dir: "/export/llm-project"
+llm_nfs_mount_dir: "/mnt/llm-project"
+
+# =====================
+# NVIDIA Driver + CUDA Toolkit (RHEL/Rocky 9)
+# =====================
+nvidia_cuda_enabled: true
+nvidia_cuda_repo_file: "/etc/yum.repos.d/cuda-rhel9.repo"
+nvidia_cuda_repo_url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo"
+
+# Toolkit a instalar (ajustable)
+nvidia_cuda_toolkit_pkg: "cuda-toolkit-12-4"
+nvidia_cuda_driver_pkg: "cuda-drivers"
+
+# Si se cambia el driver/toolkit, puede requerir reboot para cargar el módulo nvidia.
+nvidia_cuda_auto_reboot: true
+
+# =====================
+# Entorno LLM (Micromamba + PyTorch con CUDA)
+# =====================
+llm_micromamba_root: "/opt/micromamba"
+llm_micromamba_bin: "/opt/micromamba/bin/micromamba"
+llm_env_name: "llm"
+
+# Para PyTorch con CUDA vía conda (recomendado).
+# Nota: pytorch-cuda suele estar disponible como 12.1; el driver/toolkit 12.4 lo soporta.
+llm_pytorch_cuda_version: "12.1"
+
+# Paquetes conda (canales pytorch + nvidia)
+llm_conda_packages:
+  - "python=3.11"
+  - "pip"
+  - "pytorch"
+  - "torchvision"
+  - "torchaudio"
+  - "pytorch-cuda={{ llm_pytorch_cuda_version }}"
+
+llm_conda_channels:
+  - "pytorch"
+  - "nvidia"
+  - "conda-forge"
+
+# Paquetes pip dentro del env (stack HF + utilidades)
+llm_pip_packages:
+  - "numpy"
+  - "pyyaml"
+  - "tqdm"
+  - "regex"
+  - "datasets"
+  - "transformers"
+  - "accelerate"
+  - "tokenizers"
+  - "evaluate"
+  - "sentencepiece"
+  - "peft"
+
+# =====================
+# Validaciones
+# =====================
+validate_nfs: true
+validate_cuda: true
+validate_llm: true

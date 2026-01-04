@@ -1,0 +1,8 @@
+---
+ssh_port: 22
+ssh_permit_root_login: "no"
+ssh_password_authentication: "yes"
+ssh_pubkey_authentication: "yes"
+ssh_use_pam: "yes"
+ssh_kbdinteractive_authentication: "yes"
+ssh_allow_groups: []

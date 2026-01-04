@@ -1,0 +1,100 @@
+---
+- name: NVIDIA/CUDA | Install prerequisites
+  ansible.builtin.dnf:
+    name:
+      - dnf-plugins-core
+      - gcc
+      - gcc-c++
+      - make
+      - perl
+      - dkms
+      - elfutils-libelf-devel
+      - pciutils
+    state: present
+    update_cache: true
+
+- name: NVIDIA/CUDA | Install kernel headers/devel for current kernel (best effort)
+  ansible.builtin.dnf:
+    name:
+      - "kernel-devel-{{ ansible_kernel }}"
+      - "kernel-headers-{{ ansible_kernel }}"
+    state: present
+  register: _kver
+  ignore_errors: true
+
+- name: NVIDIA/CUDA | Fallback to generic kernel headers/devel if versioned packages not available
+  ansible.builtin.dnf:
+    name:
+      - kernel-devel
+      - kernel-headers
+    state: present
+  when: _kver is failed
+
+- name: NVIDIA/CUDA | Blacklist nouveau
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/blacklist-nouveau.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      blacklist nouveau
+      options nouveau modeset=0
+  register: _nouveau
+  notify: Rebuild initramfs
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Ensure NVIDIA CUDA repo file exists
+  ansible.builtin.get_url:
+    url: "{{ nvidia_cuda_repo_url }}"
+    dest: "{{ nvidia_cuda_repo_file }}"
+    mode: "0644"
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Install driver + toolkit
+  ansible.builtin.dnf:
+    name:
+      - "{{ nvidia_cuda_driver_pkg }}"
+      - "{{ nvidia_cuda_toolkit_pkg }}"
+    state: present
+  register: _cuda_install
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Add CUDA profile script
+  ansible.builtin.copy:
+    dest: /etc/profile.d/cuda.sh
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (nvidia_cuda role)
+      if [ -d /usr/local/cuda/bin ]; then
+        export PATH=/usr/local/cuda/bin:$PATH
+      fi
+      if [ -d /usr/local/cuda/lib64 ]; then
+        export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+      fi
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Flush handlers (initramfs) if any
+  ansible.builtin.meta: flush_handlers
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Auto reboot when enabled and driver/initramfs changed
+  ansible.builtin.reboot:
+    reboot_timeout: 1800
+  when:
+    - nvidia_cuda_enabled | bool
+    - nvidia_cuda_auto_reboot | bool
+    - (_cuda_install is changed) or (_nouveau is changed)
+
+- name: NVIDIA/CUDA | Check nvidia-smi
+  ansible.builtin.command: nvidia-smi -L
+  register: _nvidia_smi
+  changed_when: false
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Show nvidia-smi output
+  ansible.builtin.debug:
+    var: _nvidia_smi.stdout_lines
+  when: nvidia_cuda_enabled | bool

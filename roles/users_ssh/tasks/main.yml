@@ -1,12 +1,52 @@
 ---
-- name: Endurecer sshd_config
+- name: SSH | Ensure sshd service enabled
+  ansible.builtin.service:
+    name: sshd
+    state: started
+    enabled: true
+
+# En Rocky/RHEL modernos se usa Include /etc/ssh/sshd_config.d/*.conf
+- name: SSH | Ensure sshd_config includes sshd_config.d
   ansible.builtin.lineinfile:
     path: /etc/ssh/sshd_config
-    regexp: "^{{ item.key }}\\s+"
-    line: "{{ item.key }} {{ item.value }}"
+    regexp: '^Include\s+/etc/ssh/sshd_config\.d/\*\.conf$'
+    line: 'Include /etc/ssh/sshd_config.d/*.conf'
+    insertafter: EOF
     state: present
-  loop:
-    - { key: "Port", value: "{{ ssh_port }}" }
-    - { key: "PermitRootLogin", value: "{{ ssh_permit_root_login }}" }
-    - { key: "PasswordAuthentication", value: "{{ ssh_password_authentication }}" }
+
+- name: SSH | Ensure drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: SSH | Write drop-in config (99-hpc.conf)
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-hpc.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (users_ssh role)
+      Port {{ ssh_port }}
+      PermitRootLogin {{ ssh_permit_root_login }}
+      PasswordAuthentication {{ ssh_password_authentication }}
+      PubkeyAuthentication {{ ssh_pubkey_authentication }}
+      UsePAM {{ ssh_use_pam }}
+      KbdInteractiveAuthentication {{ ssh_kbdinteractive_authentication }}
+      {% if ssh_allow_groups | length > 0 %}
+      AllowGroups {{ ssh_allow_groups | join(' ') }}
+      {% endif %}
+
+      # Robust override (if other Match blocks disable passwords):
+      Match all
+          PasswordAuthentication {{ ssh_password_authentication }}
+          KbdInteractiveAuthentication {{ ssh_kbdinteractive_authentication }}
+          PubkeyAuthentication {{ ssh_pubkey_authentication }}
   notify: Restart sshd
+
+- name: SSH | Validate sshd configuration
+  ansible.builtin.command: sshd -t
+  changed_when: false

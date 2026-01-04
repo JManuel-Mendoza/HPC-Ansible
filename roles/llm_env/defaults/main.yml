@@ -1,0 +1,12 @@
+---
+llm_micromamba_root: "/opt/micromamba"
+llm_micromamba_bin: "/opt/micromamba/bin/micromamba"
+llm_env_name: "llm"
+
+llm_conda_channels:
+  - "pytorch"
+  - "nvidia"
+  - "conda-forge"
+
+llm_conda_packages: []
+llm_pip_packages: []
