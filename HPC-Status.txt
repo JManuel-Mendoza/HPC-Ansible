@@ -1,0 +1,91 @@
+.
+├── HPC-Status.txt
+├── README.md
+├── ansible.cfg
+├── base.yml
+├── group_vars
+│   ├── all.yml
+│   ├── hpc_master.yml
+│   └── workers.yml
+├── host_vars
+├── inventario.ini
+├── inventario_glob.ini
+├── ngrok.tgz
+├── playbooks sueltos
+│   ├── Acceso
+│   │   ├── bootstrap_sudo_nopasswd.yml
+│   │   ├── workers_lock.yml
+│   │   └── workers_unlock.yml
+│   ├── NFS
+│   │   └── nfs_hpc.yml
+│   ├── Particiones
+│   │   ├── set_boot_mount_data_scratch.yml
+│   │   ├── storage.bash
+│   │   └── storage_data_scratch.yml
+│   ├── Red
+│   │   ├── limpiar_red.yml
+│   │   ├── red_interna.yml
+│   │   ├── redconf.yml
+│   │   └── w1_w2_link.yml
+│   ├── ansible0.cfg
+│   ├── inventarios
+│   │   ├── inventario.ini
+│   │   └── inventario_glob.ini
+│   └── python env
+│       ├── llm_env.yml
+│       ├── llm_env311.yml
+│       └── llm_env_reset.yml
+├── requirements.yml
+├── roles
+│   ├── common
+│   │   ├── defaults
+│   │   ├── handlers
+│   │   ├── tasks
+│   │   │   └── main.yml
+│   │   └── templates
+│   ├── firewall
+│   │   ├── defaults
+│   │   ├── handlers
+│   │   ├── tasks
+│   │   │   └── main.yml
+│   │   └── templates
+│   ├── llm_env
+│   │   ├── defaults
+│   │   ├── handlers
+│   │   ├── tasks
+│   │   │   └── main.yml
+│   │   └── templates
+│   ├── network
+│   │   ├── defaults
+│   │   ├── handlers
+│   │   ├── tasks
+│   │   └── templates
+│   ├── nfs_client
+│   │   ├── defaults
+│   │   ├── handlers
+│   │   ├── tasks
+│   │   │   └── main.yml
+│   │   └── templates
+│   ├── nfs_server
+│   │   ├── defaults
+│   │   ├── handlers
+│   │   │   └── main.yml
+│   │   ├── tasks
+│   │   │   └── main.yml
+│   │   └── templates
+│   │       └── exports.j2
+│   ├── users_ssh
+│   │   ├── defaults
+│   │   ├── handlers
+│   │   │   └── main.yml
+│   │   ├── tasks
+│   │   │   └── main.yml
+│   │   └── templates
+│   └── validate
+│       ├── defaults
+│       │   └── main.yml
+│       └── tasks
+│           └── main.yml
+└── site.yml
+
+48 directories, 40 files
