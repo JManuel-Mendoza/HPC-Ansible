@@ -1,0 +1,238 @@
+● master
+    State: running
+    Units: 464 loaded (incl. loaded aliases)
+     Jobs: 0 queued
+   Failed: 0 units
+    Since: Wed 2026-01-07 04:57:45 -05; 1 week 0 days ago
+  systemd: 252-55.el9_7.7.rocky.0.1
+   CGroup: /
+           ├─init.scope
+           │ └─1 /usr/lib/systemd/systemd --system --deserialize 21
+           ├─system.slice
+           │ ├─ModemManager.service
+           │ │ └─135105 /usr/sbin/ModemManager
+           │ ├─NetworkManager.service
+           │ │ └─1391 /usr/sbin/NetworkManager --no-daemon
+           │ ├─accounts-daemon.service
+           │ │ └─1055 /usr/libexec/accounts-daemon
+           │ ├─alsa-state.service
+           │ │ └─134546 /usr/sbin/alsactl -s -n 19 -c -E ALSA_CONFIG_PATH=/etc/alsa/alsactl.conf --initfile=/lib/alsa/init/00main rdaemon
+           │ ├─atd.service
+           │ │ └─134550 /usr/sbin/atd -f
+           │ ├─auditd.service
+           │ │ ├─23501 /sbin/auditd
+           │ │ └─41877 /usr/sbin/sedispatch
+           │ ├─avahi-daemon.service
+           │ │ ├─134556 "avahi-daemon: running [master.local]"
+           │ │ └─134604 "avahi-daemon: chroot helper"
+           │ ├─chronyd.service
+           │ │ └─134771 /usr/sbin/chronyd -F 2
+           │ ├─colord.service
+           │ │ └─2385 /usr/libexec/colord
+           │ ├─crond.service
+           │ │ └─134565 /usr/sbin/crond -n
+           │ ├─cups.service
+           │ │ └─134573 /usr/sbin/cupsd -l
+           │ ├─dbus-broker.service
+           │ │ ├─1044 /usr/bin/dbus-broker-launch --scope system --audit
+           │ │ └─1045 dbus-broker --log 4 --controller 9 --machine-id ee31c86135474f8ebd198349829ab7a2 --max-bytes 536870912 --max-fds 4096 --max-matches 131072 --audit
+           │ ├─firewalld.service
+           │ │ └─1115 /usr/bin/python3 -s /usr/sbin/firewalld --nofork --nopid
+           │ ├─fwupd.service
+           │ │ └─170842 /usr/libexec/fwupd/fwupd
+           │ ├─gdm.service
+           │ │ └─1569 /usr/sbin/gdm
+           │ ├─gssproxy.service
+           │ │ └─1428 /usr/sbin/gssproxy -D
+           │ ├─irqbalance.service
+           │ │ └─134701 /usr/sbin/irqbalance
+           │ ├─libstoragemgmt.service
+           │ │ └─1050 /usr/bin/lsmd -d
+           │ ├─mcelog.service
+           │ │ └─1051 /usr/sbin/mcelog --daemon --foreground
+           │ ├─nfs-idmapd.service
+           │ │ └─1100 /usr/sbin/rpc.idmapd
+           │ ├─nfs-mountd.service
+           │ │ └─1571 /usr/sbin/rpc.mountd
+           │ ├─nfsdcld.service
+           │ │ └─1101 /usr/sbin/nfsdcld
+           │ ├─packagekit.service
+           │ │ └─182752 /usr/libexec/packagekitd
+           │ ├─polkit.service
+           │ │ └─134877 /usr/lib/polkit-1/polkitd --no-debug
+           │ ├─rpc-statd.service
+           │ │ └─1563 /usr/sbin/rpc.statd
+           │ ├─rpcbind.service
+           │ │ └─1015 /usr/bin/rpcbind -w -f
+           │ ├─rsyslog.service
+           │ │ └─134706 /usr/sbin/rsyslogd -n
+           │ ├─rtkit-daemon.service
+           │ │ └─1053 /usr/libexec/rtkit-daemon
+           │ ├─smartd.service
+           │ │ └─1054 /usr/sbin/smartd -n -q never --capabilities
+           │ ├─sshd.service
+           │ │ └─97739 "sshd: /usr/sbin/sshd -D [listener] 0 of 10-100 startups"
+           │ ├─sssd-kcm.service
+           │ │ └─17765 /usr/libexec/sssd/sssd_kcm --uid 0 --gid 0 --logger=files
+           │ ├─switcheroo-control.service
+           │ │ └─1056 /usr/libexec/switcheroo-control
+           │ ├─systemd-journald.service
+           │ │ └─134580 /usr/lib/systemd/systemd-journald
+           │ ├─systemd-logind.service
+           │ │ └─1059 /usr/lib/systemd/systemd-logind
+           │ ├─systemd-udevd.service
+           │ │ └─udev
+           │ │   └─134614 /usr/lib/systemd/systemd-udevd
+           │ ├─tailscaled.service
+           │ │ └─63551 /usr/sbin/tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/run/tailscale/tailscaled.sock --port=41641
+           │ ├─tuned-ppd.service
+           │ │ └─135964 /usr/bin/python3 -Es /usr/sbin/tuned-ppd -l
+           │ ├─tuned.service
+           │ │ └─135117 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+           │ ├─udisks2.service
+           │ │ └─134619 /usr/libexec/udisks2/udisksd
+           │ ├─upower.service
+           │ │ └─1061 /usr/libexec/upowerd
+           │ └─wpa_supplicant.service
+           │   └─2178 /usr/sbin/wpa_supplicant -c /etc/wpa_supplicant/wpa_supplicant.conf -u -s
+           └─user.slice
+             └─user-1000.slice
+               ├─session-2.scope
+               │ ├─17495 "gdm-session-worker [pam/gdm-password]"
+               │ ├─17522 /usr/bin/gnome-keyring-daemon --daemonize --login
+               │ ├─17536 /usr/libexec/gdm-wayland-session --register-session gnome-session
+               │ └─17541 /usr/libexec/gnome-session-binary
+               ├─session-6.scope
+               │ ├─182195 "sshd: sistemas [priv]"
+               │ ├─182199 "sshd: sistemas@pts/1"
+               │ └─182200 -bash
+               ├─session-8.scope
+               │ ├─182356 "sshd: sistemas [priv]"
+               │ ├─182359 "sshd: sistemas@pts/2"
+               │ ├─182360 -bash
+               │ └─182775 systemctl status
+               └─user@1000.service
+                 ├─app.slice
+                 │ ├─app-dbus\x2d:1.21\x2dorg.a11y.atspi.Registry.slice
+                 │ │ └─dbus-:1.21-org.a11y.atspi.Registry@0.service
+                 │ │   └─17803 /usr/libexec/at-spi2-registryd --use-gnome-session
+                 │ ├─app-dbus\x2d:1.2\x2dorg.freedesktop.portal.IBus.slice
+                 │ │ └─dbus-:1.2-org.freedesktop.portal.IBus@0.service
+                 │ │   └─17665 /usr/libexec/ibus-portal
+                 │ ├─app-dbus\x2d:1.2\x2dorg.gnome.Identity.slice
+                 │ │ └─dbus-:1.2-org.gnome.Identity@0.service
+                 │ │   └─17727 /usr/libexec/goa-identity-service
+                 │ ├─app-dbus\x2d:1.2\x2dorg.gnome.OnlineAccounts.slice
+                 │ │ └─dbus-:1.2-org.gnome.OnlineAccounts@0.service
+                 │ │   └─17705 /usr/libexec/goa-daemon
+                 │ ├─app-dbus\x2d:1.2\x2dorg.gnome.ScreenSaver.slice
+                 │ │ └─dbus-:1.2-org.gnome.ScreenSaver@0.service
+                 │ │   └─17934 /usr/bin/gjs /usr/share/gnome-shell/org.gnome.ScreenSaver
+                 │ ├─app-dbus\x2d:1.2\x2dorg.gnome.Shell.CalendarServer.slice
+                 │ │ └─dbus-:1.2-org.gnome.Shell.CalendarServer@0.service
+                 │ │   └─17673 /usr/libexec/gnome-shell-calendar-server
+                 │ ├─app-dbus\x2d:1.2\x2dorg.gnome.Shell.Notifications.slice
+                 │ │ └─dbus-:1.2-org.gnome.Shell.Notifications@0.service
+                 │ │   └─17799 /usr/bin/gjs /usr/share/gnome-shell/org.gnome.Shell.Notifications
+                 │ ├─app-gnome-org.gnome.Evolution\x2dalarm\x2dnotify-17870.scope
+                 │ │ └─17870 /usr/libexec/evolution-data-server/evolution-alarm-notify
+                 │ ├─app-gnome-org.gnome.SettingsDaemon.DiskUtilityNotify-17856.scope
+                 │ │ └─17856 /usr/libexec/gsd-disk-utility-notify
+                 │ ├─app-gnome-org.gnome.Software-17846.scope
+                 │ │ └─17846 /usr/bin/gnome-software --gapplication-service
+                 │ ├─app-gnome\x2dsession\x2dmanager.slice
+                 │ │ └─gnome-session-manager@gnome.service
+                 │ │   └─17593 /usr/libexec/gnome-session-binary --systemd-service --session=gnome
+                 │ ├─app-org.gnome.Terminal.slice
+                 │ │ ├─gnome-terminal-server.service
+                 │ │ │ └─18245 /usr/libexec/gnome-terminal-server
+                 │ │ └─vte-spawn-bc6065e2-ddfa-4025-afdb-55da7389a164.scope
+                 │ │   └─18263 bash
+                 │ ├─at-spi-dbus-bus.service
+                 │ │ ├─17640 /usr/libexec/at-spi-bus-launcher
+                 │ │ ├─17645 /usr/bin/dbus-broker-launch --config-file=/usr/share/defaults/at-spi2/accessibility.conf --scope user
+                 │ │ └─17646 dbus-broker --log 4 --controller 9 --machine-id ee31c86135474f8ebd198349829ab7a2 --max-bytes 100000000000000 --max-fds 6400000 --max-matches 5000000000
+                 │ ├─dbus-broker.service
+                 │ │ ├─17538 /usr/bin/dbus-broker-launch --scope user
+                 │ │ └─17539 dbus-broker --log 4 --controller 9 --machine-id ee31c86135474f8ebd198349829ab7a2 --max-bytes 100000000000000 --max-fds 25000000000000 --max-matches 5000000000
+                 │ ├─dconf.service
+                 │ │ └─17762 /usr/libexec/dconf-service
+                 │ ├─evolution-addressbook-factory.service
+                 │ │ └─17763 /usr/libexec/evolution-addressbook-factory
+                 │ ├─evolution-calendar-factory.service
+                 │ │ └─17714 /usr/libexec/evolution-calendar-factory
+                 │ ├─evolution-source-registry.service
+                 │ │ └─17684 /usr/libexec/evolution-source-registry
+                 │ ├─gnome-session-monitor.service
+                 │ │ └─17591 /usr/libexec/gnome-session-ctl --monitor
+                 │ ├─gvfs-daemon.service
+                 │ │ ├─17626 /usr/libexec/gvfsd
+                 │ │ └─17631 /usr/libexec/gvfsd-fuse /run/user/1000/gvfs -f
+                 │ ├─gvfs-goa-volume-monitor.service
+                 │ │ └─17772 /usr/libexec/gvfs-goa-volume-monitor
+                 │ ├─gvfs-gphoto2-volume-monitor.service
+                 │ │ └─17781 /usr/libexec/gvfs-gphoto2-volume-monitor
+                 │ ├─gvfs-metadata.service
+                 │ │ └─18315 /usr/libexec/gvfsd-metadata
+                 │ ├─gvfs-mtp-volume-monitor.service
+                 │ │ └─17764 /usr/libexec/gvfs-mtp-volume-monitor
+                 │ ├─gvfs-udisks2-volume-monitor.service
+                 │ │ └─17737 /usr/libexec/gvfs-udisks2-volume-monitor
+                 │ ├─xdg-desktop-portal-gnome.service
+                 │ │ └─18038 /usr/libexec/xdg-desktop-portal-gnome
+                 │ ├─xdg-desktop-portal-gtk.service
+                 │ │ └─18147 /usr/libexec/xdg-desktop-portal-gtk
+                 │ └─xdg-permission-store.service
+                 │   └─17675 /usr/libexec/xdg-permission-store
+                 ├─init.scope
+                 │ ├─17504 /usr/lib/systemd/systemd --user
+                 │ └─17506 "(sd-pam)"
+                 └─session.slice
+                   ├─org.gnome.SettingsDaemon.A11ySettings.service
+                   │ └─17806 /usr/libexec/gsd-a11y-settings
+                   ├─org.gnome.SettingsDaemon.Color.service
+                   │ └─17807 /usr/libexec/gsd-color
+                   ├─org.gnome.SettingsDaemon.Datetime.service
+                   │ └─17808 /usr/libexec/gsd-datetime
+                   ├─org.gnome.SettingsDaemon.Housekeeping.service
+                   │ └─17815 /usr/libexec/gsd-housekeeping
+                   ├─org.gnome.SettingsDaemon.Keyboard.service
+                   │ └─17818 /usr/libexec/gsd-keyboard
+                   ├─org.gnome.SettingsDaemon.MediaKeys.service
+                   │ └─17823 /usr/libexec/gsd-media-keys
+                   ├─org.gnome.SettingsDaemon.Power.service
+                   │ └─17826 /usr/libexec/gsd-power
+                   ├─org.gnome.SettingsDaemon.PrintNotifications.service
+                   │ ├─17838 /usr/libexec/gsd-print-notifications
+                   │ └─18121 /usr/libexec/gsd-printer
+                   ├─org.gnome.SettingsDaemon.Rfkill.service
+                   │ └─17839 /usr/libexec/gsd-rfkill
+                   ├─org.gnome.SettingsDaemon.ScreensaverProxy.service
+                   │ └─17841 /usr/libexec/gsd-screensaver-proxy
+                   ├─org.gnome.SettingsDaemon.Sharing.service
+                   │ └─17843 /usr/libexec/gsd-sharing
+                   ├─org.gnome.SettingsDaemon.Smartcard.service
+                   │ └─17845 /usr/libexec/gsd-smartcard
+                   ├─org.gnome.SettingsDaemon.Sound.service
+                   │ └─17849 /usr/libexec/gsd-sound
+                   ├─org.gnome.SettingsDaemon.UsbProtection.service
+                   │ └─17853 /usr/libexec/gsd-usb-protection
+                   ├─org.gnome.SettingsDaemon.Wacom.service
+                   │ └─17854 /usr/libexec/gsd-wacom
+                   ├─org.gnome.Shell@wayland.service
+                   │ ├─17609 /usr/bin/gnome-shell
+                   │ ├─17656 ibus-daemon --panel disable
+                   │ ├─17660 /usr/libexec/ibus-dconf
+                   │ ├─17661 /usr/libexec/ibus-extension-gtk3
+                   │ └─17962 /usr/libexec/ibus-engine-simple
+                   ├─pipewire-pulse.service
+                   │ └─17687 /usr/bin/pipewire-pulse
+                   ├─pipewire.service
+                   │ └─17685 /usr/bin/pipewire
+                   ├─wireplumber.service
+                   │ └─17686 /usr/bin/wireplumber
+                   ├─xdg-desktop-portal.service
+                   │ └─17985 /usr/libexec/xdg-desktop-portal
+                   └─xdg-document-portal.service
+                     ├─18020 /usr/libexec/xdg-document-portal
+                     └─18026 fusermount -o rw,nosuid,nodev,fsname=portal,auto_unmount,subtype=portal -- /run/user/1000/doc
