@@ -72,6 +72,10 @@
     {{ llm_micromamba_bin }} create -y -n {{ llm_env_name }}
     {% for c in llm_conda_channels %} -c {{ c }}{% endfor %}
     {% for p in llm_conda_packages %} {{ p }}{% endfor %}
+  args:
+    creates: "/opt/micromamba/envs/{{ llm_env_name }}/conda-meta/history"
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
   when: not _env_stat.stat.exists
   register: _mamba_create
   changed_when: true
@@ -81,17 +85,37 @@
     {{ llm_micromamba_bin }} install -y -n {{ llm_env_name }}
     {% for c in llm_conda_channels %} -c {{ c }}{% endfor %}
     {% for p in llm_conda_packages %} {{ p }}{% endfor %}
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
   when: _env_stat.stat.exists
-  register: _mamba_install
-  changed_when: true
+  register: conda_install
+  changed_when: "'All requested packages already installed' not in conda_install.stdout"
+
+- name: LLM Env | Compute pip marker hash
+  ansible.builtin.set_fact:
+    llm_pip_hash: "{{ llm_pip_packages | sort | join(' ') | hash('sha1') }}"
+  when: llm_pip_packages | length > 0
+
+- name: LLM Env | Check pip marker
+  ansible.builtin.stat:
+    path: "{{ llm_micromamba_root }}/envs/{{ llm_env_name }}/.llm_pip_installed_{{ llm_pip_hash }}"
+  register: _pip_marker
 
 - name: LLM Env | Install pip packages inside env
   ansible.builtin.command: >
     {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
-    python -m pip install --upgrade {% for p in llm_pip_packages %} {{ p }}{% endfor %}
-  when: llm_pip_packages | length > 0
+    pip install -U {% for p in llm_pip_packages %} {{ p }}{% endfor %}
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+  when: llm_pip_packages | length > 0 and not _pip_marker.stat.exists
   register: _pip_install
   changed_when: true
+
+- name: LLM Env | Mark pip packages installed
+  ansible.builtin.file:
+    path: "{{ llm_micromamba_root }}/envs/{{ llm_env_name }}/.llm_pip_installed_{{ llm_pip_hash }}"
+    state: touch
+  when: llm_pip_packages | length > 0 and _pip_install is changed
 
 - name: LLM Env | Drop env check helper
   ansible.builtin.copy:
