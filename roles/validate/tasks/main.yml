@@ -59,7 +59,15 @@
     python -c "import torch; print(torch.__version__); print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"
   register: torch_cuda
   changed_when: false
-  failed_when: validate_llm | bool and ('cuda True' not in torch_cuda.stdout)
+  failed_when: false
+
+- name: Validate | Fail if LLM env missing or Torch CUDA unavailable
+  ansible.builtin.fail:
+    msg: >-
+      LLM env check failed (rc={{ torch_cuda.rc }}). Ensure micromamba env
+      '{{ llm_env_name }}' exists and torch has CUDA. stdout={{ torch_cuda.stdout | default('') }}
+      stderr={{ torch_cuda.stderr | default('') }}
+  when: validate_llm | bool and (torch_cuda.rc != 0 or 'cuda True' not in torch_cuda.stdout)
 
 - name: Validate | Print Torch CUDA check
   ansible.builtin.debug:
