@@ -44,6 +44,13 @@
     creates: "{{ llm_micromamba_root }}/bin/micromamba"
   become: true
 
+- name: LLM Env | Symlink micromamba into /usr/local/bin
+  ansible.builtin.file:
+    src: "{{ llm_micromamba_root }}/bin/micromamba"
+    dest: "/usr/local/bin/micromamba"
+    state: link
+  become: true
+
 - name: LLM Env | Ensure micromamba profile
   ansible.builtin.copy:
     dest: /etc/profile.d/micromamba.sh
