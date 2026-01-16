@@ -19,9 +19,22 @@
 
 - name: LLM Env | Download micromamba (latest)
   ansible.builtin.get_url:
-    url: "https://micro.mamba.pm/api/micromamba/linux-64/latest"
+    url: "https://github.com/mamba-org/micromamba-releases/releases/latest/download/micromamba-linux-64.tar.bz2"
     dest: "/tmp/micromamba.tar.bz2"
     mode: "0644"
+  register: _micromamba_download
+  retries: 3
+  delay: 5
+  until: _micromamba_download is succeeded
+
+- name: LLM Env | Create micromamba install dir
+  ansible.builtin.file:
+    path: /opt/micromamba
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
 
 - name: LLM Env | Extract micromamba
   ansible.builtin.unarchive:
@@ -29,6 +42,7 @@
     dest: "{{ llm_micromamba_root }}"
     remote_src: true
     creates: "{{ llm_micromamba_root }}/bin/micromamba"
+  become: true
 
 - name: LLM Env | Ensure micromamba profile
   ansible.builtin.copy:
