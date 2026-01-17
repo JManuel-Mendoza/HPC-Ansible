@@ -424,3 +424,53 @@ critical libmamba 'mamba run' failed to lock (/home/sistemas/.cache/mamba/proc) 
 **Ansible commands (pendientes):**
 - `ansible-playbook -i inventario.ini site.yml --limit workers --tags cuda --diff`
 - `ansible-playbook -i inventario.ini site.yml --limit workers --tags cuda --diff` (segunda corrida idempotente)
+
+## 2026-01-17 13:16 (-05) — CUDA 580 milestone closure (master + workers)
+**Problem statement:** Pascal (Quadro P1000) breaks on R590/open modules; workers also lacked `nvidia-smi` due to provider mismatch. Symptoms included `nvidia-smi: command not found` and conflicts when the role selected a 515 provider (`nvidia-driver-cuda-3:515.*`) which conflicted with `nvidia-driver-3:580.126.09`.
+**Key decisions:**
+- Pin DNF stream to `nvidia-driver:580-dkms` and avoid `cuda-drivers`/latest/open modules.
+- For missing `nvidia-smi`, select a provider that matches major 580 via repoquery and install the exact NEVRA.
+**Role changes (summary):**
+- Keep stream pinning to 580-dkms and removal of open/590 packages.
+- Add provider selection using `dnf repoquery --whatprovides /usr/bin/nvidia-smi` filtered by `^nvidia-driver-cuda-3:580\.` and pick latest with `sort -V | tail -n 1`.
+- Fail with actionable diagnostics when no 580 provider is available.
+**Reboot/dracut rationale:** dracut/reboot only triggered when stream changes, open/590 removals, or nouveau blacklist changes require it; otherwise skipped (idempotent).
+**Final validation (all nodes):**
+- `ansible -i inventario.ini all -b -m shell -a "nvidia-smi --query-gpu=name,driver_version,pci.bus_id --format=csv,noheader"`
+```
+worker1 | CHANGED | rc=0 >>
+Quadro P1000, 580.126.09, 00000000:01:00.0
+worker2 | CHANGED | rc=0 >>
+Quadro P1000, 580.126.09, 00000000:01:00.0
+master | CHANGED | rc=0 >>
+Quadro P1000, 580.126.09, 00000000:01:00.0
+```
+- `ansible -i inventario.ini all -b -m shell -a "command -v nvidia-smi && nvidia-smi | head -n 5"`
+```
+worker1 | CHANGED | rc=0 >>
+/bin/nvidia-smi
+Sat Jan 17 13:05:47 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.126.09             Driver Version: 580.126.09     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+worker2 | CHANGED | rc=0 >>
+/bin/nvidia-smi
+Sat Jan 17 13:05:47 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.126.09             Driver Version: 580.126.09     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+master | CHANGED | rc=0 >>
+/bin/nvidia-smi
+Sat Jan 17 13:05:47 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.126.09             Driver Version: 580.126.09     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+```
+**Idempotence evidence (two runs):**
+- `ansible-playbook -i inventario.ini site.yml --tags cuda --diff`
+  - Run 1 recap: `master changed=0`, `worker1 changed=0`, `worker2 changed=0`.
+  - Run 2 recap: `master changed=0`, `worker1 changed=0`, `worker2 changed=0`.
+**Git status:** clean (`git status -sb` -> `## codex...origin/codex/inicial`).
