@@ -606,3 +606,20 @@ worker2 | CHANGED | rc=0 >>
 master | CHANGED | rc=0 >>
 3.11.14 | packaged by conda-forge | (main, Oct 22 2025, 22:46:25) [GCC 14.3.0]
 ```
+
+## 2026-01-17 15:46 (-05) — Storage survey and NFS path verification
+**Why:** NFS paths/partitions suspected to have changed; needed full storage reconnaissance to decide correct LLM storage locations.
+**Commands executed:**
+- `ansible-playbook -i inventario.ini playbooks/storage_survey.yml`
+**Artifacts saved:**
+- Per-host reports: `artifacts/storage_survey/<hostname>/report.txt`
+- Summary: `artifacts/storage_survey/SUMMARY.md`
+**Key findings (from SUMMARY + reports):**
+- All nodes: NVMe disk `nvme0n1` ~238.5G; SATA disk `sda` ~3.6T; `/data` is on `sda1` (xfs).
+- Master: `llm_nfs_export_dir` exists at `/export/llm-project` and lives on root (`/dev/nvme0n1p3`); `exportfs -v` output is empty (no active exports reported).
+- Workers: `findmnt /mnt/llm-project` empty; NFS mount appears **not mounted** even though fstab includes `master:/export/llm-project /mnt/llm-project nfs _netdev,nofail,...`.
+**Next-step recommendation:**
+- Use `/data` (SATA 3.6T) for persistent datasets/checkpoints.
+- Use NVMe (e.g., `/opt` or a dedicated `/scratch` on nvme) for scratch/cache.
+- Re-validate NFS export on master (`exportfs -v`) and mount on workers (`mount /mnt/llm-project`), then rerun the survey to confirm.
+**Notes:** summary generation initially failed due to a Jinja boolean/ternary precedence issue; fixed and reran successfully.

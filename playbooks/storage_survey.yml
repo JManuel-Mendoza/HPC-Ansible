@@ -1,0 +1,205 @@
+---
+- name: Storage survey and NFS path verification
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    storage_survey_report: /tmp/storage_survey_report.txt
+    storage_survey_artifacts_root: "{{ playbook_dir }}/../artifacts/storage_survey"
+  tasks:
+    - name: Storage Survey | Collect hostname
+      ansible.builtin.command: hostname
+      register: ss_hostname
+      changed_when: false
+
+    - name: Storage Survey | Collect date
+      ansible.builtin.command: date -Is
+      register: ss_date
+      changed_when: false
+
+    - name: Storage Survey | Collect lsblk
+      ansible.builtin.command: lsblk -e7 -o NAME,TYPE,SIZE,FSTYPE,FSVER,LABEL,UUID,PARTUUID,MOUNTPOINTS
+      register: ss_lsblk
+      changed_when: false
+
+    - name: Storage Survey | Collect blkid
+      ansible.builtin.command: blkid
+      register: ss_blkid
+      changed_when: false
+      failed_when: false
+
+    - name: Storage Survey | Collect df -hT
+      ansible.builtin.command: df -hT
+      register: ss_df
+      changed_when: false
+
+    - name: Storage Survey | Collect findmnt
+      ansible.builtin.command: findmnt -rno TARGET,SOURCE,FSTYPE,OPTIONS
+      register: ss_findmnt
+      changed_when: false
+
+    - name: Storage Survey | Collect fstab
+      ansible.builtin.command: cat /etc/fstab
+      register: ss_fstab
+      changed_when: false
+
+    - name: Storage Survey | Collect pvs
+      ansible.builtin.command: pvs
+      register: ss_pvs
+      changed_when: false
+      failed_when: false
+
+    - name: Storage Survey | Collect vgs
+      ansible.builtin.command: vgs
+      register: ss_vgs
+      changed_when: false
+      failed_when: false
+
+    - name: Storage Survey | Collect lvs
+      ansible.builtin.command: lvs
+      register: ss_lvs
+      changed_when: false
+      failed_when: false
+
+    - name: Storage Survey | Collect disk list for summary
+      ansible.builtin.command: lsblk -e7 -d -o NAME,TYPE,SIZE --noheadings
+      register: ss_disks
+      changed_when: false
+
+    - name: Storage Survey | Master exportfs -v
+      ansible.builtin.command: exportfs -v
+      register: ss_exportfs
+      changed_when: false
+      failed_when: false
+      when: inventory_hostname in groups.get('hpc_master', [])
+
+    - name: Storage Survey | Master export df
+      ansible.builtin.command: df -hT {{ llm_nfs_export_dir }}
+      register: ss_export_df
+      changed_when: false
+      failed_when: false
+      when: inventory_hostname in groups.get('hpc_master', [])
+
+    - name: Storage Survey | Master export ls
+      ansible.builtin.command: ls -la {{ llm_nfs_export_dir }}
+      register: ss_export_ls
+      changed_when: false
+      failed_when: false
+      when: inventory_hostname in groups.get('hpc_master', [])
+
+    - name: Storage Survey | Worker findmnt for NFS mount
+      ansible.builtin.command: findmnt {{ llm_nfs_mount_dir }}
+      register: ss_worker_findmnt
+      changed_when: false
+      failed_when: false
+      when: inventory_hostname in groups.get('workers', [])
+
+    - name: Storage Survey | Worker df for NFS mount
+      ansible.builtin.command: df -hT {{ llm_nfs_mount_dir }}
+      register: ss_worker_df
+      changed_when: false
+      failed_when: false
+      when: inventory_hostname in groups.get('workers', [])
+
+    - name: Storage Survey | Worker mount grep NFS
+      ansible.builtin.command: /bin/sh -c "mount | grep -E ' type nfs| type nfs4' || true"
+      register: ss_worker_mounts
+      changed_when: false
+      failed_when: false
+      when: inventory_hostname in groups.get('workers', [])
+
+    - name: Storage Survey | Write report file
+      ansible.builtin.copy:
+        dest: "{{ storage_survey_report }}"
+        mode: "0644"
+        content: |
+          hostname: {{ ss_hostname.stdout | default(ansible_hostname) }}
+          date: {{ ss_date.stdout | default('') }}
+          kernel: {{ ansible_kernel | default('') }}
+
+          --- lsblk ---
+          {{ ss_lsblk.stdout | default('') }}
+
+          --- blkid ---
+          {{ ss_blkid.stdout | default('') }}
+
+          --- df -hT ---
+          {{ ss_df.stdout | default('') }}
+
+          --- findmnt ---
+          {{ ss_findmnt.stdout | default('') }}
+
+          --- fstab ---
+          {{ ss_fstab.stdout | default('') }}
+
+          --- pvs ---
+          {{ ss_pvs.stdout | default('') }}
+
+          --- vgs ---
+          {{ ss_vgs.stdout | default('') }}
+
+          --- lvs ---
+          {{ ss_lvs.stdout | default('') }}
+
+          --- master exportfs -v ---
+          {{ ss_exportfs.stdout | default('') }}
+
+          --- master df export ---
+          {{ ss_export_df.stdout | default('') }}
+
+          --- master ls export ---
+          {{ ss_export_ls.stdout | default('') }}
+
+          --- worker findmnt mount ---
+          {{ ss_worker_findmnt.stdout | default('') }}
+
+          --- worker df mount ---
+          {{ ss_worker_df.stdout | default('') }}
+
+          --- worker NFS mounts ---
+          {{ ss_worker_mounts.stdout | default('') }}
+      changed_when: false
+
+    - name: Storage Survey | Fetch report to controller
+      ansible.builtin.fetch:
+        src: "{{ storage_survey_report }}"
+        dest: "{{ storage_survey_artifacts_root }}/{{ inventory_hostname }}/report.txt"
+        flat: true
+      changed_when: false
+
+- name: Storage survey summary
+  hosts: localhost
+  gather_facts: false
+  vars:
+    storage_survey_artifacts_root: "{{ playbook_dir }}/../artifacts/storage_survey"
+    summary_path: "{{ storage_survey_artifacts_root }}/SUMMARY.md"
+  tasks:
+    - name: Storage Survey | Ensure artifacts directory
+      ansible.builtin.file:
+        path: "{{ storage_survey_artifacts_root }}"
+        state: directory
+        mode: "0755"
+
+    - name: Storage Survey | Write summary
+      ansible.builtin.copy:
+        dest: "{{ summary_path }}"
+        mode: "0644"
+        content: |
+          # Storage Survey Summary
+          Generated: {{ lookup('pipe', 'date -Is') }}
+
+          | Host | Kernel | Disks (nvme) | Disks (sata/other) | NFS export mount (master) | NFS mount (workers) | /scratch recommendation | /data recommendation |
+          | --- | --- | --- | --- | --- | --- | --- | --- |
+          {% for host in groups['all'] | sort %}
+          {% set disks = hostvars[host].ss_disks.stdout_lines | default([]) %}
+          {% set nvme = disks | select('match', '^nvme') | list %}
+          {% set other = disks | reject('match', '^nvme') | list %}
+          {% set nvme_present = (nvme | length) > 0 %}
+          {% set other_present = (other | length) > 0 %}
+          {% set nfs_export = hostvars[host].ss_export_df.stdout | default('') %}
+          {% set nfs_mount_raw = hostvars[host].ss_worker_findmnt.stdout | default('') %}
+          {% set nfs_mount_present = (nfs_mount_raw | trim | length) > 0 %}
+          {% set nfs_mount = nfs_mount_raw if nfs_mount_present else 'not mounted' %}
+          | {{ host }} | {{ hostvars[host].ansible_kernel | default('') }} | {{ nvme_present | ternary(nvme | join('<br>'), 'none') }} | {{ other_present | ternary(other | join('<br>'), 'none') }} | {{ nfs_export | default('') | replace('\n','<br>') }} | {{ nfs_mount | default('') | replace('\n','<br>') }} | {{ nvme_present | ternary('nvme scratch', 'no nvme detected') }} | {{ other_present | ternary('sata/other data', 'no sata detected') }} |
+          {% endfor %}
+      changed_when: false
