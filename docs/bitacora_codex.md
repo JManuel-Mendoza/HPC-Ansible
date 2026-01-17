@@ -315,3 +315,13 @@ critical libmamba 'mamba run' failed to lock (/home/sistemas/.cache/mamba/proc) 
 **Validation:** run `ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags cuda` (expect 580-dkms installed, reboot as needed, `nvidia-smi` OK, torch CUDA returns GPU name).
 **Rollback:** revert the 580-dkms stream pinning and cleanup steps in `roles/nvidia_cuda`; reinstall the previous stream if needed.
 **Notes:** reboot required after stream change/driver install before validation.
+
+## 2026-01-16 21:25 (America/Bogota) — fix 580-dkms pin for Pascal GPUs
+**Context:** host: master; playbook: site.yml; tags: cuda; branch: codex
+**Symptom:** latest driver stream pulled 590/open modules; Pascal (Quadro P1000) requires 580 proprietary modules.
+**Root cause:** R590 drops Pascal support, causing `nvidia.ko does not include the required GPU` and `nvidia-smi` rc=9.
+**Fix:** switch DNF module stream to `nvidia-driver:580-dkms` via `module switch-to` and avoid `cuda-drivers` meta package; keep CUDA toolkit install and rebuild initramfs when blacklist/stream changes; ensure reboot gating stays in place.
+**Files changed:** roles/nvidia_cuda/tasks/main.yml, docs/bitacora_codex.md
+**Validation:** `ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags cuda` (expect `nvidia-smi` OK). Working evidence: Driver 580.126.09, GPU Quadro P1000.
+**Rollback:** revert stream pinning in `roles/nvidia_cuda/tasks/main.yml` and reinstall previous stream if needed.
+**Notes:** dracut required to rebuild initramfs after module stream change; reboot required before validation.

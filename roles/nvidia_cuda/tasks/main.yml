@@ -32,10 +32,10 @@
   failed_when: false
   when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Enable nvidia-driver module stream
-  ansible.builtin.command: dnf -y module enable nvidia-driver:{{ nvidia_driver_stream }}
-  register: _dnf_mod_enable_nvidia
-  changed_when: "'Nothing to do' not in (_dnf_mod_enable_nvidia.stdout ~ _dnf_mod_enable_nvidia.stderr)"
+- name: NVIDIA/CUDA | Switch nvidia-driver module stream
+  ansible.builtin.command: dnf -y module switch-to nvidia-driver:{{ nvidia_driver_stream }} --allowerasing
+  register: _dnf_mod_switch_nvidia
+  changed_when: "'Nothing to do' not in (_dnf_mod_switch_nvidia.stdout ~ _dnf_mod_switch_nvidia.stderr)"
   failed_when: false
   when:
     - nvidia_cuda_enabled | bool
@@ -121,7 +121,7 @@
     - nvidia_cuda_enabled | bool
     - _cuda_repo_hotfix is changed
       or _dnf_mod_reset_nvidia is changed
-      or _dnf_mod_enable_nvidia is changed
+      or _dnf_mod_switch_nvidia is changed
       or _dnf_mod_reset_cuda is changed
       or _dnf_mod_disable_cuda is changed
 
@@ -133,7 +133,7 @@
     - nvidia_cuda_enabled | bool
     - _cuda_repo_hotfix is changed
       or _dnf_mod_reset_nvidia is changed
-      or _dnf_mod_enable_nvidia is changed
+      or _dnf_mod_switch_nvidia is changed
       or _dnf_mod_reset_cuda is changed
       or _dnf_mod_disable_cuda is changed
 
@@ -143,15 +143,6 @@
   changed_when: "'No match for argument' not in (_nvidia_open_remove.stdout ~ _nvidia_open_remove.stderr)"
   failed_when: false
   when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Install nvidia-driver module stream
-  ansible.builtin.command: dnf -y module install nvidia-driver:{{ nvidia_driver_stream }}/default --allowerasing
-  register: _nvidia_mod_install
-  changed_when: "'Nothing to do' not in (_nvidia_mod_install.stdout ~ _nvidia_mod_install.stderr)"
-  failed_when: false
-  when:
-    - nvidia_cuda_enabled | bool
-    - not _nvidia_mod_stream_ok | default(false)
 
 - name: NVIDIA/CUDA | Install CUDA toolkit
   ansible.builtin.dnf:
@@ -188,7 +179,7 @@
   failed_when: false
   when:
     - nvidia_cuda_enabled | bool
-    - _dnf_mod_enable_nvidia is changed or _nvidia_mod_install is changed or _nvidia_open_remove is changed
+    - _dnf_mod_switch_nvidia is changed or _nvidia_open_remove is changed
 
 - name: NVIDIA/CUDA | Rebuild initramfs after driver changes
   ansible.builtin.command: dracut --force
@@ -197,7 +188,7 @@
   notify: Reboot node
   when:
     - nvidia_cuda_enabled | bool
-    - _dnf_mod_enable_nvidia is changed or _nvidia_mod_install is changed or _nvidia_open_remove is changed or _nvidia_cleanup is changed
+    - _dnf_mod_switch_nvidia is changed or _nvidia_open_remove is changed or _nvidia_cleanup is changed
 
 - name: NVIDIA/CUDA | Auto reboot when enabled and driver/initramfs changed
   ansible.builtin.reboot:
@@ -205,7 +196,7 @@
   when:
     - nvidia_cuda_enabled | bool
     - nvidia_cuda_auto_reboot | bool
-    - (_cuda_install is changed) or (_nouveau is changed) or (_nouveau_loaded | default(false)) or (_dnf_mod_enable_nvidia is changed) or (_nvidia_mod_install is changed) or (_dracut_rebuild is changed)
+    - (_cuda_install is changed) or (_nouveau is changed) or (_nouveau_loaded | default(false)) or (_dnf_mod_switch_nvidia is changed) or (_dracut_rebuild is changed)
 
 - name: NVIDIA/CUDA | Check nvidia-smi
   ansible.builtin.command: nvidia-smi -L
