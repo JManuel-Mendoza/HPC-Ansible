@@ -159,3 +159,13 @@ wmi                    45056  10 dell_wmi_sysman,video,intel_wmi_thunderbolt,del
   - `micromamba run -n llm python -c "import torch; print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"` (expect `cuda True` and GPU name)
 **Rollback:** N/A
 **Notes:** reboot is required after blacklist/dracut and driver install, before validation tasks.
+
+## 2026-01-16 19:46 (America/Bogota) — switch to proprietary DKMS driver stream
+**Context:** host: master; playbook: site.yml; tags: cuda; branch: codex
+**Symptom:** `nvidia-smi` rc=9 after reboot; dmesg reports "NVRM: ... nvidia.ko because it does not include the required GPU" for Quadro P1000 (10de:1cb1).
+**Root cause:** open GPU kernel modules are incompatible with Pascal GPUs; proprietary DKMS modules are required.
+**Fix:** detect enabled module stream and switch to `nvidia-driver:latest-dkms`, remove `nvidia-open*` packages, reinstall `cuda-drivers` with `--allowerasing`, rebuild initramfs when changes occur, and gate reboot on stream/package/initramfs changes; add torch CUDA check after install.
+**Files changed:** roles/nvidia_cuda/tasks/main.yml, docs/bitacora_codex.md
+**Validation:** run `ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags cuda` (expect DKMS driver installed, reboot if needed, `nvidia-smi` works, torch CUDA shows GPU).
+**Rollback:** revert the module switch/remove/reinstall tasks in `roles/nvidia_cuda/tasks/main.yml`; if needed, reinstall the previous stream and remove the blacklist file.
+**Notes:** reboot is required after switching to DKMS or rebuilding initramfs before `nvidia-smi` validation.

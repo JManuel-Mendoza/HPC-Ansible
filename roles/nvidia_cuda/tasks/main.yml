@@ -13,6 +13,18 @@
     state: present
     update_cache: true
 
+- name: NVIDIA/CUDA | Check enabled nvidia-driver module stream
+  ansible.builtin.command: dnf -q module list --enabled nvidia-driver
+  register: _nvidia_mod_enabled
+  changed_when: false
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Set nvidia-driver stream flag
+  ansible.builtin.set_fact:
+    _nvidia_mod_latest_dkms: "{{ 'latest-dkms' in (_nvidia_mod_enabled.stdout | default('')) }}"
+  when: nvidia_cuda_enabled | bool
+
 - name: NVIDIA/CUDA | Reset/disable DNF modules (nvidia/cuda)
   ansible.builtin.command: dnf -y module reset nvidia-driver
   register: _dnf_mod_reset_nvidia
@@ -20,12 +32,14 @@
   failed_when: false
   when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Disable DNF module nvidia-driver
-  ansible.builtin.command: dnf -y module disable nvidia-driver
-  register: _dnf_mod_disable_nvidia
-  changed_when: "'Nothing to do' not in (_dnf_mod_disable_nvidia.stdout ~ _dnf_mod_disable_nvidia.stderr)"
+- name: NVIDIA/CUDA | Switch nvidia-driver module to latest-dkms
+  ansible.builtin.command: dnf -y module switch-to nvidia-driver:latest-dkms --allowerasing
+  register: _dnf_mod_switch_nvidia
+  changed_when: "'Nothing to do' not in (_dnf_mod_switch_nvidia.stdout ~ _dnf_mod_switch_nvidia.stderr)"
   failed_when: false
-  when: nvidia_cuda_enabled | bool
+  when:
+    - nvidia_cuda_enabled | bool
+    - not _nvidia_mod_latest_dkms | default(false)
 
 - name: NVIDIA/CUDA | Reset DNF module cuda
   ansible.builtin.command: dnf -y module reset cuda
@@ -107,7 +121,7 @@
     - nvidia_cuda_enabled | bool
     - _cuda_repo_hotfix is changed
       or _dnf_mod_reset_nvidia is changed
-      or _dnf_mod_disable_nvidia is changed
+      or _dnf_mod_switch_nvidia is changed
       or _dnf_mod_reset_cuda is changed
       or _dnf_mod_disable_cuda is changed
 
@@ -119,9 +133,16 @@
     - nvidia_cuda_enabled | bool
     - _cuda_repo_hotfix is changed
       or _dnf_mod_reset_nvidia is changed
-      or _dnf_mod_disable_nvidia is changed
+      or _dnf_mod_switch_nvidia is changed
       or _dnf_mod_reset_cuda is changed
       or _dnf_mod_disable_cuda is changed
+
+- name: NVIDIA/CUDA | Remove open kernel module packages (if any)
+  ansible.builtin.command: dnf -y remove 'nvidia-open*' 'kmod-nvidia-open*'
+  register: _nvidia_open_remove
+  changed_when: "'No match for argument' not in (_nvidia_open_remove.stdout ~ _nvidia_open_remove.stderr)"
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
 
 - name: NVIDIA/CUDA | Install driver + toolkit
   ansible.builtin.dnf:
@@ -129,6 +150,7 @@
       - "{{ nvidia_cuda_driver_pkg }}"
       - "{{ nvidia_cuda_toolkit_pkg }}"
     state: present
+    allowerasing: true
   register: _cuda_install
   when: nvidia_cuda_enabled | bool
 
@@ -152,13 +174,22 @@
   ansible.builtin.meta: flush_handlers
   when: nvidia_cuda_enabled | bool
 
+- name: NVIDIA/CUDA | Rebuild initramfs after driver changes
+  ansible.builtin.command: dracut --force
+  register: _dracut_rebuild
+  changed_when: true
+  notify: Reboot node
+  when:
+    - nvidia_cuda_enabled | bool
+    - _dnf_mod_switch_nvidia is changed or _cuda_install is changed or _nvidia_open_remove is changed
+
 - name: NVIDIA/CUDA | Auto reboot when enabled and driver/initramfs changed
   ansible.builtin.reboot:
     reboot_timeout: 1800
   when:
     - nvidia_cuda_enabled | bool
     - nvidia_cuda_auto_reboot | bool
-    - (_cuda_install is changed) or (_nouveau is changed) or (_nouveau_loaded | default(false))
+    - (_cuda_install is changed) or (_nouveau is changed) or (_nouveau_loaded | default(false)) or (_dnf_mod_switch_nvidia is changed) or (_dracut_rebuild is changed)
 
 - name: NVIDIA/CUDA | Check nvidia-smi
   ansible.builtin.command: nvidia-smi -L
@@ -201,4 +232,20 @@
 - name: NVIDIA/CUDA | Show NVIDIA kernel module
   ansible.builtin.debug:
     var: _nvidia_lsmod.stdout_lines
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Check Torch CUDA inside micromamba env
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
+    python -c "import torch; print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+  register: _torch_cuda
+  changed_when: false
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Show Torch CUDA check
+  ansible.builtin.debug:
+    var: _torch_cuda.stdout_lines
   when: nvidia_cuda_enabled | bool
