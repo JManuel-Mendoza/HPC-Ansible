@@ -474,3 +474,135 @@ Sat Jan 17 13:05:47 2026
   - Run 1 recap: `master changed=0`, `worker1 changed=0`, `worker2 changed=0`.
   - Run 2 recap: `master changed=0`, `worker1 changed=0`, `worker2 changed=0`.
 **Git status:** clean (`git status -sb` -> `## codex...origin/codex/inicial`).
+
+## 2026-01-17 13:49 (-05) — llm_env torch installer check timeout fix
+**Context:** task "LLM Env | Detect torch installer" nunca terminaba durante `--tags llm`.
+**Root cause:** `micromamba run` quedaba colgado; el task no tenia timeout ni fallo accionable.
+**Fix:** reemplazar heredoc por `python -c` y envolver con `timeout 60s`; si expira, fallar con mensaje claro.
+**Files changed:** roles/llm_env/tasks/main.yml, docs/bitacora_codex.md
+**Notes:** reintentar `ansible-playbook -i inventario.ini site.yml --tags llm --diff` y verificar que el task finalice.
+
+## 2026-01-17 14:36 (-05) — Torch CUDA validation (all nodes)
+**Context:** post-fix verification of CUDA-enabled PyTorch in micromamba env `llm` across master + workers.
+**Commands executed:**
+- `ansible -i inventario.ini all -b -m shell -a "/opt/micromamba/bin/micromamba run -n llm python -c \"import torch; print('torch', torch.__version__); print('torch.version.cuda', torch.version.cuda); print('is_built', torch.backends.cuda.is_built()); print('cuda_available', torch.cuda.is_available())\""`
+- `ansible -i inventario.ini all -b -m shell -a "/opt/micromamba/bin/micromamba list -n llm | egrep -i 'torch|pytorch|cuda|cudnn|nvidia' || true"`
+- `ansible -i inventario.ini all -b -m shell -a "/opt/micromamba/bin/micromamba run -n llm python -c \"import torch; print(torch.__file__)\""`
+**Torch CUDA check output:**
+```
+worker1 | CHANGED | rc=0 >>
+torch 2.4.0
+torch.version.cuda 12.4
+is_built True
+cuda_available True
+worker2 | CHANGED | rc=0 >>
+torch 2.4.0
+torch.version.cuda 12.4
+is_built True
+cuda_available True
+master | CHANGED | rc=0 >>
+torch 2.4.0
+torch.version.cuda 12.4
+is_built True
+cuda_available True
+```
+**Package inventory (filtered):**
+```
+worker1 | CHANGED | rc=0 >>
+  cuda-cudart                           12.4.127    0                             nvidia     
+  cuda-cupti                            12.4.127    0                             nvidia     
+  cuda-libraries                        12.4.1      0                             nvidia     
+  cuda-nvrtc                            12.4.127    0                             nvidia     
+  cuda-nvtx                             12.4.127    0                             nvidia     
+  cuda-opencl                           13.1.115    h4f1e1d6_0                    nvidia     
+  cuda-runtime                          12.4.1      0                             nvidia     
+  cuda-version                          13.1        hd92462c_3                    nvidia     
+  libcublas                             12.4.5.8    0                             nvidia     
+  libcufft                              11.2.1.3    0                             nvidia     
+  libcufile                             1.16.1.26   h3b4bcfc_0                    nvidia     
+  libcurand                             10.4.1.81   h1b6c897_0                    nvidia     
+  libcusolver                           11.6.1.9    0                             nvidia     
+  libcusparse                           12.3.1.170  0                             nvidia     
+  libnpp                                12.2.5.30   0                             nvidia     
+  libnvfatbin                           13.1.115    he32a221_0                    nvidia     
+  libnvjitlink                          12.4.127    0                             nvidia     
+  libnvjpeg                             12.3.1.117  0                             nvidia     
+  libopenvino-pytorch-frontend          2025.4.1    hecca717_0                    conda-forge
+  pytorch                               2.4.0       py3.11_cuda12.4_cudnn9.1.0_0  pytorch    
+  pytorch-cuda                          12.4        hc786d27_7                    pytorch    
+  pytorch-mutex                         1.0         cuda                          pytorch    
+  torchaudio                            2.4.0       py311_cu124                   pytorch    
+  torchtriton                           3.0.0       py311                         pytorch    
+  torchvision                           0.19.0      py311_cu124                   pytorch    
+worker2 | CHANGED | rc=0 >>
+  cuda-cudart                           12.4.127    0                             nvidia     
+  cuda-cupti                            12.4.127    0                             nvidia     
+  cuda-libraries                        12.4.1      0                             nvidia     
+  cuda-nvrtc                            12.4.127    0                             nvidia     
+  cuda-nvtx                             12.4.127    0                             nvidia     
+  cuda-opencl                           13.1.115    h4f1e1d6_0                    nvidia     
+  cuda-runtime                          12.4.1      0                             nvidia     
+  cuda-version                          13.1        hd92462c_3                    nvidia     
+  libcublas                             12.4.5.8    0                             nvidia     
+  libcufft                              11.2.1.3    0                             nvidia     
+  libcufile                             1.16.1.26   h3b4bcfc_0                    nvidia     
+  libcurand                             10.4.1.81   h1b6c897_0                    nvidia     
+  libcusolver                           11.6.1.9    0                             nvidia     
+  libcusparse                           12.3.1.170  0                             nvidia     
+  libnpp                                12.2.5.30   0                             nvidia     
+  libnvfatbin                           13.1.115    he32a221_0                    nvidia     
+  libnvjitlink                          12.4.127    0                             nvidia     
+  libnvjpeg                             12.3.1.117  0                             nvidia     
+  libopenvino-pytorch-frontend          2025.4.1    hecca717_0                    conda-forge
+  pytorch                               2.4.0       py3.11_cuda12.4_cudnn9.1.0_0  pytorch    
+  pytorch-cuda                          12.4        hc786d27_7                    pytorch    
+  pytorch-mutex                         1.0         cuda                          pytorch    
+  torchaudio                            2.4.0       py311_cu124                   pytorch    
+  torchtriton                           3.0.0       py311                         pytorch    
+  torchvision                           0.19.0      py311_cu124                   pytorch    
+master | CHANGED | rc=0 >>
+  cuda-cudart                           12.4.127    0                             nvidia     
+  cuda-cupti                            12.4.127    0                             nvidia     
+  cuda-libraries                        12.4.1      0                             nvidia     
+  cuda-nvrtc                            12.4.127    0                             nvidia     
+  cuda-nvtx                             12.4.127    0                             nvidia     
+  cuda-opencl                           13.1.115    h4f1e1d6_0                    nvidia     
+  cuda-runtime                          12.4.1      0                             nvidia     
+  cuda-version                          13.1        hd92462c_3                    nvidia     
+  libcublas                             12.4.5.8    0                             nvidia     
+  libcufft                              11.2.1.3    0                             nvidia     
+  libcufile                             1.16.1.26   h3b4bcfc_0                    nvidia     
+  libcurand                             10.4.1.81   h1b6c897_0                    nvidia     
+  libcusolver                           11.6.1.9    0                             nvidia     
+  libcusparse                           12.3.1.170  0                             nvidia     
+  libnpp                                12.2.5.30   0                             nvidia     
+  libnvfatbin                           13.1.115    he32a221_0                    nvidia     
+  libnvjitlink                          12.4.127    0                             nvidia     
+  libnvjpeg                             12.3.1.117  0                             nvidia     
+  libopenvino-pytorch-frontend          2025.4.1    hecca717_0                    conda-forge
+  pytorch                               2.4.0       py3.11_cuda12.4_cudnn9.1.0_0  pytorch    
+  pytorch-cuda                          12.4        hc786d27_7                    pytorch    
+  pytorch-mutex                         1.0         cuda                          pytorch    
+  torchaudio                            2.4.0       py311_cu124                   pytorch    
+  torchtriton                           3.0.0       py311                         pytorch    
+  torchvision                           0.19.0      py311_cu124                   pytorch    
+```
+**Torch path check:**
+```
+worker1 | CHANGED | rc=0 >>
+/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/__init__.py
+worker2 | CHANGED | rc=0 >>
+/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/__init__.py
+master | CHANGED | rc=0 >>
+/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/__init__.py
+```
+**Python/env details:**
+- Command: `ansible -i inventario.ini all -b -m shell -a "/opt/micromamba/bin/micromamba run -n llm python -c \"import sys; print(sys.version.replace('\\n', ' '))\""`
+```
+worker1 | CHANGED | rc=0 >>
+3.11.14 | packaged by conda-forge | (main, Oct 22 2025, 22:46:25) [GCC 14.3.0]
+worker2 | CHANGED | rc=0 >>
+3.11.14 | packaged by conda-forge | (main, Oct 22 2025, 22:46:25) [GCC 14.3.0]
+master | CHANGED | rc=0 >>
+3.11.14 | packaged by conda-forge | (main, Oct 22 2025, 22:46:25) [GCC 14.3.0]
+```

@@ -12,6 +12,31 @@ Proyecto reproducible para:
 > - Micromamba: `/opt/micromamba/bin/micromamba`
 > - Env: `llm`
 
+## Provisioning and smoke validation (Ansible)
+
+1) CUDA driver provisioning (pins 580-dkms for Pascal):
+```bash
+ansible-playbook -i inventario.ini site.yml --tags cuda --diff
+```
+
+2) LLM env provisioning (CUDA-enabled PyTorch):
+```bash
+ansible-playbook -i inventario.ini site.yml --tags llm --diff
+```
+
+3) Cluster validation + GPU smoke test:
+```bash
+ansible-playbook -i inventario.ini site.yml --tags validate --diff
+```
+
+Expected outputs:
+- `nvidia-smi` shows driver 580.126.09 and Quadro P1000.
+- Torch reports `cuda_available True`, `torch.version.cuda 12.4`, and the smoke script prints `cuda_mem_delta` and a numeric `result_sum`.
+
+Troubleshooting:
+- If `cuda_available False`, ensure the driver stream is `nvidia-driver:580-dkms`, and re-run `--tags cuda` + `--tags llm`.
+- If the smoke script is missing, verify the NFS mount/export path contains `scripts/00_smoke_gpu.py`.
+
 ## Flujo mínimo
 
 1) Colocar textos en `data/raw/*.txt`

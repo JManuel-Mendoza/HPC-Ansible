@@ -80,6 +80,24 @@
   register: _mamba_create
   changed_when: true
 
+- name: LLM Env | Set env exists flag
+  ansible.builtin.set_fact:
+    _llm_env_exists: "{{ _env_stat.stat.exists or (_mamba_create is defined and _mamba_create is changed) }}"
+
+- name: LLM Env | Ensure llm env channel config
+  ansible.builtin.copy:
+    dest: "{{ llm_micromamba_root }}/envs/{{ llm_env_name }}/.condarc"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      channels:
+        - pytorch
+        - nvidia
+        - conda-forge
+      channel_priority: strict
+  when: _llm_env_exists | bool
+
 - name: LLM Env | Install/update conda packages in existing env
   ansible.builtin.command: >
     {{ llm_micromamba_bin }} install -y -n {{ llm_env_name }}
@@ -90,6 +108,24 @@
   when: _env_stat.stat.exists
   register: conda_install
   changed_when: "'All requested packages already installed' not in conda_install.stdout"
+
+- name: LLM Env | Install PyTorch CUDA stack
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} install -y -n {{ llm_env_name }}
+    -c pytorch -c nvidia -c conda-forge
+    python={{ llm_pytorch_python_version }} pytorch torchvision torchaudio pytorch-cuda=12.4
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+  register: _pytorch_cuda_install
+  changed_when: "'All requested packages already installed' not in _pytorch_cuda_install.stdout"
+  when: _llm_env_exists | bool
+
+- name: LLM Env | Fail if pip packages include torch
+  ansible.builtin.fail:
+    msg: >-
+      llm_pip_packages incluye torch. Esto puede sobrescribir el torch conda.
+      Elimine torch de la lista pip y reintente.
+  when: llm_pip_packages | select('match', '^torch($|[=<>])') | list | length > 0
 
 - name: LLM Env | Compute pip marker hash
   ansible.builtin.set_fact:
@@ -116,6 +152,65 @@
     path: "{{ llm_micromamba_root }}/envs/{{ llm_env_name }}/.llm_pip_installed_{{ llm_pip_hash }}"
     state: touch
   when: llm_pip_packages | length > 0 and _pip_install is changed
+
+- name: LLM Env | Detect torch installer
+  ansible.builtin.command: >
+    /bin/sh -c "timeout 60s {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
+    python -c \"import importlib.metadata as m; 
+    dist = m.distribution('torch'); 
+    installer = (dist.read_text('INSTALLER') or '').strip(); 
+    print(installer if installer else 'unknown')\""
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+  register: _torch_installer
+  changed_when: false
+  when: _llm_env_exists | bool
+
+- name: LLM Env | Fail if torch installer check times out
+  ansible.builtin.fail:
+    msg: >-
+      La validacion de installer de torch excedio 60s. Revise el estado de
+      micromamba/conda locks y reintente.
+  when:
+    - _llm_env_exists | bool
+    - _torch_installer.rc == 124
+
+- name: LLM Env | Fail if torch installed via pip
+  ansible.builtin.fail:
+    msg: >-
+      torch fue instalado via pip en el env {{ llm_env_name }}. Esto puede anular
+      el stack CUDA. Remueva torch pip y reinstale via micromamba con canales CUDA.
+  when:
+    - _llm_env_exists | bool
+    - _torch_installer.stdout | trim == 'pip'
+
+- name: LLM Env | Detect NVIDIA GPU
+  ansible.builtin.command: "lspci -nn -d 10de:"
+  register: _llm_nvidia_lspci
+  changed_when: false
+  failed_when: false
+
+- name: LLM Env | Validate Torch CUDA
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
+    python -c "import torch; print(torch.__version__); print(torch.version.cuda); print(torch.backends.cuda.is_built()); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+  register: _torch_cuda_check
+  changed_when: false
+  when: _llm_env_exists | bool
+
+- name: LLM Env | Fail if CUDA not available on NVIDIA nodes
+  ansible.builtin.fail:
+    msg: >-
+      Torch CUDA no esta disponible en un nodo con GPU NVIDIA. Salida:
+      {{ _torch_cuda_check.stdout | default('') }}. Verifique que el stack
+      pytorch-cuda=12.4 este instalado y que el driver 580 este activo.
+  when:
+    - _llm_env_exists | bool
+    - _llm_nvidia_lspci.rc == 0
+    - (_llm_nvidia_lspci.stdout | trim) != ''
+    - "'False' in (_torch_cuda_check.stdout | default(''))"
 
 - name: LLM Env | Drop env check helper
   ansible.builtin.copy:

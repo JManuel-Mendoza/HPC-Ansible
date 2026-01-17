@@ -43,6 +43,33 @@
     msg: "NFS mount path missing on worker: {{ validate_nfs_mount_path }}"
   when: validate_nfs | bool and inventory_hostname in groups.get('workers', []) and not st_mount.stat.exists
 
+- name: Validate | Definir ruta del proyecto LLM
+  ansible.builtin.set_fact:
+    _llm_project_path: "{{ (inventory_hostname in groups.get('hpc_master', [])) | ternary(validate_nfs_export_path, validate_nfs_mount_path) }}"
+  when: validate_llm | bool
+
+- name: Validate | Verificar ruta del proyecto LLM
+  ansible.builtin.stat:
+    path: "{{ _llm_project_path }}"
+  register: st_llm_project
+  when: validate_llm | bool
+
+- name: Validate | Fallar si falta ruta del proyecto LLM
+  ansible.builtin.fail:
+    msg: "Ruta del proyecto LLM no existe: {{ _llm_project_path }}"
+  when: validate_llm | bool and not st_llm_project.stat.exists
+
+- name: Validate | Verificar script smoke GPU
+  ansible.builtin.stat:
+    path: "{{ _llm_project_path }}/scripts/00_smoke_gpu.py"
+  register: st_llm_smoke
+  when: validate_llm | bool
+
+- name: Validate | Fallar si falta script smoke GPU
+  ansible.builtin.fail:
+    msg: "Falta script smoke GPU: {{ _llm_project_path }}/scripts/00_smoke_gpu.py"
+  when: validate_llm | bool and not st_llm_smoke.stat.exists
+
 - name: Validate | Check nvidia-smi
   ansible.builtin.command: nvidia-smi -L
   register: nvsmi
@@ -74,3 +101,26 @@
 - name: Validate | Print Torch CUDA check
   ansible.builtin.debug:
     var: torch_cuda.stdout_lines
+
+- name: Validate | LLM smoke GPU (tensor op)
+  ansible.builtin.command: >
+    {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
+    python {{ _llm_project_path }}/scripts/00_smoke_gpu.py
+  environment:
+    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+  register: llm_smoke
+  changed_when: false
+  failed_when: false
+  when: validate_llm | bool
+
+- name: Validate | Fail si smoke GPU falla
+  ansible.builtin.fail:
+    msg: >-
+      Smoke GPU fallo (rc={{ llm_smoke.rc }}). stdout={{ llm_smoke.stdout | default('') }}
+      stderr={{ llm_smoke.stderr | default('') }}
+  when: validate_llm | bool and llm_smoke.rc != 0
+
+- name: Validate | Print smoke GPU output
+  ansible.builtin.debug:
+    var: llm_smoke.stdout_lines
+  when: validate_llm | bool
