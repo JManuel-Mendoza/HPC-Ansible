@@ -169,3 +169,149 @@ wmi                    45056  10 dell_wmi_sysman,video,intel_wmi_thunderbolt,del
 **Validation:** run `ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags cuda` (expect DKMS driver installed, reboot if needed, `nvidia-smi` works, torch CUDA shows GPU).
 **Rollback:** revert the module switch/remove/reinstall tasks in `roles/nvidia_cuda/tasks/main.yml`; if needed, reinstall the previous stream and remove the blacklist file.
 **Notes:** reboot is required after switching to DKMS or rebuilding initramfs before `nvidia-smi` validation.
+
+## 2026-01-16 20:14 (America/Bogota) — post-reboot CUDA validation (master)
+**Context:** host: master; playbook: site.yml; tags: cuda; branch: codex
+**Symptom:** `nvidia-smi` still fails after reboot.
+**Root cause:** driver still not binding to Quadro P1000 (Pascal); dmesg shows `nvidia.ko` missing required GPU support.
+**Fix:** N/A (validation only).
+**Files changed:** docs/bitacora_codex.md
+**Validation:** commands and outputs captured below.
+
+`uname -r`
+```
+5.14.0-611.16.1.el9_7.x86_64
+```
+
+`lsmod | egrep 'nouveau|nvidia' || true`
+```
+```
+
+`nvidia-smi || true`
+```
+NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running.
+```
+
+`ls -la /dev/nvidia* 2>/dev/null || true`
+```
+```
+
+`micromamba run -n llm python -c "import torch; print('torch', torch.__version__); print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"`
+```
+error    libmamba Could not open lockfile '/home/sistemas/.cache/mamba/proc/proc.lock'
+critical libmamba 'mamba run' failed to lock (/home/sistemas/.cache/mamba/proc) or lockfile was not properly deleted - error: invocation failed : `ZN5mamba12_GLOBAL__N_119LockedFilesRegistry12acquire_lockERKNS_2fs6u8pathENSt6chrono8durationIlSt5ratioILl1ELl1EEEEEUlvE_` threw exception `N5mamba11mamba_errorE` : LockFile acquisition failed, aborting: Could not open lockfile '/home/sistemas/.cache/mamba/proc/proc.lock'
+```
+
+`dmesg -T | egrep -i 'nvidia|nouveau' | tail -n 120`
+```
+[Fri Jan 16 20:00:11 2026] Command line: BOOT_IMAGE=(hd2,gpt2)/vmlinuz-5.14.0-611.16.1.el9_7.x86_64 root=UUID=89c7bebb-e7b2-4b30-a177-2900bbb73583 ro resume=UUID=66a3234c-459f-4cd8-85ed-8ec9fe7b20e2 crashkernel=1G-2G:192M,2G-64G:256M,64G-:512M rd.driver.blacklist=nouveau rd.driver.blacklist=nova-core
+[Fri Jan 16 20:00:11 2026] Kernel command line: BOOT_IMAGE=(hd2,gpt2)/vmlinuz-5.14.0-611.16.1.el9_7.x86_64 root=UUID=89c7bebb-e7b2-4b30-a177-2900bbb73583 ro resume=UUID=66a3234c-459f-4cd8-85ed-8ec9fe7b20e2 crashkernel=1G-2G:192M,2G-64G:256M,64G-:512M rd.driver.blacklist=nouveau rd.driver.blacklist=nova-core
+[Fri Jan 16 20:00:12 2026] Loaded X.509 cert 'Rocky Enterprise Software Foundation: Nvidia GPU OOT Signing 101: 816ba9c770e6960cefe378020865d4ebbc352a7d'
+[Fri Jan 16 20:00:15 2026] input: HDA NVidia HDMI/DP,pcm=3 as /devices/pci0000:00/0000:00:01.0/0000:01:00.1/sound/card1/input9
+[Fri Jan 16 20:00:15 2026] input: HDA NVidia HDMI/DP,pcm=7 as /devices/pci0000:00/0000:00:01.0/0000:01:00.1/sound/card1/input10
+[Fri Jan 16 20:00:15 2026] input: HDA NVidia HDMI/DP,pcm=8 as /devices/pci0000:00/0000:00:01.0/0000:01:00.1/sound/card1/input11
+[Fri Jan 16 20:00:15 2026] input: HDA NVidia HDMI/DP,pcm=9 as /devices/pci0000:00/0000:00:01.0/0000:01:00.1/sound/card1/input12
+[Fri Jan 16 20:00:15 2026] nvidia: loading out-of-tree module taints kernel.
+[Fri Jan 16 20:00:15 2026] nvidia: module verification failed: signature and/or required key missing - tainting kernel
+[Fri Jan 16 20:00:15 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:00:15 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:00:15 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:00:15 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:00:15 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:00:15 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:00:15 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:00:15 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:00:15 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:00:15 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:00:15 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:00:15 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:00:16 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:00:16 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:00:16 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:00:16 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:00:16 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:00:16 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:00:19 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:00:19 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:00:19 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:00:19 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:00:19 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:00:19 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:09:29 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:09:29 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:09:29 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:09:29 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:09:29 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:09:29 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:09:30 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:09:30 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:09:30 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:09:30 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:09:30 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:09:30 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:11:04 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:11:04 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:11:04 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:11:04 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:11:04 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:11:04 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:11:06 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:11:06 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:11:06 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:11:06 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:11:06 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:11:06 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:12:27 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:12:27 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:12:27 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:12:27 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:12:27 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:12:27 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:12:27 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:12:27 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:12:27 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:12:27 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:12:27 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:12:27 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+[Fri Jan 16 20:12:28 2026] nvidia-nvlink: Nvlink Core is being initialized, major device number 235
+[Fri Jan 16 20:12:28 2026] NVRM: The NVIDIA GPU 0000:01:00.0 (PCI ID: 10de:1cb1)
+                           NVRM: nvidia.ko because it does not include the required GPU
+                           NVRM: www.nvidia.com.
+[Fri Jan 16 20:12:28 2026] nvidia: probe of 0000:01:00.0 failed with error -1
+[Fri Jan 16 20:12:28 2026] NVRM: The NVIDIA probe routine failed for 1 device(s).
+[Fri Jan 16 20:12:28 2026] NVRM: None of the NVIDIA devices were initialized.
+[Fri Jan 16 20:12:28 2026] nvidia-nvlink: Unregistered Nvlink Core, major device number 235
+```
+
+**Rollback:** N/A
+**Notes:** driver still failing; next action is to review driver version compatibility for Pascal (Quadro P1000) and confirm the installed `nvidia-driver` branch supports PCI ID 10de:1cb1. The micromamba lock error also blocks torch validation; retry when no concurrent micromamba processes exist.
+
+## 2026-01-16 20:24 (America/Bogota) — pin NVIDIA driver to 580-dkms for Pascal
+**Context:** host: master; playbook: site.yml; tags: cuda; branch: codex
+**Symptom:** NVIDIA driver 590.48.01 installed; dmesg shows "nvidia.ko does not include the required GPU" for PCI ID 10de:1cb1 (Quadro P1000). `nvidia-smi` rc=9 and torch reports `cuda False`.
+**Root cause:** R590 drops Pascal support; Quadro P1000 requires the proprietary 580 branch and non-open kernel modules.
+**Fix:** add `nvidia_driver_stream: "580-dkms"` default; switch module stream to 580-dkms (enable/install), remove `nvidia-open*`/`kmod-nvidia-open*` packages, clean old `nvidia*.ko*`, run `depmod -a` and `dracut --force`, and reboot when changes occur; fail with dmesg tail if `nvidia-smi` still fails.
+**Files changed:** roles/nvidia_cuda/defaults/main.yml, roles/nvidia_cuda/tasks/main.yml, docs/bitacora_codex.md
+**Validation:** run `ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags cuda` (expect 580-dkms installed, reboot as needed, `nvidia-smi` OK, torch CUDA returns GPU name).
+**Rollback:** revert the 580-dkms stream pinning and cleanup steps in `roles/nvidia_cuda`; reinstall the previous stream if needed.
+**Notes:** reboot required after stream change/driver install before validation.
