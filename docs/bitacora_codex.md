@@ -371,3 +371,56 @@ critical libmamba 'mamba run' failed to lock (/home/sistemas/.cache/mamba/proc) 
 **Fix:** eliminar group arg y usar `regex_search` + `default` + `regex_replace` para evitar NoneType.
 **Files changed:** roles/nvidia_cuda/tasks/main.yml
 **Notes:** reintentar el playbook `--tags cuda`.
+
+## 2026-01-17 12:21 (-05) — integrar secuencia reset/switch/dracut/reboot para paquetes 590
+**Context:** workers fallan en task "Fallar si quedan paquetes 590"; se requiere aplicar secuencia manual.
+**Change:** cuando se detectan paquetes 590, ejecutar:
+- `dnf -y module reset nvidia-driver`
+- `dnf -y module switch-to nvidia-driver:580-dkms --allowerasing`
+- `dracut --force`
+- `reboot` (condicionado por `nvidia_cuda_reboot`)
+**Files changed:** roles/nvidia_cuda/tasks/main.yml, docs/bitacora_codex.md
+**Notes:** si `nvidia_cuda_reboot=false`, el rol falla con mensaje indicando reinicio manual.
+
+## 2026-01-17 12:23 (-05) — diferir reboot al final del playbook
+**Context:** el reboot de nvidia_cuda ocurria durante la ejecucion y cortaba el playbook.
+**Change:** eliminar flush inmediato y programar reboot via handler para que se ejecute al final del play.
+**Files changed:** roles/nvidia_cuda/tasks/main.yml, docs/bitacora_codex.md
+**Notes:** el reboot ahora ocurre al final del play cuando el handler `Reboot node` es notificado.
+
+## 2026-01-17 12:43 (-05) — Workers: nvidia-smi missing
+**Context:** en workers hay modulos NVIDIA cargados y stream `nvidia-driver:580-dkms` correcto, pero `nvidia-smi` no existe.
+**Evidence (workers):** pendiente de ejecucion del usuario.
+- paquetes (ejemplo esperado): `rpm -qa | grep -Ei 'nvidia|cuda'`
+- modulos cargados: `lsmod | egrep '(^nvidia|nouveau)'`
+- `command -v nvidia-smi` -> faltante
+**Provider resolution:** el rol ahora ejecuta `dnf -q provides '*/nvidia-smi' | awk 'NR==1{print $1}'` para seleccionar el primer paquete proveedor.
+**Fix aplicado (rol):** instalar automaticamente el paquete proveedor si falta `nvidia-smi`, sin tocar el stream fijado 580-dkms.
+**Before/After validation:** pendiente de ejecucion del usuario.
+- before: `command -v nvidia-smi` (expected: no encontrado)
+- after: `command -v nvidia-smi` y `nvidia-smi` (expected: rc=0)
+**Ansible commands (pendientes):**
+- `ansible-playbook -i inventario.ini site.yml --limit workers --tags cuda --diff`
+- `ansible-playbook -i inventario.ini site.yml --limit workers --tags cuda --diff` (segunda corrida idempotente)
+**Notes:** completar esta seccion con salidas reales y agregar el paquete instalado resultante de `dnf provides`.
+
+## 2026-01-17 12:54 (-05) — Workers: nvidia-smi missing and provider selection bug
+**Context:** workers con Quadro P1000 (Pascal), stream `nvidia-driver:580-dkms` correcto y modulos NVIDIA cargados; `nvidia-smi` ausente.
+**Evidence (workers):** pendiente de ejecucion del usuario.
+- paquetes: `nvidia-driver-3:580.126.09`, `kmod-nvidia-latest-dkms-580.126.09`
+- modulos: `nvidia`, `nvidia_uvm`, `nvidia_drm`, `nvidia_modeset`
+- `command -v nvidia-smi` -> `command not found`
+**Bug:** el task anterior elegia el primer resultado de `dnf provides '*/nvidia-smi'` (515.*), provocando conflicto:
+- `file /usr/bin/nvidia-powerd from nvidia-driver-cuda-3:515.* conflicts with nvidia-driver-3:580.126.09`
+**Fix (nuevo algoritmo):**
+- derivar major desde `nvidia_driver_stream` (580-dkms -> 580)
+- ejecutar `dnf -q repoquery --available --whatprovides /usr/bin/nvidia-smi --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}'`
+- filtrar `^nvidia-driver-cuda-3:580\.` y elegir el mas reciente con `sort -V | tail -n 1`
+- instalar ese NEVRA exacto con `dnf ... --allowerasing`
+- si no hay match, fallar mostrando driver instalado y primeras lineas del repoquery
+**Before/After validation (workers):** pendiente de ejecucion del usuario.
+- before: `command -v nvidia-smi` y `nvidia-smi` (expected fail)
+- after: `command -v nvidia-smi` y `nvidia-smi` (expected rc=0)
+**Ansible commands (pendientes):**
+- `ansible-playbook -i inventario.ini site.yml --limit workers --tags cuda --diff`
+- `ansible-playbook -i inventario.ini site.yml --limit workers --tags cuda --diff` (segunda corrida idempotente)

@@ -211,23 +211,45 @@
   changed_when: _nvidia_reboot_required | bool
   notify: Reboot node
 
-- name: NVIDIA/CUDA | Ejecutar handlers cuando sea necesario
-  ansible.builtin.meta: flush_handlers
-  when:
-    - _nvidia_reboot_required | bool
-    - nvidia_cuda_reboot | bool
-
 - name: NVIDIA/CUDA | Verificar ausencia de paquetes 590
   ansible.builtin.shell: "rpm -qa | grep -E '(nvidia|xorg-x11-drv-nvidia|kmod-nvidia).*590' || true"
   register: _nvidia_590_post
   changed_when: false
 
-- name: NVIDIA/CUDA | Fallar si quedan paquetes 590
+- name: NVIDIA/CUDA | Forzar stream 580-dkms si quedan paquetes 590
+  ansible.builtin.command: dnf -y module reset nvidia-driver
+  register: _nvidia_590_module_reset
+  changed_when: "'Nothing to do' not in (_nvidia_590_module_reset.stdout ~ _nvidia_590_module_reset.stderr)"
+  when: _nvidia_590_post.stdout | trim != ''
+
+- name: NVIDIA/CUDA | Cambiar a stream 580-dkms por compatibilidad Pascal
+  ansible.builtin.command: dnf -y module switch-to nvidia-driver:{{ nvidia_driver_stream }} --allowerasing
+  register: _nvidia_590_module_switch
+  changed_when: "'Nothing to do' not in (_nvidia_590_module_switch.stdout ~ _nvidia_590_module_switch.stderr)"
+  when: _nvidia_590_post.stdout | trim != ''
+
+- name: NVIDIA/CUDA | Rebuild initramfs tras ajuste de stream 580-dkms
+  ansible.builtin.command: dracut --force
+  register: _nvidia_590_dracut
+  changed_when: true
+  when: _nvidia_590_post.stdout | trim != ''
+
+- name: NVIDIA/CUDA | Reboot requerido tras ajuste de stream 580-dkms
   ansible.builtin.fail:
     msg: >-
-      Se detectaron paquetes NVIDIA 590 instalados: {{ _nvidia_590_post.stdout_lines | join(', ') }}.
-      Remuevalos y asegure el stream {{ nvidia_driver_stream }}.
-  when: _nvidia_590_post.stdout | trim != ''
+      Se forzo el stream {{ nvidia_driver_stream }} por presencia de paquetes 590,
+      pero nvidia_cuda_reboot=false. Reinicie el host manualmente y reejecute el rol.
+  when:
+    - _nvidia_590_post.stdout | trim != ''
+    - not nvidia_cuda_reboot | bool
+
+- name: NVIDIA/CUDA | Programar reinicio tras ajuste de stream 580-dkms
+  ansible.builtin.command: /usr/bin/true
+  changed_when: true
+  notify: Reboot node
+  when:
+    - _nvidia_590_post.stdout | trim != ''
+    - nvidia_cuda_reboot | bool
 
 - name: NVIDIA/CUDA | Validar modulos cargados
   ansible.builtin.shell: "lsmod | egrep '(^nvidia|nouveau)' || true"
@@ -252,6 +274,82 @@
     - nvidia_cuda_validate | bool
     - "'nvidia' not in (_nvidia_lsmod_check.stdout | default(''))"
 
+- name: NVIDIA/CUDA | Verificar comando nvidia-smi
+  ansible.builtin.command: /bin/sh -c "command -v nvidia-smi"
+  register: _nvidia_smi_path
+  changed_when: false
+  failed_when: false
+
+- name: NVIDIA/CUDA | Definir major del driver fijado
+  ansible.builtin.set_fact:
+    _nvidia_driver_major: "{{ nvidia_driver_stream.split('-')[0] }}"
+  when: _nvidia_smi_path.rc != 0
+
+- name: NVIDIA/CUDA | Obtener lista de proveedores de nvidia-smi
+  ansible.builtin.command: >-
+    /bin/sh -c "dnf -q repoquery --available --whatprovides /usr/bin/nvidia-smi
+    --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}'"
+  register: _nvidia_smi_repoquery
+  changed_when: false
+  failed_when: false
+  when: _nvidia_smi_path.rc != 0
+
+- name: NVIDIA/CUDA | Seleccionar proveedor compatible con {{ nvidia_driver_stream }}
+  ansible.builtin.command: >-
+    /bin/sh -c "dnf -q repoquery --available --whatprovides /usr/bin/nvidia-smi
+    --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}' |
+    grep -E '^nvidia-driver-cuda-3:{{ _nvidia_driver_major }}\\.' |
+    sort -V | tail -n 1"
+  register: _nvidia_smi_provider
+  changed_when: false
+  failed_when: false
+  when: _nvidia_smi_path.rc != 0
+
+- name: NVIDIA/CUDA | Capturar driver instalado
+  ansible.builtin.command: /bin/sh -c "rpm -q nvidia-driver || true"
+  register: _nvidia_driver_installed
+  changed_when: false
+  when: _nvidia_smi_path.rc != 0
+
+- name: NVIDIA/CUDA | Fallar si no se encuentra proveedor 580 de nvidia-smi
+  ansible.builtin.fail:
+    msg: >-
+      No se encontro un paquete proveedor de nvidia-smi compatible con
+      {{ nvidia_driver_stream }}. Driver instalado: {{ _nvidia_driver_installed.stdout | default('') }}.
+      repoquery (primeras lineas): {{ (_nvidia_smi_repoquery.stdout_lines | default([]))[:30] | join(' | ') }}.
+      Accion sugerida: verifique repos CUDA/NVIDIA, luego ejecute
+      `dnf repoquery --available --whatprovides /usr/bin/nvidia-smi` y
+      reinstale el paquete 580 correspondiente.
+  when:
+    - _nvidia_smi_path.rc != 0
+    - (_nvidia_smi_provider.stdout | default('') | trim) == ''
+
+- name: NVIDIA/CUDA | Instalar proveedor de nvidia-smi compatible
+  ansible.builtin.dnf:
+    name: "{{ _nvidia_smi_provider.stdout | trim }}"
+    state: present
+    allowerasing: true
+  register: _nvidia_smi_install
+  when:
+    - _nvidia_smi_path.rc != 0
+    - (_nvidia_smi_provider.stdout | default('') | trim) != ''
+
+- name: NVIDIA/CUDA | Revalidar comando nvidia-smi
+  ansible.builtin.command: /bin/sh -c "command -v nvidia-smi"
+  register: _nvidia_smi_path_after
+  changed_when: false
+  failed_when: false
+  when: _nvidia_smi_path.rc != 0
+
+- name: NVIDIA/CUDA | Fallar si nvidia-smi sigue ausente
+  ansible.builtin.fail:
+    msg: >-
+      nvidia-smi sigue ausente tras instalar el proveedor {{ _nvidia_smi_provider.stdout | default('') }}.
+      Verifique repositorios CUDA/NVIDIA e intente reinstalar el paquete.
+  when:
+    - _nvidia_smi_path.rc != 0
+    - _nvidia_smi_path_after.rc != 0
+
 - name: NVIDIA/CUDA | Ejecutar nvidia-smi
   ansible.builtin.command: nvidia-smi
   register: _nvidia_smi_full
@@ -260,10 +358,18 @@
   when: nvidia_cuda_validate | bool
 
 - name: NVIDIA/CUDA | Capturar dmesg cuando nvidia-smi falla
-  ansible.builtin.command: dmesg -T | egrep -i 'NVRM|nvidia|nouveau' | tail -n 120
+  ansible.builtin.command: dmesg -T | egrep -i 'NVRM|nvidia|nouveau' | tail -n 80
   register: _nvidia_dmesg
   changed_when: false
   failed_when: false
+  when:
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc != 0
+
+- name: NVIDIA/CUDA | Capturar paquetes NVIDIA/CUDA cuando falla nvidia-smi
+  ansible.builtin.shell: "rpm -qa | grep -Ei 'nvidia|cuda' || true"
+  register: _nvidia_pkg_list
+  changed_when: false
   when:
     - nvidia_cuda_validate | bool
     - _nvidia_smi_full.rc != 0
@@ -273,7 +379,8 @@
     msg: >-
       nvidia-smi fallo (rc={{ _nvidia_smi_full.rc }}). stdout: {{ _nvidia_smi_full.stdout | default('') }}
       stderr: {{ _nvidia_smi_full.stderr | default('') }}. dmesg tail:
-      {{ _nvidia_dmesg.stdout | default('') }}
+      {{ _nvidia_dmesg.stdout | default('') }}. paquetes:
+      {{ _nvidia_pkg_list.stdout | default('') }}
   when:
     - nvidia_cuda_validate | bool
     - _nvidia_smi_full.rc != 0
