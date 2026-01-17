@@ -1,90 +1,156 @@
 ---
-- name: NVIDIA/CUDA | Install prerequisites
-  ansible.builtin.dnf:
-    name:
-      - dnf-plugins-core
-      - gcc
-      - gcc-c++
-      - make
-      - perl
-      - dkms
-      - elfutils-libelf-devel
-      - pciutils
-    state: present
-    update_cache: true
+- name: NVIDIA/CUDA | Verificar binario lspci
+  ansible.builtin.stat:
+    path: /usr/sbin/lspci
+  register: _lspci_bin
 
-- name: NVIDIA/CUDA | Check enabled nvidia-driver module stream
-  ansible.builtin.command: dnf -q module list --enabled nvidia-driver
-  register: _nvidia_mod_enabled
+- name: NVIDIA/CUDA | Instalar pciutils si falta
+  ansible.builtin.dnf:
+    name: pciutils
+    state: present
+  when: not _lspci_bin.stat.exists
+
+- name: NVIDIA/CUDA | Detectar GPU NVIDIA
+  ansible.builtin.command: "lspci -nn -d 10de:"
+  register: _nvidia_lspci
   changed_when: false
   failed_when: false
-  when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Set nvidia-driver stream flag
+- name: NVIDIA/CUDA | Definir presencia de GPU
   ansible.builtin.set_fact:
-    _nvidia_mod_stream_ok: "{{ nvidia_driver_stream in (_nvidia_mod_enabled.stdout | default('')) }}"
-  when: nvidia_cuda_enabled | bool
+    _nvidia_gpu_present: "{{ _nvidia_lspci.rc == 0 and (_nvidia_lspci.stdout | trim) != '' }}"
 
-- name: NVIDIA/CUDA | Reset/disable DNF modules (nvidia/cuda)
-  ansible.builtin.command: dnf -y module reset nvidia-driver
-  register: _dnf_mod_reset_nvidia
-  changed_when: "'Nothing to do' not in (_dnf_mod_reset_nvidia.stdout ~ _dnf_mod_reset_nvidia.stderr)"
-  failed_when: false
-  when: nvidia_cuda_enabled | bool
+- name: NVIDIA/CUDA | Informar sin GPU y omitir rol
+  ansible.builtin.debug:
+    msg: "No se detecta GPU NVIDIA (vendor 10de). Se omite el rol nvidia_cuda en este host."
+  when: not _nvidia_gpu_present
 
-- name: NVIDIA/CUDA | Switch nvidia-driver module stream
-  ansible.builtin.command: dnf -y module switch-to nvidia-driver:{{ nvidia_driver_stream }} --allowerasing
-  register: _dnf_mod_switch_nvidia
-  changed_when: "'Nothing to do' not in (_dnf_mod_switch_nvidia.stdout ~ _dnf_mod_switch_nvidia.stderr)"
-  failed_when: false
+- name: NVIDIA/CUDA | Saltar host sin GPU
+  ansible.builtin.meta: end_host
+  when: not _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Capturar nombre de GPU
+  ansible.builtin.set_fact:
+    _nvidia_gpu_name: >-
+      {{
+        (
+          (_nvidia_lspci.stdout_lines | first | default(''))
+          | regex_search('\\[[^\\]]+\\]$')
+        )
+        | default((_nvidia_lspci.stdout_lines | first) | default('desconocido'), true)
+        | regex_replace('^\\[|\\]$', '')
+      }}
+  when: _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Asegurar repo CUDA (RHEL9)
+  ansible.builtin.get_url:
+    url: "{{ nvidia_cuda_repo_url }}"
+    dest: "{{ nvidia_cuda_repo_file }}"
+    mode: "0644"
+  register: _cuda_repo_file
+  when: nvidia_cuda_repo_enabled | bool
+
+- name: NVIDIA/CUDA | Asegurar module_hotfixes=1 en repo CUDA
+  ansible.builtin.lineinfile:
+    path: "{{ nvidia_cuda_repo_file }}"
+    regexp: '^module_hotfixes='
+    line: 'module_hotfixes=1'
+    insertafter: '^\\[cuda-rhel9-x86_64\\]$'
+  register: _cuda_repo_hotfix
+  when: nvidia_cuda_repo_enabled | bool
+
+- name: NVIDIA/CUDA | Refrescar cache DNF si repo cambia
+  ansible.builtin.dnf:
+    update_cache: true
+  changed_when: false
   when:
-    - nvidia_cuda_enabled | bool
-    - not _nvidia_mod_stream_ok | default(false)
+    - nvidia_cuda_repo_enabled | bool
+    - _cuda_repo_file is changed or _cuda_repo_hotfix is changed
 
-- name: NVIDIA/CUDA | Reset DNF module cuda
-  ansible.builtin.command: dnf -y module reset cuda
-  register: _dnf_mod_reset_cuda
-  changed_when: "'Nothing to do' not in (_dnf_mod_reset_cuda.stdout ~ _dnf_mod_reset_cuda.stderr)"
+- name: NVIDIA/CUDA | Verificar stream habilitado de nvidia-driver
+  ansible.builtin.command: dnf -q module list --enabled nvidia-driver
+  register: _nvidia_module_enabled
+  changed_when: false
   failed_when: false
-  when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Disable DNF module cuda
-  ansible.builtin.command: dnf -y module disable cuda
-  register: _dnf_mod_disable_cuda
-  changed_when: "'Nothing to do' not in (_dnf_mod_disable_cuda.stdout ~ _dnf_mod_disable_cuda.stderr)"
-  failed_when: false
-  when: nvidia_cuda_enabled | bool
+- name: NVIDIA/CUDA | Evaluar stream requerido
+  ansible.builtin.set_fact:
+    _nvidia_module_stream_ok: "{{ nvidia_driver_stream in (_nvidia_module_enabled.stdout | default('')) }}"
 
-- name: NVIDIA/CUDA | Install kernel headers/devel for current kernel (best effort)
+- name: NVIDIA/CUDA | Resetear stream si no coincide
+  ansible.builtin.command: dnf -y module reset nvidia-driver
+  register: _nvidia_module_reset
+  changed_when: "'Nothing to do' not in (_nvidia_module_reset.stdout ~ _nvidia_module_reset.stderr)"
+  when: not _nvidia_module_stream_ok
+
+- name: NVIDIA/CUDA | Cambiar a stream fijado {{ nvidia_driver_stream }}
+  ansible.builtin.command: dnf -y module switch-to nvidia-driver:{{ nvidia_driver_stream }} --allowerasing
+  register: _nvidia_module_switch
+  changed_when: "'Nothing to do' not in (_nvidia_module_switch.stdout ~ _nvidia_module_switch.stderr)"
+  when: not _nvidia_module_stream_ok
+
+- name: NVIDIA/CUDA | Instalar prerequisitos de compilacion
+  ansible.builtin.dnf:
+    name: "{{ nvidia_cuda_prereq_packages }}"
+    state: present
+  register: _nvidia_prereqs
+
+- name: NVIDIA/CUDA | Instalar headers/devel del kernel actual (best effort)
   ansible.builtin.dnf:
     name:
       - "kernel-devel-{{ ansible_kernel }}"
       - "kernel-headers-{{ ansible_kernel }}"
     state: present
-  register: _kver
+  register: _nvidia_kernel_specific
   ignore_errors: true
 
-- name: NVIDIA/CUDA | Fallback to generic kernel headers/devel if versioned packages not available
+- name: NVIDIA/CUDA | Fallback a headers/devel genericos si faltan
   ansible.builtin.dnf:
     name:
       - kernel-devel
       - kernel-headers
     state: present
-  when: _kver is failed
+  when: _nvidia_kernel_specific is failed
 
-- name: NVIDIA/CUDA | Check if nouveau is loaded
+- name: NVIDIA/CUDA | Remover paquetes de modulos abiertos
+  ansible.builtin.dnf:
+    name:
+      - "nvidia-open*"
+      - "kmod-nvidia-open*"
+      - "kmod-nvidia-open-dkms*"
+      - "nvidia-driver-open*"
+    state: absent
+  register: _nvidia_open_remove
+
+- name: NVIDIA/CUDA | Detectar paquetes 590 instalados
+  ansible.builtin.shell: "rpm -qa | grep -E '(nvidia|xorg-x11-drv-nvidia|kmod-nvidia).*590' || true"
+  register: _nvidia_590_list
+  changed_when: false
+
+- name: NVIDIA/CUDA | Remover paquetes 590 detectados
+  ansible.builtin.dnf:
+    name: "{{ _nvidia_590_list.stdout_lines }}"
+    state: absent
+  register: _nvidia_590_remove
+  when: _nvidia_590_list.stdout_lines | length > 0
+
+- name: NVIDIA/CUDA | Instalar driver NVIDIA (stream fijado)
+  ansible.builtin.dnf:
+    name: "{{ nvidia_cuda_driver_packages }}"
+    state: present
+  register: _nvidia_driver_install
+
+- name: NVIDIA/CUDA | Verificar si nouveau esta cargado
   ansible.builtin.command: lsmod
-  register: _lsmod_out
+  register: _nvidia_lsmod
   changed_when: false
   failed_when: false
-  when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Set nouveau loaded flag
+- name: NVIDIA/CUDA | Definir estado de nouveau
   ansible.builtin.set_fact:
-    _nouveau_loaded: "{{ 'nouveau' in (_lsmod_out.stdout | default('')) }}"
-  when: nvidia_cuda_enabled | bool
+    _nouveau_loaded: "{{ 'nouveau' in (_nvidia_lsmod.stdout | default('')) }}"
 
-- name: NVIDIA/CUDA | Blacklist nouveau
+- name: NVIDIA/CUDA | Blacklist de nouveau
   ansible.builtin.copy:
     dest: /etc/modprobe.d/blacklist-nouveau.conf
     owner: root
@@ -93,180 +159,154 @@
     content: |
       blacklist nouveau
       options nouveau modeset=0
-  register: _nouveau
+  register: _nouveau_blacklist
   notify: Rebuild initramfs
-  when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Ensure NVIDIA CUDA repo file exists
-  ansible.builtin.get_url:
-    url: "{{ nvidia_cuda_repo_url }}"
-    dest: "{{ nvidia_cuda_repo_file }}"
-    mode: "0644"
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Ensure module_hotfixes enabled for CUDA repo
-  ansible.builtin.lineinfile:
-    path: "{{ nvidia_cuda_repo_file }}"
-    regexp: '^module_hotfixes='
-    line: 'module_hotfixes=1'
-    insertafter: '^\[cuda-rhel9-x86_64\]$'
-  register: _cuda_repo_hotfix
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Refresh DNF cache after module/repo changes
-  ansible.builtin.command: dnf -y clean all
-  register: _dnf_clean
+- name: NVIDIA/CUDA | Consultar grubby para argumentos de kernel
+  ansible.builtin.command: grubby --info=DEFAULT
+  register: _grubby_info
   changed_when: false
-  when:
-    - nvidia_cuda_enabled | bool
-    - _cuda_repo_hotfix is changed
-      or _dnf_mod_reset_nvidia is changed
-      or _dnf_mod_switch_nvidia is changed
-      or _dnf_mod_reset_cuda is changed
-      or _dnf_mod_disable_cuda is changed
-
-- name: NVIDIA/CUDA | Build DNF cache
-  ansible.builtin.command: dnf -y makecache
-  register: _dnf_makecache
-  changed_when: false
-  when:
-    - nvidia_cuda_enabled | bool
-    - _cuda_repo_hotfix is changed
-      or _dnf_mod_reset_nvidia is changed
-      or _dnf_mod_switch_nvidia is changed
-      or _dnf_mod_reset_cuda is changed
-      or _dnf_mod_disable_cuda is changed
-
-- name: NVIDIA/CUDA | Remove open kernel module packages (if any)
-  ansible.builtin.command: dnf -y remove 'nvidia-open*' 'kmod-nvidia-open*' 'kmod-nvidia-open-dkms*'
-  register: _nvidia_open_remove
-  changed_when: "'No match for argument' not in (_nvidia_open_remove.stdout ~ _nvidia_open_remove.stderr)"
   failed_when: false
-  when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Install CUDA toolkit
-  ansible.builtin.dnf:
-    name:
-      - "{{ nvidia_cuda_toolkit_pkg }}"
-    state: present
-  register: _cuda_install
-  when: nvidia_cuda_enabled | bool
+- name: NVIDIA/CUDA | Evaluar argumentos de blacklist en kernel
+  ansible.builtin.set_fact:
+    _grubby_has_nouveau_args: >-
+      {{
+        'rd.driver.blacklist=nouveau' in (_grubby_info.stdout | default(''))
+        and 'modprobe.blacklist=nouveau' in (_grubby_info.stdout | default(''))
+      }}
 
-- name: NVIDIA/CUDA | Add CUDA profile script
-  ansible.builtin.copy:
-    dest: /etc/profile.d/cuda.sh
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      # Managed by Ansible (nvidia_cuda role)
-      if [ -d /usr/local/cuda/bin ]; then
-        export PATH=/usr/local/cuda/bin:$PATH
-      fi
-      if [ -d /usr/local/cuda/lib64 ]; then
-        export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-      fi
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Flush handlers (initramfs) if any
-  ansible.builtin.meta: flush_handlers
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Cleanup old NVIDIA modules
-  ansible.builtin.command: /bin/bash -c "rm -f /lib/modules/$(uname -r)/extra/nvidia*.ko* && depmod -a"
-  register: _nvidia_cleanup
+- name: NVIDIA/CUDA | Agregar argumentos de kernel para nouveau
+  ansible.builtin.command: grubby --update-kernel=ALL --args="rd.driver.blacklist=nouveau modprobe.blacklist=nouveau"
+  register: _grubby_update
   changed_when: true
-  failed_when: false
+  notify: Rebuild initramfs
+  when: not _grubby_has_nouveau_args
+
+- name: NVIDIA/CUDA | Calcular necesidad de reinicio
+  ansible.builtin.set_fact:
+    _nvidia_reboot_required: >-
+      {{
+        (_nvidia_module_reset is defined and _nvidia_module_reset is changed)
+        or (_nvidia_module_switch is defined and _nvidia_module_switch is changed)
+        or (_nvidia_driver_install is defined and _nvidia_driver_install is changed)
+        or (_nvidia_open_remove is defined and _nvidia_open_remove is changed)
+        or (_nvidia_590_remove is defined and _nvidia_590_remove is changed)
+        or (_nouveau_blacklist is defined and _nouveau_blacklist is changed)
+        or (_grubby_update is defined and _grubby_update is changed)
+      }}
+
+- name: NVIDIA/CUDA | Fallar si requiere reinicio y esta deshabilitado
+  ansible.builtin.fail:
+    msg: >-
+      Se requieren cambios (driver/blacklist/initramfs) que necesitan reinicio,
+      pero nvidia_cuda_reboot=false. Reinicie el host manualmente o establezca
+      nvidia_cuda_reboot=true y vuelva a ejecutar el rol.
   when:
-    - nvidia_cuda_enabled | bool
-    - _dnf_mod_switch_nvidia is changed or _nvidia_open_remove is changed
+    - _nvidia_reboot_required | bool
+    - not nvidia_cuda_reboot | bool
 
-- name: NVIDIA/CUDA | Rebuild initramfs after driver changes
-  ansible.builtin.command: dracut --force
-  register: _dracut_rebuild
-  changed_when: true
+- name: NVIDIA/CUDA | Marcar reinicio requerido
+  ansible.builtin.command: /usr/bin/true
+  changed_when: _nvidia_reboot_required | bool
   notify: Reboot node
+
+- name: NVIDIA/CUDA | Ejecutar handlers cuando sea necesario
+  ansible.builtin.meta: flush_handlers
   when:
-    - nvidia_cuda_enabled | bool
-    - _dnf_mod_switch_nvidia is changed or _nvidia_open_remove is changed or _nvidia_cleanup is changed
+    - _nvidia_reboot_required | bool
+    - nvidia_cuda_reboot | bool
 
-- name: NVIDIA/CUDA | Auto reboot when enabled and driver/initramfs changed
-  ansible.builtin.reboot:
-    reboot_timeout: 1800
+- name: NVIDIA/CUDA | Verificar ausencia de paquetes 590
+  ansible.builtin.shell: "rpm -qa | grep -E '(nvidia|xorg-x11-drv-nvidia|kmod-nvidia).*590' || true"
+  register: _nvidia_590_post
+  changed_when: false
+
+- name: NVIDIA/CUDA | Fallar si quedan paquetes 590
+  ansible.builtin.fail:
+    msg: >-
+      Se detectaron paquetes NVIDIA 590 instalados: {{ _nvidia_590_post.stdout_lines | join(', ') }}.
+      Remuevalos y asegure el stream {{ nvidia_driver_stream }}.
+  when: _nvidia_590_post.stdout | trim != ''
+
+- name: NVIDIA/CUDA | Validar modulos cargados
+  ansible.builtin.shell: "lsmod | egrep '(^nvidia|nouveau)' || true"
+  register: _nvidia_lsmod_check
+  changed_when: false
+  when: nvidia_cuda_validate | bool
+
+- name: NVIDIA/CUDA | Fallar si nouveau sigue cargado
+  ansible.builtin.fail:
+    msg: >-
+      El modulo nouveau sigue cargado despues de la instalacion. Revise blacklist,
+      initramfs y reinicie el host.
   when:
-    - nvidia_cuda_enabled | bool
-    - nvidia_cuda_auto_reboot | bool
-    - (_cuda_install is changed) or (_nouveau is changed) or (_nouveau_loaded | default(false)) or (_dnf_mod_switch_nvidia is changed) or (_dracut_rebuild is changed)
+    - nvidia_cuda_validate | bool
+    - "'nouveau' in (_nvidia_lsmod_check.stdout | default(''))"
 
-- name: NVIDIA/CUDA | Check nvidia-smi
-  ansible.builtin.command: nvidia-smi -L
-  register: _nvidia_smi
-  changed_when: false
-  failed_when: false
-  when: nvidia_cuda_enabled | bool
+- name: NVIDIA/CUDA | Fallar si no se cargan modulos nvidia
+  ansible.builtin.fail:
+    msg: >-
+      No se detectan modulos nvidia cargados. Revise el estado del driver y reinicie si aplica.
+  when:
+    - nvidia_cuda_validate | bool
+    - "'nvidia' not in (_nvidia_lsmod_check.stdout | default(''))"
 
-- name: NVIDIA/CUDA | Show nvidia-smi output
-  ansible.builtin.debug:
-    var: _nvidia_smi.stdout_lines
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Validate nvidia-smi is available
-  ansible.builtin.command: which nvidia-smi
-  register: _nvidia_smi_path
-  changed_when: false
-  failed_when: nvidia_cuda_enabled | bool and _nvidia_smi_path.rc != 0
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Run nvidia-smi
+- name: NVIDIA/CUDA | Ejecutar nvidia-smi
   ansible.builtin.command: nvidia-smi
   register: _nvidia_smi_full
   changed_when: false
   failed_when: false
-  when: nvidia_cuda_enabled | bool
+  when: nvidia_cuda_validate | bool
 
-- name: NVIDIA/CUDA | Show nvidia-smi
-  ansible.builtin.debug:
-    var: _nvidia_smi_full.stdout_lines
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Collect dmesg when nvidia-smi fails
-  ansible.builtin.command: dmesg -T | egrep -i 'nvidia|nouveau' | tail -n 120
+- name: NVIDIA/CUDA | Capturar dmesg cuando nvidia-smi falla
+  ansible.builtin.command: dmesg -T | egrep -i 'NVRM|nvidia|nouveau' | tail -n 120
   register: _nvidia_dmesg
   changed_when: false
   failed_when: false
-  when: nvidia_cuda_enabled | bool and _nvidia_smi_full.rc != 0
+  when:
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc != 0
 
-- name: NVIDIA/CUDA | Fail if nvidia-smi still fails
+- name: NVIDIA/CUDA | Fallar si nvidia-smi no responde
   ansible.builtin.fail:
     msg: >-
-      nvidia-smi failed (rc={{ _nvidia_smi_full.rc }}). dmesg tail:
+      nvidia-smi fallo (rc={{ _nvidia_smi_full.rc }}). stdout: {{ _nvidia_smi_full.stdout | default('') }}
+      stderr: {{ _nvidia_smi_full.stderr | default('') }}. dmesg tail:
       {{ _nvidia_dmesg.stdout | default('') }}
-  when: nvidia_cuda_enabled | bool and _nvidia_smi_full.rc != 0
+  when:
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc != 0
 
-- name: NVIDIA/CUDA | Check NVIDIA kernel module
-  ansible.builtin.command: lsmod | grep -i nvidia
-  register: _nvidia_lsmod
+- name: NVIDIA/CUDA | Obtener version de driver y nombre GPU desde nvidia-smi
+  ansible.builtin.command: nvidia-smi --query-gpu=driver_version,name --format=csv,noheader
+  register: _nvidia_smi_query
+  changed_when: false
+  when: nvidia_cuda_validate | bool
+
+- name: NVIDIA/CUDA | Normalizar datos de nvidia-smi
+  ansible.builtin.set_fact:
+    _nvidia_smi_first: "{{ _nvidia_smi_query.stdout_lines | first | default('') }}"
+    _nvidia_driver_version: "{{ (_nvidia_smi_query.stdout_lines | first | default('')) | split(',') | first | trim }}"
+    _nvidia_gpu_name_smi: >-
+      {{
+        (_nvidia_smi_query.stdout_lines | first | default(''))
+        | regex_replace('^[^,]+,\s*', '')
+        | trim
+      }}
+  when: nvidia_cuda_validate | bool
+
+- name: NVIDIA/CUDA | Releer stream habilitado
+  ansible.builtin.command: dnf -q module list --enabled nvidia-driver
+  register: _nvidia_module_enabled_after
   changed_when: false
   failed_when: false
-  when: nvidia_cuda_enabled | bool
+  when: nvidia_cuda_validate | bool
 
-- name: NVIDIA/CUDA | Show NVIDIA kernel module
+- name: NVIDIA/CUDA | Resumen final
   ansible.builtin.debug:
-    var: _nvidia_lsmod.stdout_lines
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Check Torch CUDA inside micromamba env
-  ansible.builtin.command: >
-    {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
-    python -c "import torch; print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"
-  environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
-  register: _torch_cuda
-  changed_when: false
-  failed_when: false
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Show Torch CUDA check
-  ansible.builtin.debug:
-    var: _torch_cuda.stdout_lines
-  when: nvidia_cuda_enabled | bool
+    msg:
+      - "stream habilitado: {{ _nvidia_module_enabled_after.stdout | default('desconocido') | trim }}"
+      - "driver version: {{ _nvidia_driver_version | default('desconocido') }}"
+      - "gpu detectada: {{ _nvidia_gpu_name_smi | default(_nvidia_gpu_name | default('desconocido')) }}"
+  when: nvidia_cuda_validate | bool

@@ -325,3 +325,49 @@ critical libmamba 'mamba run' failed to lock (/home/sistemas/.cache/mamba/proc) 
 **Validation:** `ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags cuda` (expect `nvidia-smi` OK). Working evidence: Driver 580.126.09, GPU Quadro P1000.
 **Rollback:** revert stream pinning in `roles/nvidia_cuda/tasks/main.yml` and reinstall previous stream if needed.
 **Notes:** dracut required to rebuild initramfs after module stream change; reboot required before validation.
+
+## 2026-01-17 10:58 (-05) — reescritura completa del rol nvidia_cuda (pin 580-dkms)
+**Context:** repo: hpc-ansible; rol: roles/nvidia_cuda; objetivo: Rocky/RHEL9 + Quadro P1000 (10de:1cb1)
+**Rationale:** R590/"latest" y los modulos open no soportan Pascal; se requiere fijar el stream `nvidia-driver:580-dkms` y forzar idempotencia, dracut/reboot controlados y validaciones claras.
+**Commands (inspeccion/edicion):**
+- `ls`
+- `cat AGENTS.md`
+- `ls roles/nvidia_cuda`
+- `find roles/nvidia_cuda -type f -maxdepth 3 -print`
+- `cat roles/nvidia_cuda/tasks/main.yml`
+- `cat roles/nvidia_cuda/defaults/main.yml`
+- `cat roles/nvidia_cuda/handlers/main.yml`
+- `sed -n '1,200p' docs/bitacora_codex.md`
+- `sed -n '200,400p' docs/bitacora_codex.md`
+- `date "+%Y-%m-%d %H:%M (%Z)"`
+**Before:** rol instalaba `cuda-drivers` (latest), no garantizaba stream 580-dkms, y mezclaba validaciones con reinicios no controlados.
+**After (nuevo diseno):**
+- detecta GPU via `lspci -nn -d 10de:` y omite el rol si no hay GPU.
+- fija stream `nvidia-driver:580-dkms` y evita metapaquetes latest.
+- remueve paquetes `nvidia-open*` y cualquier paquete 590.
+- asegura blacklist nouveau + args grubby, dracut solo si cambia, reboot controlado por `nvidia_cuda_reboot`.
+- validaciones explicitas (`lsmod`, `nvidia-smi`, `dmesg`), y resumen final con stream, driver y GPU.
+**Files changed (rewritten):**
+- roles/nvidia_cuda/defaults/main.yml
+- roles/nvidia_cuda/handlers/main.yml
+- roles/nvidia_cuda/tasks/main.yml
+**Notes:** pendientes pruebas de `ansible-playbook` y registro de estados inicial/final.
+
+## 2026-01-17 11:07 (-05) — pruebas solicitadas no ejecutadas por restriccion
+**Context:** repo: hpc-ansible; rol: roles/nvidia_cuda
+**Request:** ejecutar `ansible-playbook` (syntax, dry-run, run real) y registrar salidas.
+**Outcome:** el usuario indico que omita ejecucion de playbooks; no se ejecutan pruebas.
+**Commands attempted:**
+- `ansible-playbook -i inventario.ini site.yml --syntax-check` (exitoso)
+- `ansible -i inventario.ini hpc_master -m command -a "dnf -q module list --enabled nvidia-driver"` (timeout 120s)
+- `ansible -i inventario.ini hpc_master -m ping` (ok)
+- `ansible -i inventario.ini hpc_master -m command -a "dnf -q module list --enabled nvidia-driver --cacheonly"` (rechazado por el usuario)
+**Notes:** quedan pendientes las pruebas pedidas en el objetivo. El usuario ejecutara localmente y debe registrar salidas aqui.
+
+## 2026-01-17 11:11 (-05) — fix regex nombre GPU (regex_search NoneType)
+**Context:** error en `roles/nvidia_cuda/tasks/main.yml` durante `Capturar nombre de GPU`.
+**Symptom:** `AttributeError: 'NoneType' object has no attribute 'group'`.
+**Root cause:** `regex_search(..., '\\1')` falla cuando no hay match.
+**Fix:** eliminar group arg y usar `regex_search` + `default` + `regex_replace` para evitar NoneType.
+**Files changed:** roles/nvidia_cuda/tasks/main.yml
+**Notes:** reintentar el playbook `--tags cuda`.

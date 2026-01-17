@@ -1,11 +1,19 @@
 ---
-nvidia_cuda_enabled: true
+nvidia_driver_stream: "580-dkms"
+nvidia_cuda_reboot: true
+nvidia_cuda_repo_enabled: true
+nvidia_cuda_validate: true
+
 nvidia_cuda_repo_file: "/etc/yum.repos.d/cuda-rhel9.repo"
 nvidia_cuda_repo_url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo"
 
-nvidia_cuda_toolkit_pkg: "cuda-toolkit-12-4"
-nvidia_cuda_driver_pkg: "cuda-drivers"
-nvidia_driver_stream: "580-dkms"
+nvidia_cuda_driver_packages:
+  - nvidia-driver
 
-# Si true, reinicia el nodo cuando se instalen drivers o se cambie initramfs
-nvidia_cuda_auto_reboot: false
+nvidia_cuda_prereq_packages:
+  - dkms
+  - gcc
+  - gcc-c++
+  - make
+  - elfutils-libelf-devel
+  - pciutils
