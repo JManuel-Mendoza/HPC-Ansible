@@ -13,6 +13,34 @@
     state: present
     update_cache: true
 
+- name: NVIDIA/CUDA | Reset/disable DNF modules (nvidia/cuda)
+  ansible.builtin.command: dnf -y module reset nvidia-driver
+  register: _dnf_mod_reset_nvidia
+  changed_when: "'Nothing to do' not in (_dnf_mod_reset_nvidia.stdout ~ _dnf_mod_reset_nvidia.stderr)"
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Disable DNF module nvidia-driver
+  ansible.builtin.command: dnf -y module disable nvidia-driver
+  register: _dnf_mod_disable_nvidia
+  changed_when: "'Nothing to do' not in (_dnf_mod_disable_nvidia.stdout ~ _dnf_mod_disable_nvidia.stderr)"
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Reset DNF module cuda
+  ansible.builtin.command: dnf -y module reset cuda
+  register: _dnf_mod_reset_cuda
+  changed_when: "'Nothing to do' not in (_dnf_mod_reset_cuda.stdout ~ _dnf_mod_reset_cuda.stderr)"
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Disable DNF module cuda
+  ansible.builtin.command: dnf -y module disable cuda
+  register: _dnf_mod_disable_cuda
+  changed_when: "'Nothing to do' not in (_dnf_mod_disable_cuda.stdout ~ _dnf_mod_disable_cuda.stderr)"
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
 - name: NVIDIA/CUDA | Install kernel headers/devel for current kernel (best effort)
   ansible.builtin.dnf:
     name:
@@ -29,6 +57,18 @@
       - kernel-headers
     state: present
   when: _kver is failed
+
+- name: NVIDIA/CUDA | Check if nouveau is loaded
+  ansible.builtin.command: lsmod
+  register: _lsmod_out
+  changed_when: false
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Set nouveau loaded flag
+  ansible.builtin.set_fact:
+    _nouveau_loaded: "{{ 'nouveau' in (_lsmod_out.stdout | default('')) }}"
+  when: nvidia_cuda_enabled | bool
 
 - name: NVIDIA/CUDA | Blacklist nouveau
   ansible.builtin.copy:
@@ -49,6 +89,39 @@
     dest: "{{ nvidia_cuda_repo_file }}"
     mode: "0644"
   when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Ensure module_hotfixes enabled for CUDA repo
+  ansible.builtin.lineinfile:
+    path: "{{ nvidia_cuda_repo_file }}"
+    regexp: '^module_hotfixes='
+    line: 'module_hotfixes=1'
+    insertafter: '^\[cuda-rhel9-x86_64\]$'
+  register: _cuda_repo_hotfix
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Refresh DNF cache after module/repo changes
+  ansible.builtin.command: dnf -y clean all
+  register: _dnf_clean
+  changed_when: false
+  when:
+    - nvidia_cuda_enabled | bool
+    - _cuda_repo_hotfix is changed
+      or _dnf_mod_reset_nvidia is changed
+      or _dnf_mod_disable_nvidia is changed
+      or _dnf_mod_reset_cuda is changed
+      or _dnf_mod_disable_cuda is changed
+
+- name: NVIDIA/CUDA | Build DNF cache
+  ansible.builtin.command: dnf -y makecache
+  register: _dnf_makecache
+  changed_when: false
+  when:
+    - nvidia_cuda_enabled | bool
+    - _cuda_repo_hotfix is changed
+      or _dnf_mod_reset_nvidia is changed
+      or _dnf_mod_disable_nvidia is changed
+      or _dnf_mod_reset_cuda is changed
+      or _dnf_mod_disable_cuda is changed
 
 - name: NVIDIA/CUDA | Install driver + toolkit
   ansible.builtin.dnf:
@@ -85,7 +158,7 @@
   when:
     - nvidia_cuda_enabled | bool
     - nvidia_cuda_auto_reboot | bool
-    - (_cuda_install is changed) or (_nouveau is changed)
+    - (_cuda_install is changed) or (_nouveau is changed) or (_nouveau_loaded | default(false))
 
 - name: NVIDIA/CUDA | Check nvidia-smi
   ansible.builtin.command: nvidia-smi -L
@@ -97,4 +170,35 @@
 - name: NVIDIA/CUDA | Show nvidia-smi output
   ansible.builtin.debug:
     var: _nvidia_smi.stdout_lines
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Validate nvidia-smi is available
+  ansible.builtin.command: which nvidia-smi
+  register: _nvidia_smi_path
+  changed_when: false
+  failed_when: nvidia_cuda_enabled | bool and _nvidia_smi_path.rc != 0
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Run nvidia-smi
+  ansible.builtin.command: nvidia-smi
+  register: _nvidia_smi_full
+  changed_when: false
+  failed_when: nvidia_cuda_enabled | bool and _nvidia_smi_full.rc != 0
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Show nvidia-smi
+  ansible.builtin.debug:
+    var: _nvidia_smi_full.stdout_lines
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Check NVIDIA kernel module
+  ansible.builtin.command: lsmod | grep -i nvidia
+  register: _nvidia_lsmod
+  changed_when: false
+  failed_when: false
+  when: nvidia_cuda_enabled | bool
+
+- name: NVIDIA/CUDA | Show NVIDIA kernel module
+  ansible.builtin.debug:
+    var: _nvidia_lsmod.stdout_lines
   when: nvidia_cuda_enabled | bool
