@@ -7,6 +7,7 @@
     - { role: common, tags: ["common"] }
     - { role: users_ssh, tags: ["ssh"] }
     - { role: firewall, tags: ["firewall"] }
+    - { role: network_internal, tags: ["network_internal"] }
     - { role: nvidia_cuda, tags: ["cuda"] }
     - { role: llm_env, tags: ["llm"] }
 

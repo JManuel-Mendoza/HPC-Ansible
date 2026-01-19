@@ -1,0 +1,63 @@
+---
+- name: Red Interna | Obtener conexiones NM distintas de {{ network_internal_keep_if }}
+  ansible.builtin.shell: |
+    nmcli -t -f NAME,DEVICE con show | awk -F: '$2 != "{{ network_internal_keep_if }}" && $2 != "" {print $1}'
+  register: nmcli_conns
+  changed_when: false
+
+- name: Red Interna | Mostrar conexiones a borrar
+  ansible.builtin.debug:
+    var: nmcli_conns.stdout_lines
+
+- name: Red Interna | Borrar conexiones no permitidas
+  ansible.builtin.command: nmcli con delete "{{ item }}"
+  loop: "{{ nmcli_conns.stdout_lines }}"
+  when: nmcli_conns.stdout != ""
+
+- name: Red Interna | Configurar enlaces internos en el master
+  when: inventory_hostname == "master"
+  block:
+    - name: Red Interna | Iterar enlaces master
+      ansible.builtin.include_tasks: master_link.yml
+      loop: "{{ network_internal_links | dict2items }}"
+      loop_control:
+        loop_var: link_item
+
+- name: Red Interna | Configurar enlace interno en worker
+  when:
+    - inventory_hostname != "master"
+    - inventory_hostname in network_internal_links
+  block:
+    - name: Red Interna | Definir enlace del worker
+      ansible.builtin.set_fact:
+        _worker_link: "{{ network_internal_links[inventory_hostname] }}"
+
+    - name: Red Interna | Verificar conexion int-master
+      ansible.builtin.command: nmcli -t -f NAME con show int-master
+      register: worker_link_exists
+      changed_when: false
+      failed_when: false
+
+    - name: Red Interna | Crear conexion int-master
+      ansible.builtin.command: >-
+        nmcli con add type ethernet ifname {{ _worker_link.worker_if }} con-name int-master
+        ipv4.method manual ipv4.addresses {{ _worker_link.worker_ip }} ipv6.method ignore
+      when: worker_link_exists.rc != 0
+
+    - name: Red Interna | Leer parametros int-master
+      ansible.builtin.command: nmcli -g ipv4.addresses,ipv4.method,ipv6.method con show int-master
+      register: worker_link_settings
+      changed_when: false
+
+    - name: Red Interna | Calcular ajustes int-master
+      ansible.builtin.set_fact:
+        _worker_link_needs_mod: "{{ worker_link_settings.stdout | trim != (_worker_link.worker_ip ~ ':manual:ignore') }}"
+
+    - name: Red Interna | Ajustar int-master
+      ansible.builtin.command: >-
+        nmcli con mod int-master ipv4.addresses {{ _worker_link.worker_ip }} ipv4.method manual ipv6.method ignore
+      when: _worker_link_needs_mod
+
+    - name: Red Interna | Activar int-master
+      ansible.builtin.command: nmcli con up int-master
+      changed_when: false

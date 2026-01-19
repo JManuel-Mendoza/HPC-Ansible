@@ -1,0 +1,30 @@
+---
+- name: Red Interna | Verificar conexion int-{{ link_item.key }}
+  ansible.builtin.command: nmcli -t -f NAME con show int-{{ link_item.key }}
+  register: master_link_exists
+  changed_when: false
+  failed_when: false
+
+- name: Red Interna | Crear conexion int-{{ link_item.key }}
+  ansible.builtin.command: >-
+    nmcli con add type ethernet ifname {{ link_item.value.master_if }} con-name int-{{ link_item.key }}
+    ipv4.method manual ipv4.addresses {{ link_item.value.master_ip }} ipv6.method ignore
+  when: master_link_exists.rc != 0
+
+- name: Red Interna | Leer parametros int-{{ link_item.key }}
+  ansible.builtin.command: nmcli -g ipv4.addresses,ipv4.method,ipv6.method con show int-{{ link_item.key }}
+  register: master_link_settings
+  changed_when: false
+
+- name: Red Interna | Calcular ajustes int-{{ link_item.key }}
+  ansible.builtin.set_fact:
+    _master_link_needs_mod: "{{ master_link_settings.stdout | trim != (link_item.value.master_ip ~ ':manual:ignore') }}"
+
+- name: Red Interna | Ajustar int-{{ link_item.key }}
+  ansible.builtin.command: >-
+    nmcli con mod int-{{ link_item.key }} ipv4.addresses {{ link_item.value.master_ip }} ipv4.method manual ipv6.method ignore
+  when: _master_link_needs_mod
+
+- name: Red Interna | Activar int-{{ link_item.key }}
+  ansible.builtin.command: nmcli con up int-{{ link_item.key }}
+  changed_when: false

@@ -623,3 +623,19 @@ master | CHANGED | rc=0 >>
 - Use NVMe (e.g., `/opt` or a dedicated `/scratch` on nvme) for scratch/cache.
 - Re-validate NFS export on master (`exportfs -v`) and mount on workers (`mount /mnt/llm-project`), then rerun the survey to confirm.
 **Notes:** summary generation initially failed due to a Jinja boolean/ternary precedence issue; fixed and reran successfully.
+
+## 2026-01-17 16:24 (-05) — red interna: integrar limpiar_red + redconf en rol
+**Context:** IPs internos de nodos mal configurados; se requiere aplicar la misma logica del playbook standalone `redconf.yml` y limpiar conexiones con `limpiar_red.yml`.
+**Changes implemented:**
+- Nuevo rol `roles/network_internal` con:
+  - limpieza de conexiones NM excepto `eno1` (equivalente a `limpiar_red.yml`).
+  - configuracion de enlaces internos master<->workers con `nmcli` (equivalente a `redconf.yml`).
+- Se agrega el rol al play principal con tag `network_internal`.
+**Files added/updated:**
+- `roles/network_internal/defaults/main.yml` (mapa `network_internal_links` y `network_internal_keep_if`)
+- `roles/network_internal/tasks/main.yml`
+- `roles/network_internal/tasks/master_link.yml`
+- `site.yml`
+**Execution:** no se ejecuto el rol en esta sesion (evitar cambios de red en vivo). Ejecute cuando sea apropiado:
+- `ansible-playbook -i inventario.ini site.yml --tags network_internal --diff`
+**Notes:** revisar hostnames y NICs reales antes de aplicar; los enlaces siguen el mapping de `playbooks sueltos/Red/redconf.yml`.
