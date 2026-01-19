@@ -1,4 +1,0 @@
-# Export NFS del proyecto LLM (master)
-nfs_exports:
-  - path: "{{ llm_nfs_export_dir }}"
-    clients: "{{ llm_internal_cidr }}(rw,sync,no_subtree_check,root_squash)"
