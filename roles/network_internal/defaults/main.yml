@@ -1,5 +1,8 @@
 ---
 network_internal_keep_if: "eno1"
+network_internal_exclude_ifaces:
+  - "tailscale0"
+network_internal_exclude_conn_regex: ".*tailscale.*"
 
 network_internal_links:
   worker1:

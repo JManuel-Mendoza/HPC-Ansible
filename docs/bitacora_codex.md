@@ -639,3 +639,18 @@ master | CHANGED | rc=0 >>
 **Execution:** no se ejecuto el rol en esta sesion (evitar cambios de red en vivo). Ejecute cuando sea apropiado:
 - `ansible-playbook -i inventario.ini site.yml --tags network_internal --diff`
 **Notes:** revisar hostnames y NICs reales antes de aplicar; los enlaces siguen el mapping de `playbooks sueltos/Red/redconf.yml`.
+
+## 2026-01-19 11:26 (-05) — evitar interferencia con Tailscale en red interna
+**Context:** el rol `network_internal` borraba conexiones NM excepto `eno1`, lo que podia eliminar `tailscale0` y romper Tailscale.
+**Change:** se agregan exclusiones para interfaces y conexiones Tailscale durante la limpieza.
+**Files changed:**
+- `roles/network_internal/defaults/main.yml` (vars: `network_internal_exclude_ifaces`, `network_internal_exclude_conn_regex`)
+- `roles/network_internal/tasks/main.yml` (filtrado de conexiones a borrar)
+**Notes:** el rol ahora omite cualquier conexion con nombre que haga match `.*tailscale.*` y la interfaz `tailscale0`.
+
+## 2026-01-19 11:30 (-05) — SSH PasswordAuthentication toggle playbook
+**Context:** requested an Ansible-controlled toggle to lock/unlock SSH password auth by editing `/etc/ssh/sshd_config` only.
+**Changes:**
+- Added `playbooks/ssh-password-toggle.yml` with `serial: 1`, `lineinfile` for `PasswordAuthentication`, validation via `sshd -t -f /etc/ssh/sshd_config`, and handler restart on change.
+- Added `docs/codex-log.md` entry with canonical commands.
+**Notes:** no other roles/files modified; no playbook run executed in this step.

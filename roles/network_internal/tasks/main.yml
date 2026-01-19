@@ -5,14 +5,30 @@
   register: nmcli_conns
   changed_when: false
 
+- name: Red Interna | Filtrar conexiones a borrar (excluir Tailscale)
+  ansible.builtin.set_fact:
+    nmcli_to_delete: >-
+      {%- set out = [] -%}
+      {%- for line in nmcli_conns.stdout_lines | default([]) -%}
+      {%- set parts = line.split(':', 1) -%}
+      {%- set name = parts[0] -%}
+      {%- set dev = (parts | length > 1) | ternary(parts[1], '') -%}
+      {%- set is_excluded_iface = dev in network_internal_exclude_ifaces -%}
+      {%- set is_excluded_name = (name | regex_search(network_internal_exclude_conn_regex)) is not none -%}
+      {%- if dev and dev != network_internal_keep_if and not is_excluded_iface and not is_excluded_name -%}
+      {%-   set _ = out.append(name) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+
 - name: Red Interna | Mostrar conexiones a borrar
   ansible.builtin.debug:
-    var: nmcli_conns.stdout_lines
+    var: nmcli_to_delete
 
 - name: Red Interna | Borrar conexiones no permitidas
   ansible.builtin.command: nmcli con delete "{{ item }}"
-  loop: "{{ nmcli_conns.stdout_lines }}"
-  when: nmcli_conns.stdout != ""
+  loop: "{{ nmcli_to_delete }}"
+  when: nmcli_to_delete | length > 0
 
 - name: Red Interna | Configurar enlaces internos en el master
   when: inventory_hostname == "master"
