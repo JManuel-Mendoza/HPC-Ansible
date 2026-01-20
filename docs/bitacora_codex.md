@@ -669,3 +669,11 @@ master | CHANGED | rc=0 >>
 - `site.yml` ya incluye el rol con tags `[slurm, munge, identities]` en un play dedicado.
 **Notes:** no se realizaron cambios de archivos (solo lectura) aparte de esta bitácora obligatoria.
 **Purpose of folders/files reviewed:** el directorio `roles/slurm_identities/` agrupa la automatización para crear identidades base de SLURM (usuarios/grupos munge/slurm) y su `tasks/main.yml` contiene la lógica idempotente; estos archivos existen para asegurar coherencia de UID/GID y shells entre nodos antes de instalar servicios SLURM/MUNGE.
+
+## 2026-01-20 11:29 (-05) — ajustar MUNGE en Rocky con dnf (CRB)
+**Context:** se requiere que la instalacion replique la secuencia dnf (epel-release, munge-devel con CRB, munge) sin ejecutar comandos directos.
+**Change:** en `roles/munge/tasks/main.yml` se reorganiza la instalacion Rocky para:
+- `epel-release` con `ansible.builtin.dnf`
+- `munge-devel` con `enablerepo: crb`
+- `munge` con `ansible.builtin.dnf`
+**Notes:** mantiene idempotencia con modulo dnf; no se ejecutaron comandos en esta sesion.

@@ -40,3 +40,10 @@
     - role: slurm_identities
       tags: [slurm, munge, identities]
 
+- name: Configuración de munge en nodos SLURM
+  hosts: all
+  become: true
+  roles:
+    - role: munge
+      tags: [munge]
+

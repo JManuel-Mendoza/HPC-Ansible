@@ -1,0 +1,103 @@
+- name: Ensure EPEL is present on Rocky
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [munge]
+
+- name: Install munge-devel from CRB on Rocky
+  ansible.builtin.dnf:
+    name: munge-devel
+    state: present
+    enablerepo: crb
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [munge]
+
+- name: Install munge package on Rocky
+  ansible.builtin.dnf:
+    name: munge
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [munge]
+
+- name: Install munge packages on Ubuntu
+  ansible.builtin.apt:
+    name:
+      - munge
+      - libmunge-dev
+    state: present
+    update_cache: true
+  when: ansible_facts['os_family'] == 'Debian'
+  tags: [munge]
+
+- name: Ensure munge directories exist with correct perms
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: munge
+    group: munge
+    mode: "0700"
+  loop:
+    - /etc/munge
+    - /var/log/munge
+    - /var/lib/munge
+  tags: [munge]
+
+# Evita problemas con /run (tmpfs) tras reinicio
+- name: Ensure systemd tmpfiles entry for /run/munge
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/munge.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      d /run/munge 0700 munge munge -
+  tags: [munge]
+
+- name: Create /run/munge via tmpfiles
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/munge.conf
+  changed_when: false
+  tags: [munge]
+
+# Generar key SOLO en el master (si no existe)
+- name: Generate munge key on key host if missing
+  ansible.builtin.command: "dd if=/dev/urandom of=/etc/munge/munge.key bs=1M count={{ munge_key_size_mb }}"
+  args:
+    creates: /etc/munge/munge.key
+  when: inventory_hostname == munge_key_host
+  tags: [munge]
+
+- name: Set ownership and mode on munge key (key host)
+  ansible.builtin.file:
+    path: /etc/munge/munge.key
+    owner: munge
+    group: munge
+    mode: "0600"
+  when: inventory_hostname == munge_key_host
+  tags: [munge]
+
+# Leer key desde el master y distribuirla a todos
+- name: Slurp munge key from key host
+  ansible.builtin.slurp:
+    src: /etc/munge/munge.key
+  delegate_to: "{{ munge_key_host }}"
+  run_once: true
+  register: munge_key_slurped
+  tags: [munge]
+
+- name: Distribute munge key to all nodes
+  ansible.builtin.copy:
+    dest: /etc/munge/munge.key
+    content: "{{ munge_key_slurped.content | b64decode }}"
+    owner: munge
+    group: munge
+    mode: "0600"
+  notify: Restart munge
+  tags: [munge]
+
+- name: Enable and start munge service
+  ansible.builtin.systemd:
+    name: munge
+    enabled: true
+    state: started
+  tags: [munge]
