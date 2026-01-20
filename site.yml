@@ -26,6 +26,13 @@
   roles:
     - { role: mariadb_server, tags: ["mariadb"] }
 
+- name: Preparar SlurmDB en MariaDB (master)
+  hosts: hpc_master
+  become: true
+  gather_facts: true
+  roles:
+    - { role: slurm_db_prep, tags: ["mariadb", "slurmdb"] }
+
 - name: Configuración NFS en workers
   hosts: workers
   become: true

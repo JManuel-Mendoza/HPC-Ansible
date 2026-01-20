@@ -727,3 +727,32 @@ master | CHANGED | rc=0 >>
 - Fixed assert to cast values to int: `(mariadb_version_major | int) >= (mariadb_min_version_major | int)`.
 **Outcome:** user confirmed MariaDB role now works.
 **Notes:** bitacora entry consolidated after resolution per request.
+
+## 2026-01-20 16:15 (-05) — Step 4: SlurmDB prep + MariaDB tuning
+**Context:** create Slurm accounting DB/users and apply MariaDB tuning on master.
+**Changes:**
+- New role `roles/slurm_db_prep` with tuning, DB/user creation, grants, and verification.
+- Added vars in `group_vars/hpc_master.yml` for DB/user/password/hosts and tuning defaults.
+- Wired role into `site.yml` for `hpc_master` with tags `mariadb`, `slurmdb`.
+**Files added/updated:**
+- `roles/slurm_db_prep/tasks/main.yml`
+- `roles/slurm_db_prep/handlers/main.yml`
+- `group_vars/hpc_master.yml`
+- `site.yml`
+**Notes:** no execution performed in this step.
+
+## 2026-01-20 16:33 (-05) — SlurmDB prep role run (success)
+**Context:** slurmdb tag run failed due to `slurmdb_mysql_user` being a list not handled by tasks.
+**Fix applied:**
+- `group_vars/hpc_master.yml`: `slurmdb_mysql_user` set as list.
+- `roles/slurm_db_prep/tasks/main.yml`: loop users x hosts for CREATE USER/GRANT.
+**Outcome:** user confirmed slurmdb role now works.
+
+## 2026-01-20 17:12 (-05) — revisión Step 4 (slurmdb) y hardening de salida
+**Context:** revisión de Step 4 (tuning + DB + usuarios/grants) y control de salida sensible.
+**Review summary:**
+- `slurmdb_mysql_db` = `slurm_acct_db`, hosts definidos: `localhost`, `master`.
+- `slurmdb_mysql_user` como lista; creación/GRANT usa producto users x hosts.
+- Tuning escrito en `/etc/my.cnf.d/slurm.cnf` con valores de `mariadb_slurm_tuning`.
+**Change:** se agregó `no_log: true` en creación de usuarios y se ajustó el verify para usar el primer usuario cuando la variable es lista.
+**Files changed:** `roles/slurm_db_prep/tasks/main.yml`, `docs/bitacora_codex.md`.
