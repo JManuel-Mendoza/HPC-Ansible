@@ -51,12 +51,22 @@
     group: root
     mode: "0644"
     content: |
-      d /run/munge 0700 munge munge -
+      d /run/munge 0711 munge munge -
   tags: [munge]
 
 - name: Create /run/munge via tmpfiles
   ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/munge.conf
   changed_when: false
+  tags: [munge]
+
+- name: Ensure /run/munge perms on Rocky/RHEL
+  ansible.builtin.file:
+    path: /run/munge
+    state: directory
+    owner: munge
+    group: munge
+    mode: "0711"
+  when: ansible_facts['os_family'] == 'RedHat'
   tags: [munge]
 
 # Generar key SOLO en el master (si no existe)
@@ -100,4 +110,9 @@
     name: munge
     enabled: true
     state: started
+  tags: [munge]
+
+- name: Verify munge local STATUS
+  ansible.builtin.shell: "munge -n | unmunge | grep -q STATUS"
+  changed_when: false
   tags: [munge]
