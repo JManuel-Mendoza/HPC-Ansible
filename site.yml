@@ -60,3 +60,19 @@
   roles:
     - role: munge
       tags: [munge]
+
+- name: Configuración de SLURM en nodo master
+  hosts: hpc_master
+  become: true
+  roles:
+    - role: slurm_rpm_build
+    - role: slurm_install
+      tags: [slurm, slurm_config, slurm_install]
+    - { role: slurm_controller, tags: ["slurm", "slurm_config"] }
+
+- name: Configuración de SLURM en nodos workers
+  hosts: workers
+  become: true
+  roles:
+    - role: slurm_compute
+      tags: [slurm, slurm_config]

@@ -1,0 +1,32 @@
+---
+- name: Slurm | Ensure log dir exists (master)
+  ansible.builtin.file:
+    path: "{{ slurm_log_dir }}"
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Ensure slurmctld spool dir exists (master)
+  ansible.builtin.file:
+    path: /var/spool/slurmctld
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Touch controller/db logs (master)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: touch
+    owner: slurm
+    group: slurm
+    mode: "0644"
+  loop:
+    - "{{ slurm_log_dir }}/slurmctld.log"
+    - "{{ slurm_log_dir }}/slurm_jobacct.log"
+    - "{{ slurm_log_dir }}/slurm_jobcomp.log"
+    - "{{ slurm_log_dir }}/slurmdbd.log"
+  tags: [slurm, slurm_config]

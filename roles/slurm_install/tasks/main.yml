@@ -1,0 +1,33 @@
+---
+- name: Slurm | See locally built RPMs (Rocky/RHEL)
+  ansible.builtin.shell: "ls -1 /root/rpmbuild/RPMS/x86_64/*.rpm"
+  register: _slurm_rpms
+  changed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Install RPMs (Rocky/RHEL)
+  ansible.builtin.dnf:
+    name: "{{ _slurm_rpms.stdout_lines }}"
+    state: present
+    disable_gpg_check: true
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Ensure /etc/slurm exists
+  ansible.builtin.file:
+    path: "{{ slurm_etc_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Install cgroup.conf
+  ansible.builtin.copy:
+    dest: "{{ slurm_etc_dir }}/cgroup.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ slurm_cgroup_conf }}"
+  tags: [slurm, slurm_config]

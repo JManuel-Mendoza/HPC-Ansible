@@ -1,0 +1,27 @@
+---
+- name: Slurm | Ensure log dir exists (compute)
+  ansible.builtin.file:
+    path: "{{ slurm_log_dir }}"
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Ensure slurmd spool dir exists (compute)
+  ansible.builtin.file:
+    path: /var/spool/slurmd
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Touch slurmd log (compute)
+  ansible.builtin.file:
+    path: "{{ slurm_log_dir }}/slurmd.log"
+    state: touch
+    owner: slurm
+    group: slurm
+    mode: "0644"
+  tags: [slurm, slurm_config]

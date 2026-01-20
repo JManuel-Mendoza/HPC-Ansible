@@ -1,0 +1,39 @@
+---
+- name: Slurm | Install build deps (Rocky/RHEL)
+  ansible.builtin.dnf:
+    name:
+      - rpm-build
+      - wget
+      - perl
+      - python3
+      - pam-devel
+      - dbus-devel
+      - readline-devel
+      - hwloc-devel
+      - munge-devel
+      - mariadb-devel
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_build]
+
+- name: Slurm | Download tarball (Rocky/RHEL)
+  ansible.builtin.get_url:
+    url: "{{ slurm_tarball_url }}"
+    dest: "/root/slurm-{{ slurm_version }}.tar.bz2"
+    mode: "0644"
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_build]
+
+- name: Slurm | Build RPMs with rpmbuild (Rocky/RHEL)
+  ansible.builtin.command: "rpmbuild -ta /root/slurm-{{ slurm_version }}.tar.bz2"
+  args:
+    creates: "/root/rpmbuild/RPMS/x86_64/.slurm_{{ slurm_version }}_built"
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_build]
+
+- name: Slurm | Mark RPM build complete (Rocky/RHEL)
+  ansible.builtin.file:
+    path: "/root/rpmbuild/RPMS/x86_64/.slurm_{{ slurm_version }}_built"
+    state: touch
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_build]

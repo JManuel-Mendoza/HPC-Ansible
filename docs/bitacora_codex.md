@@ -756,3 +756,19 @@ master | CHANGED | rc=0 >>
 - Tuning escrito en `/etc/my.cnf.d/slurm.cnf` con valores de `mariadb_slurm_tuning`.
 **Change:** se agregó `no_log: true` en creación de usuarios y se ajustó el verify para usar el primer usuario cuando la variable es lista.
 **Files changed:** `roles/slurm_db_prep/tasks/main.yml`, `docs/bitacora_codex.md`.
+
+## 2026-01-20 17:52 (-05) — revisión Step 5 (SLURM roles)
+**Context:** revisión de roles SLURM (build/install/controller/compute) sin aplicar cambios.
+**Findings:**
+- `slurm_rpm_build` y `slurm_install` se ejecutan solo en RedHat (when), Ubuntu no intenta rpmbuild/instalación.
+- `slurm_install` crea `/etc/slurm` y `cgroup.conf` en todos los nodos; esto es aceptable pero no específico de distro.
+- `slurm_controller` está en el play de SlurmDB, antes del play de build/install; se recomienda moverlo al play master de SLURM después de `slurm_install`.
+- `rpmbuild` usa `creates` con wildcard (`slurm-{{ slurm_version }}*.rpm`), no idempotente seguro.
+**Suggested minimal fixes:** ver diffs en la respuesta.
+
+## 2026-01-20 17:54 (-05) — aplicar fixes Step 5 (SLURM)
+**Context:** aplicar ajustes minimos de idempotencia y orden de roles.
+**Changes:**
+- `site.yml`: mover `slurm_controller` al play de SLURM master, despues de `slurm_install`.
+- `roles/slurm_rpm_build/tasks/main.yml`: reemplazar `creates` con wildcard por un marker `.slurm_{{ slurm_version }}_built` y crear marker tras `rpmbuild`.
+**Notes:** no ejecucion realizada.

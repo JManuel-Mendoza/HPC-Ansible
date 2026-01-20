@@ -51,7 +51,7 @@ llm_python_packages:
   - transformers
 
 # =====================
-# SLURM settings
+# SLURM-Munge settings
 # =====================
 
 munge_uid: 1011
@@ -61,3 +61,19 @@ slurm_gid: 1012
 
 munge_key_host: master   # nombre de inventario del master
 munge_key_size_mb: 4
+
+# =====================
+# --- Slurm core ---
+# =====================
+slurm_version: "23.11.3"
+slurm_tarball_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
+
+slurm_etc_dir: /etc/slurm
+slurm_log_dir: /var/log/slurm
+
+# cgroup
+slurm_cgroup_conf: |
+  CgroupPlugin=autodetect
+
+# control machine (ajusta si tu inventario no usa "master")
+slurm_control_machine: "master"
