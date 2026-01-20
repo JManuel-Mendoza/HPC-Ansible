@@ -677,3 +677,53 @@ master | CHANGED | rc=0 >>
 - `munge-devel` con `enablerepo: crb`
 - `munge` con `ansible.builtin.dnf`
 **Notes:** mantiene idempotencia con modulo dnf; no se ejecutaron comandos en esta sesion.
+
+## 2026-01-20 14:37 (-05) — ajustar permisos /run/munge en Rocky/RHEL
+**Context:** munge.service falla en Rocky/RHEL por permisos en `/run/munge`.
+**Change:**
+- `roles/munge/tasks/main.yml`: tmpfiles ahora crea `/run/munge` con modo `0711`.
+- Se agrega task idempotente para forzar `owner=munge`, `group=munge`, `mode=0711` en `/run/munge` en RedHat.
+**Notes:** no se ejecutaron comandos en esta sesion.
+
+## 2026-01-20 15:07 (-05) — Step 3: MariaDB server role on master
+**Context:** install and start MariaDB on master (Rocky 9.6) with version verification.
+**Changes:**
+- New role `roles/mariadb_server` with defaults and tasks.
+- Packages (RedHat): `mariadb-server`, `mariadb-devel`, `mariadb-connector-c-devel`, `readline-devel`.
+- Optional `mariadb_devel_enablerepo` to install `mariadb-devel` from a specific repo.
+- Service `mariadb` enabled/started.
+- Verification: `mariadb -N -B -e 'SELECT VERSION();'` and assert major >= `mariadb_min_version_major`.
+- Role wired into `site.yml` for `hpc_master` with tag `mariadb`.
+**Files added/updated:**
+- `roles/mariadb_server/defaults/main.yml`
+- `roles/mariadb_server/tasks/main.yml`
+- `site.yml`
+**Notes:** no execution performed in this step.
+
+## 2026-01-20 15:13 (-05) — MariaDB role run (failed)
+**Command:** `ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags mariadb,verify --diff`
+**Result:** failed during `MariaDB | Install mariadb-devel (Rocky/RHEL, default repos)`.
+**Error:** `mariadb-devel All matches were filtered out by modular filtering for argument: mariadb-devel`.
+**Notes:** no remediation attempted; awaiting decision to adjust repo/module handling.
+
+## 2026-01-20 15:17 (-05) — MariaDB modular filtering fix
+**Context:** `mariadb-devel` was filtered out by modular filtering on Rocky/RHEL.
+**Change:** added module detection and reset/disable steps before installing `mariadb-devel` in `roles/mariadb_server/tasks/main.yml`.
+**Notes:** no execution in this step.
+
+## 2026-01-20 15:28 (-05) — MariaDB module stream enablement
+**Context:** fix `mariadb-devel` modular filtering on Rocky/RHEL by selecting module stream.
+**Change:**
+- Added `mariadb_module_stream` in `group_vars/hpc_master.yml` (default `10.11`).
+- `roles/mariadb_server/tasks/main.yml`: reset mariadb module and enable `mariadb:{{ mariadb_module_stream }}` before installing `mariadb-devel`.
+**Notes:** no execution performed in this step.
+
+## 2026-01-20 16:10 (-05) — MariaDB role stabilization (module/verify issues resolved)
+**Context:** MariaDB install/verify on Rocky had multiple failures (modular filtering, regex parsing, assert type mismatch). Required simplification and robust verification.
+**Changes applied (summary):**
+- Simplified Rocky install to a single DNF package set: `mariadb-server`, `mariadb-devel`, `mariadb-connector-c-devel`, `readline-devel`.
+- Removed module reset/enable logic to avoid modular filtering complexity.
+- Hardened version parsing to safely extract major version from `mariadb -N -B -e 'SELECT VERSION();'` output.
+- Fixed assert to cast values to int: `(mariadb_version_major | int) >= (mariadb_min_version_major | int)`.
+**Outcome:** user confirmed MariaDB role now works.
+**Notes:** bitacora entry consolidated after resolution per request.

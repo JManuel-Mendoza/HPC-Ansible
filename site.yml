@@ -19,6 +19,13 @@
     - { role: nfs_server, tags: ["nfs"] }
     - { role: llm_project, tags: ["llm_project"] }
 
+- name: MariaDB en master
+  hosts: hpc_master
+  become: true
+  gather_facts: true
+  roles:
+    - { role: mariadb_server, tags: ["mariadb"] }
+
 - name: Configuración NFS en workers
   hosts: workers
   become: true
@@ -46,4 +53,3 @@
   roles:
     - role: munge
       tags: [munge]
-

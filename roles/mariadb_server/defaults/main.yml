@@ -1,0 +1,3 @@
+---
+mariadb_devel_enablerepo: ""
+mariadb_min_version_major: 10
