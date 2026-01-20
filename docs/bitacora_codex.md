@@ -654,3 +654,18 @@ master | CHANGED | rc=0 >>
 - Added `playbooks/ssh-password-toggle.yml` with `serial: 1`, `lineinfile` for `PasswordAuthentication`, validation via `sshd -t -f /etc/ssh/sshd_config`, and handler restart on change.
 - Added `docs/codex-log.md` entry with canonical commands.
 **Notes:** no other roles/files modified; no playbook run executed in this step.
+
+## 2026-01-20 10:50 (-05) — revisión de slurm_identities (solo lectura)
+**Context:** se solicitó revisar carpetas/archivos relacionados con SLURM sin modificar nada.
+**Commands executed:**
+- `ls roles/slurm_identities`
+- `find roles/slurm_identities -type f -maxdepth 2 -print`
+- `cat roles/slurm_identities/tasks/main.yml`
+- `rg -n "slurm_identities|slurm_uid|munge_uid" -S roles site.yml group_vars`
+- `sed -n '30,60p' site.yml`
+**Findings:**
+- El rol `roles/slurm_identities` ya existe y define grupos/usuarios munge y slurm con nologin por distro (Debian/Ubuntu vs Rocky/RHEL) en `roles/slurm_identities/tasks/main.yml`.
+- Variables `munge_uid`, `munge_gid`, `slurm_uid`, `slurm_gid` están en `group_vars/all.yml`.
+- `site.yml` ya incluye el rol con tags `[slurm, munge, identities]` en un play dedicado.
+**Notes:** no se realizaron cambios de archivos (solo lectura) aparte de esta bitácora obligatoria.
+**Purpose of folders/files reviewed:** el directorio `roles/slurm_identities/` agrupa la automatización para crear identidades base de SLURM (usuarios/grupos munge/slurm) y su `tasks/main.yml` contiene la lógica idempotente; estos archivos existen para asegurar coherencia de UID/GID y shells entre nodos antes de instalar servicios SLURM/MUNGE.

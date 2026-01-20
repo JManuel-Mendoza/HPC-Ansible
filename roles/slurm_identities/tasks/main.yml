@@ -1,0 +1,37 @@
+- name: Choose nologin shell (varies by distro)
+  ansible.builtin.set_fact:
+    nologin_shell: "{{ '/usr/sbin/nologin' if (ansible_facts['distribution'] in ['Ubuntu', 'Debian']) else '/sbin/nologin' }}"
+
+- name: Ensure munge group exists
+  ansible.builtin.group:
+    name: munge
+    gid: "{{ munge_gid }}"
+    state: present
+
+- name: Ensure munge user exists
+  ansible.builtin.user:
+    name: munge
+    comment: "MUNGE Uid 'N' Gid Emporium"
+    uid: "{{ munge_uid }}"
+    group: munge
+    home: /var/lib/munge
+    create_home: true
+    shell: "{{ nologin_shell }}"
+    state: present
+
+- name: Ensure slurm group exists
+  ansible.builtin.group:
+    name: slurm
+    gid: "{{ slurm_gid }}"
+    state: present
+
+- name: Ensure slurm user exists
+  ansible.builtin.user:
+    name: slurm
+    comment: "SLURM workload manager"
+    uid: "{{ slurm_uid }}"
+    group: slurm
+    home: /var/lib/slurm
+    create_home: true
+    shell: /bin/bash
+    state: present

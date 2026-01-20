@@ -49,3 +49,12 @@ llm_python_packages:
   - numpy
   - torch
   - transformers
+
+# =====================
+# SLURM settings
+# =====================
+
+munge_uid: 1011
+munge_gid: 1011
+slurm_uid: 1012
+slurm_gid: 1012

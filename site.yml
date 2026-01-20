@@ -32,3 +32,11 @@
   gather_facts: true
   roles:
     - { role: validate, tags: ["validate"] }
+
+- name: Configuración de identidades SLURM
+  hosts: all
+  become: true
+  roles:
+    - role: slurm_identities
+      tags: [slurm, munge, identities]
+
