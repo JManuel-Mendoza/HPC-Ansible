@@ -814,3 +814,47 @@ master | CHANGED | rc=0 >>
 - worker3: ok=12 changed=0 failed=0
 - worker4: ok=12 changed=0 failed=0
 **Notes:** slurm_facts populated hostvars and slurm_install templated slurm.conf without errors.
+
+## 2026-01-21 12:37 (-05) — fixes slurm.conf templating + worker distribution
+**Context:** slurmctld failed due to malformed PartitionName lines; workers lacked slurm.conf.
+**Changes:**
+- `roles/slurm_install/templates/slurm.conf.j2`: corrected partition loop whitespace to avoid concatenated lines; safe group lookup.
+- `roles/slurm_install/tasks/main.yml`: restrict RPM discovery/install to master only.
+- `site.yml`: add `slurm_install` to workers for config distribution.
+**Notes:** no execution performed in this step.
+
+## 2026-01-21 13:55 (-05) — slurm_facts/slurm_install/slurm_config run (failed)
+**Command:** `ansible-playbook -i inventario.ini site.yml -b --limit 'master:worker1:worker2' --tags 'munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd' --diff`
+**Failure:** `slurm_install` template step failed with missing `slurm_node_name` in hostvars during `slurm.conf` rendering on master.
+**Error excerpt:** `AnsibleUndefinedVariable: 'ansible.vars.hostvars.HostVarsVars object' has no attribute 'slurm_node_name'`.
+**Notes:** no remediation applied in this step.
+
+## 2026-01-21 14:21 (-05) — slurm.conf template fix + RPM distribución a workers
+**Context:** hosts: master, worker1, worker2; playbook: site.yml; tags: munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd; branch: codex.
+**Symptom:** `slurm_install` falló al templar `slurm.conf` con el error Jinja `expected token 'end of statement block', got '{'`; luego, al reintentar, `slurm_compute` falló en workers con `Could not find the requested service slurmd`.
+**Root cause:** en `slurm.conf.j2` faltaba el cierre `-%}` de un `{% set %}` en el loop de particiones, rompiendo el render. Además, la instalación de RPMs se hacía solo en el master; los workers no recibían los paquetes Slurm, por lo que el servicio `slurmd` no existía.
+**Fix:** se corrigió la sintaxis del template cerrando el `{% set _ = nodes.append(...) %}` y se agregó un flujo de distribución de RPMs para workers: se define un cache local en el controlador (`.cache/slurm-rpms`), se hace `find`/`fetch` de los RPMs construidos en el master, se copian a cada worker en un staging (`/tmp/slurm-rpms`), se construye una lista de paquetes desde ese staging y se instala con `dnf` en hosts RedHat que no son master. Esto asegura que `slurmd` esté instalado antes de intentar habilitar el servicio.
+**Files changed:** `roles/slurm_install/templates/slurm.conf.j2`, `roles/slurm_install/tasks/main.yml`, `roles/slurm_install/defaults/main.yml`, `docs/bitacora_codex.md`.
+**Validation:** re-ejecutar `ansible-playbook -i inventario.ini site.yml -b --limit 'master:worker1:worker2' --tags 'munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd' --diff`; en workers validar `rpm -qa | grep -i slurm` y `systemctl status slurmd` (esperar servicio presente y activo).
+**Rollback:** revertir los cambios en `roles/slurm_install/templates/slurm.conf.j2` y `roles/slurm_install/tasks/main.yml`, eliminar `roles/slurm_install/defaults/main.yml`, limpiar `/tmp/slurm-rpms` en workers y `./.cache/slurm-rpms` en el controlador, y desinstalar los paquetes Slurm en workers si fuera necesario.
+**Notes:** el flujo usa `delegate_to`/`run_once` para copiar RPMs desde el master al controlador y luego distribuirlos a los workers.
+
+## 2026-01-21 14:28 (-05) — cache de RPMs en /tmp para evitar permisos
+**Context:** hosts: master, worker1, worker2; playbook: site.yml; tags: munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd; branch: codex.
+**Symptom:** `slurm_install` falló en `Fetch RPMs to controller cache` con `PermissionError: [Errno 13] Permission denied` al escribir en `/home/sistemas/hpc-ansible/.cache/slurm-rpms/*.rpm`.
+**Root cause:** el cache de RPMs estaba bajo el árbol del repo y quedó con permisos/propietario no escribibles por el usuario que ejecuta el playbook.
+**Fix:** mover el cache local del controlador a `/tmp/slurm-rpms` (valor de `slurm_rpm_cache_dir`) para evitar problemas de permisos y permitir que `fetch` escriba los RPMs descargados desde el master.
+**Files changed:** `roles/slurm_install/defaults/main.yml`, `docs/bitacora_codex.md`.
+**Validation:** rerun `ansible-playbook -i inventario.ini site.yml -b --limit 'master:worker1:worker2' --tags 'munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd' --diff` y confirmar que `Fetch RPMs to controller cache` completa sin errores.
+**Rollback:** revertir `slurm_rpm_cache_dir` a `{{ playbook_dir }}/.cache/slurm-rpms`, asegurando permisos correctos en `.cache/slurm-rpms` o recreando el directorio con ownership adecuado.
+**Notes:** el staging en workers sigue siendo `/tmp/slurm-rpms`; el cache del controlador usa la misma ruta pero en una máquina distinta.
+
+## 2026-01-21 14:35 (-05) — asegurar permisos del cache local para fetch
+**Context:** hosts: master, worker1, worker2; playbook: site.yml; tags: munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd; branch: codex.
+**Symptom:** persistió `PermissionError` en `Fetch RPMs to controller cache` aun con `slurm_rpm_cache_dir=/tmp/slurm-rpms`.
+**Root cause:** el directorio `/tmp/slurm-rpms` fue creado previamente como root con permisos 0755; `fetch` escribe con el usuario local que ejecuta Ansible y no puede crear archivos allí.
+**Fix:** en el task `Slurm | Ensure local RPM cache dir exists (controller)` se forza `owner`/`group` al usuario local (`lookup('env','USER')`) para garantizar escritura del cache por el proceso de Ansible.
+**Files changed:** `roles/slurm_install/tasks/main.yml`, `docs/bitacora_codex.md`.
+**Validation:** rerun `ansible-playbook -i inventario.ini site.yml -b --limit 'master:worker1:worker2' --tags 'munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd' --diff` y confirmar que `Fetch RPMs to controller cache` completa sin errores.
+**Rollback:** revertir el `owner`/`group` en `roles/slurm_install/tasks/main.yml`; si el error vuelve, recrear manualmente el directorio con permisos adecuados.
+**Notes:** el `fetch` siempre escribe en el controlador como el usuario local; por eso el ownership del cache es crítico.

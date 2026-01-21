@@ -81,5 +81,7 @@
   hosts: workers
   become: true
   roles:
+    - role: slurm_install
+      tags: [slurm, slurm_config]
     - role: slurm_compute
       tags: [slurm, slurm_config]

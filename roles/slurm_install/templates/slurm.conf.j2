@@ -9,7 +9,7 @@
 # See the slurm.conf man page for more information.
 #
 ClusterName=cluster_HPC
-SlurmctldHost={{ hostvars[slurm_control_machine].slurm_node_name }}
+SlurmctldHost={{ slurm_control_machine }}
 #
 #DisableRootJobs=NO
 #EnforcePartLimits=NO
@@ -176,17 +176,22 @@ SlurmdLogFile=/var/log/slurm/slurmd.log
 #
 #
 # COMPUTE NODES (ANSIBLE MANAGED)
-{% for h in groups['slurm_all'] | sort %}
-NodeName={{ hostvars[h].slurm_node_name }} CPUs={{ hostvars[h].slurm_cpus }} RealMemory={{ hostvars[h].slurm_real_memory }}{% if (hostvars[h].slurm_node_gres | default('')) | length > 0 %} Gres={{ hostvars[h].slurm_node_gres }}{% endif %} State=UNKNOWN
+{% for h in (ansible_play_hosts_all | sort) %}
+{% set hn   = hostvars[h].get('slurm_node_name', h) %}
+{% set cpus = hostvars[h].get('slurm_cpus', 1) %}
+{% set mem  = hostvars[h].get('slurm_real_memory', 1024) %}
+{% set gres = hostvars[h].get('slurm_node_gres', '') %}
+NodeName={{ hn }} CPUs={{ cpus }} RealMemory={{ mem }}{% if gres %} Gres={{ gres }}{% endif %} State=UNKNOWN
 {% endfor %}
 
+
 # PARTITIONS (ANSIBLE MANAGED)
-{% for p in slurm_partitions %}
-{% set nodes = [] %}
-{% for g in (p.groups | default([])) %}
-  {% for h in (groups[g] | default([])) %}
-    {% set _ = nodes.append(hostvars[h].slurm_node_name) %}
-  {% endfor %}
-{% endfor %}
+{% for p in slurm_partitions -%}
+{%- set nodes = [] -%}
+{%- for g in (p.groups | default([])) -%}
+{%- for h in (groups.get(g, [])) -%}
+{%- set _ = nodes.append(hostvars[h].get('slurm_node_name', h)) -%}
+{%- endfor -%}
+{%- endfor -%}
 PartitionName={{ p.name }} Nodes={{ nodes | unique | join(',') }}{% if (p.default | default(false)) %} Default=YES{% else %} Default=NO{% endif %} MaxTime={{ p.max_time | default('INFINITE') }} State={{ p.state | default('UP') }}{% if p.shared is defined %} Shared={{ p.shared }}{% endif %}
 {% endfor %}

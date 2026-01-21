@@ -1,0 +1,4 @@
+---
+slurm_rpm_cache_dir: "/tmp/slurm-rpms"
+slurm_rpm_staging_dir: "/tmp/slurm-rpms"
+slurm_rpm_source_dir: "/root/rpmbuild/RPMS/x86_64"

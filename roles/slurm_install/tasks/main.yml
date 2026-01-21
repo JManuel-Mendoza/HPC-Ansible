@@ -3,7 +3,9 @@
   ansible.builtin.shell: "ls -1 /root/rpmbuild/RPMS/x86_64/*.rpm | grep -v '/slurm-openlava-'"
   register: _slurm_rpms
   changed_when: false
-  when: ansible_facts['os_family'] == 'RedHat'
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname in groups.get('hpc_master', [])
   tags: [slurm, slurm_install]
 
 - name: Slurm | Install RPMs (Rocky/RHEL)
@@ -13,7 +15,93 @@
     disable_gpg_check: true
   when:
     - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname in groups.get('hpc_master', [])
     - _slurm_rpms.stdout_lines | length > 0
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Ensure local RPM cache dir exists (controller)
+  ansible.builtin.file:
+    path: "{{ slurm_rpm_cache_dir }}"
+    state: directory
+    owner: "{{ lookup('env', 'USER') | default('sistemas', true) }}"
+    group: "{{ lookup('env', 'USER') | default('sistemas', true) }}"
+    mode: "0755"
+  delegate_to: localhost
+  run_once: true
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Find built RPMs on master (Rocky/RHEL)
+  ansible.builtin.find:
+    paths: "{{ slurm_rpm_source_dir }}"
+    patterns: "*.rpm"
+    file_type: file
+  register: _slurm_rpm_find
+  changed_when: false
+  delegate_to: "{{ groups['hpc_master'][0] }}"
+  run_once: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - groups.get('hpc_master', []) | length > 0
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Fetch RPMs to controller cache (Rocky/RHEL)
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: "{{ slurm_rpm_cache_dir }}/"
+    flat: true
+  loop: "{{ _slurm_rpm_find.files | rejectattr('path', 'search', '/slurm-openlava-') | list }}"
+  delegate_to: "{{ groups['hpc_master'][0] }}"
+  run_once: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - groups.get('hpc_master', []) | length > 0
+    - _slurm_rpm_find is defined
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Ensure RPM staging dir exists (workers)
+  ansible.builtin.file:
+    path: "{{ slurm_rpm_staging_dir }}"
+    state: directory
+    mode: "0755"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname not in groups.get('hpc_master', [])
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Copy RPMs to workers (Rocky/RHEL)
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ slurm_rpm_staging_dir }}/{{ item | basename }}"
+    mode: "0644"
+  with_fileglob:
+    - "{{ slurm_rpm_cache_dir }}/*.rpm"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname not in groups.get('hpc_master', [])
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Build worker RPM list from cache (Rocky/RHEL)
+  ansible.builtin.set_fact:
+    slurm_worker_rpms: >-
+      {{ lookup('fileglob', slurm_rpm_cache_dir + '/*.rpm', wantlist=True)
+         | map('basename')
+         | map('regex_replace', '^(.*)$', slurm_rpm_staging_dir ~ '/\\1')
+         | list }}
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname not in groups.get('hpc_master', [])
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Install RPMs on workers (Rocky/RHEL)
+  ansible.builtin.dnf:
+    name: "{{ slurm_worker_rpms }}"
+    state: present
+    disable_gpg_check: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname not in groups.get('hpc_master', [])
+    - slurm_worker_rpms | length > 0
   tags: [slurm, slurm_install]
 
 - name: Slurm | Ensure /etc/slurm exists
@@ -33,6 +121,15 @@
     mode: "0644"
     content: "{{ slurm_cgroup_conf }}"
   tags: [slurm, slurm_config]
+
+- name: Slurm | Fallback per-host facts for templating
+  ansible.builtin.set_fact:
+    slurm_node_name: "{{ ansible_facts.hostname }}"
+    slurm_cpus: "{{ ansible_facts.processor_vcpus | default(1) | int }}"
+    slurm_real_memory: "{{ [ (ansible_facts.memtotal_mb | default(2048) | int) - (slurm_mem_reserve_mb | default(1024) | int), 1024 ] | max }}"
+  when: slurm_node_name is not defined or slurm_cpus is not defined or slurm_real_memory is not defined
+  tags: [slurm, slurm_facts]
+
 
 - name: Slurm | Install slurm.conf (templated from facts)
   ansible.builtin.template:
