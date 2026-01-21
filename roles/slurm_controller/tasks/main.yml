@@ -30,3 +30,41 @@
     - "{{ slurm_log_dir }}/slurm_jobcomp.log"
     - "{{ slurm_log_dir }}/slurmdbd.log"
   tags: [slurm, slurm_config]
+
+- name: Slurm | Install slurmdbd.conf (master)
+  ansible.builtin.template:
+    src: slurmdbd.conf.j2
+    dest: /etc/slurm/slurmdbd.conf
+    owner: slurm
+    group: slurm
+    mode: "0600"
+  register: _slurmdbd_conf
+  tags: [slurm, slurmdbd]
+
+- name: Slurm | Enable and start slurmdbd (master)
+  ansible.builtin.systemd:
+    name: slurmdbd
+    enabled: true
+    state: started
+  tags: [slurm, slurmdbd]
+
+- name: Slurm | Restart slurmdbd if config changed (master)
+  ansible.builtin.systemd:
+    name: slurmdbd
+    state: restarted
+  when: _slurmdbd_conf.changed
+  tags: [slurm, slurmdbd]
+
+- name: Slurm | Enable and start slurmctld (master)
+  ansible.builtin.systemd:
+    name: slurmctld
+    enabled: true
+    state: started
+  tags: [slurm, slurmctld]
+
+- name: Slurm | Restart slurmctld if slurm.conf changed (master)
+  ansible.builtin.systemd:
+    name: slurmctld
+    state: restarted
+  when: slurm_conf_changed | default(false)
+  tags: [slurm, slurmctld]

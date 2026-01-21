@@ -1,0 +1,39 @@
+---
+- name: Slurm facts | Default memory reserve (MB)
+  ansible.builtin.set_fact:
+    slurm_mem_reserve_mb: "{{ slurm_mem_reserve_mb | default(1024) | int }}"
+  tags: [slurm, slurm_facts]
+
+- name: Slurm facts | Set node identity + CPU + RealMemory
+  ansible.builtin.set_fact:
+    # NodeName = hostname corto real por defecto
+    slurm_node_name: "{{ slurm_node_name | default(ansible_facts.hostname) }}"
+    slurm_cpus: >-
+      {{
+        (ansible_facts.processor_vcpus | default(
+          (ansible_facts.processor_count | int) *
+          (ansible_facts.processor_cores | int) *
+          (ansible_facts.processor_threads_per_core | default(1) | int)
+        )) | int
+      }}
+    slurm_real_memory: "{{ [ (ansible_facts.memtotal_mb | int) - (slurm_mem_reserve_mb | int), 1024 ] | max }}"
+  tags: [slurm, slurm_facts]
+
+- name: Slurm facts | Detect GPU count (nvidia-smi)
+  ansible.builtin.command: nvidia-smi -L
+  register: _nvidia_smi
+  changed_when: false
+  failed_when: false
+  tags: [slurm, slurm_facts]
+
+- name: Slurm facts | Set GRES string if GPU exists
+  ansible.builtin.set_fact:
+    slurm_gpu_count: "{{ 0 if _nvidia_smi.rc != 0 else (_nvidia_smi.stdout_lines | length) }}"
+    slurm_node_gres: "{{ ('gpu:' ~ (0 if _nvidia_smi.rc != 0 else (_nvidia_smi.stdout_lines | length))) }}"
+  tags: [slurm, slurm_facts]
+
+- name: Slurm facts | Clear GRES if no GPU
+  ansible.builtin.set_fact:
+    slurm_node_gres: ""
+  when: slurm_gpu_count | int == 0
+  tags: [slurm, slurm_facts]

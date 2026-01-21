@@ -25,3 +25,17 @@
     group: slurm
     mode: "0644"
   tags: [slurm, slurm_config]
+
+- name: Slurm | Enable and start slurmd (compute)
+  ansible.builtin.systemd:
+    name: slurmd
+    enabled: true
+    state: started
+  tags: [slurm, slurmd]
+
+- name: Slurm | Restart slurmd if slurm.conf changed (compute)
+  ansible.builtin.systemd:
+    name: slurmd
+    state: restarted
+  when: slurm_conf_changed | default(false)
+  tags: [slurm, slurmd]

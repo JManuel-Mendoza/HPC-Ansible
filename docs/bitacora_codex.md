@@ -772,3 +772,45 @@ master | CHANGED | rc=0 >>
 - `site.yml`: mover `slurm_controller` al play de SLURM master, despues de `slurm_install`.
 - `roles/slurm_rpm_build/tasks/main.yml`: reemplazar `creates` con wildcard por un marker `.slurm_{{ slurm_version }}_built` y crear marker tras `rpmbuild`.
 **Notes:** no ejecucion realizada.
+
+## 2026-01-21 11:06 (-05) — revisión Step 5 (Slurm) sin cambios
+**Context:** revisión de implementación Step 5 (slurm.conf, slurmdbd.conf, arranque de daemons).
+**Commands executed:**
+- `find roles/slurm_rpm_build roles/slurm_install roles/slurm_controller roles/slurm_compute -type f -maxdepth 2 -print`
+- `sed -n '1,200p' roles/slurm_rpm_build/tasks/main.yml`
+- `sed -n '1,200p' roles/slurm_install/tasks/main.yml`
+- `sed -n '1,200p' roles/slurm_controller/tasks/main.yml`
+- `sed -n '1,200p' roles/slurm_compute/tasks/main.yml`
+- `rg -n "Flags=HAS_FILE|JobCompType|JobCompLoc|SlurmctldHost|NodeName" roles/slurm_install/files/slurm.conf`
+- `cat inventario.ini`
+**Findings:** ver respuesta detallada; no se aplicaron cambios.
+
+## 2026-01-21 11:44 (-05) — fix indentación slurm_controller
+**Context:** `roles/slurm_controller/tasks/main.yml` tenía un bloque indentado incorrectamente para el template `slurmdbd.conf`.
+**Change:** corregida la indentación para que el task `Slurm | Install slurmdbd.conf (master)` sea de nivel superior.
+**Files changed:** `roles/slurm_controller/tasks/main.yml`.
+
+## 2026-01-21 12:00 (-05) — slurm_facts fix + sudo password for worker3/worker4
+**Context:** `slurm_facts` failed on int/str subtraction; workers 3/4 failed with missing sudo password.
+**Changes:**
+- `roles/slurm_facts/tasks/main.yml`: cast `slurm_mem_reserve_mb | int` in real memory calculation.
+- `inventario.ini`: added `ansible_become_password` for `worker3` and `worker4` (value provided by user).
+**Notes:** rerun `ansible-playbook -i inventario.ini site.yml --tags "slurm_facts,slurm_config"` to confirm.
+
+## 2026-01-21 12:18 (-05) — fix slurm_install tags + filtro openlava
+**Context:** evitar que `--tags slurm_config` ejecute instalación de RPMs y filtrar paquetes slurm-openlava con deps faltantes.
+**Changes:**
+- `site.yml`: se elimina `slurm_config` del tag del rol `slurm_install`.
+- `roles/slurm_install/tasks/main.yml`: filtra RPMs con `grep -v '/slurm-openlava-'` y evita instalar si la lista queda vacía.
+**Notes:** no ejecución realizada en esta etapa.
+
+## 2026-01-21 12:26 (-05) — slurm_facts + slurm_install run (success)
+**Command:** `ansible-playbook -i inventario.ini site.yml --tags "slurm_facts,slurm_install"`
+**Result:** success; no failures.
+**Recap:**
+- master: ok=19 changed=0 failed=0
+- worker1: ok=11 changed=0 failed=0
+- worker2: ok=11 changed=0 failed=0
+- worker3: ok=12 changed=0 failed=0
+- worker4: ok=12 changed=0 failed=0
+**Notes:** slurm_facts populated hostvars and slurm_install templated slurm.conf without errors.

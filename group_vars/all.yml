@@ -75,5 +75,21 @@ slurm_log_dir: /var/log/slurm
 slurm_cgroup_conf: |
   CgroupPlugin=autodetect
 
-# control machine (ajusta si tu inventario no usa "master")
-slurm_control_machine: "master"
+# control machine
+# Para construir slurm.conf a partir de facts
+slurm_control_machine: "master"     # nombre de inventario del master
+slurm_mem_reserve_mb: 1024          # reserva RAM para el SO (MB)
+
+# Define particiones por grupos de inventario (recomendado)
+slurm_partitions:
+  - name: debug
+    groups: ["slurm_all"]
+    default: true
+    max_time: "INFINITE"
+    state: "UP"
+  - name: gpu
+    groups: ["slurm_gpu"]
+    default: false
+    max_time: "INFINITE"
+    state: "UP"
+    shared: "YES"
