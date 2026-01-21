@@ -81,16 +81,25 @@
     - inventory_hostname not in groups.get('hpc_master', [])
   tags: [slurm, slurm_install]
 
-- name: Slurm | Build worker RPM list from cache (Rocky/RHEL)
-  ansible.builtin.set_fact:
-    slurm_worker_rpms: >-
-      {{ lookup('fileglob', slurm_rpm_cache_dir + '/*.rpm', wantlist=True)
-         | map('basename')
-         | map('regex_replace', '^(.*)$', slurm_rpm_staging_dir ~ '/\\1')
-         | list }}
+- name: Slurm | List RPMs staged on workers (Rocky/RHEL)
+  ansible.builtin.find:
+    paths: "{{ slurm_rpm_staging_dir }}"
+    patterns: "*.rpm"
+    file_type: file
+  register: _slurm_worker_rpms
+  changed_when: false
   when:
     - ansible_facts['os_family'] == 'RedHat'
     - inventory_hostname not in groups.get('hpc_master', [])
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Build worker RPM list from staging (Rocky/RHEL)
+  ansible.builtin.set_fact:
+    slurm_worker_rpms: "{{ _slurm_worker_rpms.files | map(attribute='path') | list }}"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname not in groups.get('hpc_master', [])
+    - _slurm_worker_rpms is defined
   tags: [slurm, slurm_install]
 
 - name: Slurm | Install RPMs on workers (Rocky/RHEL)
@@ -98,10 +107,22 @@
     name: "{{ slurm_worker_rpms }}"
     state: present
     disable_gpg_check: true
+    disable_excludes: all
+    update_cache: true
   when:
     - ansible_facts['os_family'] == 'RedHat'
     - inventory_hostname not in groups.get('hpc_master', [])
     - slurm_worker_rpms | length > 0
+  tags: [slurm, slurm_install]
+
+- name: Slurm | Verify slurmd package installed (workers)
+  ansible.builtin.command: rpm -q slurm-slurmd
+  register: _slurm_slurmd_rpm
+  changed_when: false
+  failed_when: _slurm_slurmd_rpm.rc != 0
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - inventory_hostname not in groups.get('hpc_master', [])
   tags: [slurm, slurm_install]
 
 - name: Slurm | Ensure /etc/slurm exists

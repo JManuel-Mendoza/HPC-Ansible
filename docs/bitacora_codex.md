@@ -858,3 +858,13 @@ master | CHANGED | rc=0 >>
 **Validation:** rerun `ansible-playbook -i inventario.ini site.yml -b --limit 'master:worker1:worker2' --tags 'munge,mariadb,slurm_facts,slurm_build,slurm_install,slurm_config,slurmdbd,slurmctld,slurmd' --diff` y confirmar que `Fetch RPMs to controller cache` completa sin errores.
 **Rollback:** revertir el `owner`/`group` en `roles/slurm_install/tasks/main.yml`; si el error vuelve, recrear manualmente el directorio con permisos adecuados.
 **Notes:** el `fetch` siempre escribe en el controlador como el usuario local; por eso el ownership del cache es crítico.
+
+## 2026-01-21 15:05 (-05) — asegurar instalación real de slurmd en workers
+**Context:** hosts: worker1, worker2; playbook: site.yml; tags: slurm_install, slurm_config, slurmd; branch: codex.
+**Symptom:** `slurm_compute` falló con `Could not find the requested service slurmd: host` aunque los RPMs se copiaron a `/tmp/slurm-rpms`.
+**Root cause:** la lista de RPMs a instalar en workers se construía en el controlador y no validaba los archivos realmente presentes en el staging remoto; además, el task de instalación no fallaba si el paquete `slurm-slurmd` no quedaba instalado.
+**Fix:** listar los RPMs directamente en cada worker con `find` y construir la lista desde esos paths; agregar `disable_excludes: all` y `update_cache: true` al `dnf` para evitar bloqueos por exclusiones; añadir verificación explícita `rpm -q slurm-slurmd` para fallar si el paquete no se instala; y recargar systemd (`daemon_reload: true`) antes de arrancar `slurmd`.
+**Files changed:** `roles/slurm_install/tasks/main.yml`, `roles/slurm_compute/tasks/main.yml`, `docs/bitacora_codex.md`.
+**Validation:** rerun `ansible-playbook -i inventario.ini site.yml -b --limit 'worker1:worker2' --tags 'slurm_install,slurm_config,slurmd' --diff`, luego `systemctl status slurmd` en workers (esperar activo).
+**Rollback:** revertir los cambios en `roles/slurm_install/tasks/main.yml` y `roles/slurm_compute/tasks/main.yml`; si es necesario, desinstalar los RPMs de Slurm en workers.
+**Notes:** la verificación de `slurm-slurmd` sirve como guardrail para detectar fallos silenciosos en la instalación.

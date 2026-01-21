@@ -26,6 +26,11 @@
     mode: "0644"
   tags: [slurm, slurm_config]
 
+- name: Slurm | Reload systemd units (compute)
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags: [slurm, slurmd]
+
 - name: Slurm | Enable and start slurmd (compute)
   ansible.builtin.systemd:
     name: slurmd
