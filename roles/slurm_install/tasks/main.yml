@@ -161,17 +161,22 @@
     content: "{{ slurm_cgroup_conf }}"
   tags: [slurm, slurm_config]
 
-- name: Slurm | Ensure SLURM facts exist for templating (reuse slurm_facts)
-  ansible.builtin.include_role:
-    name: slurm_facts
-    apply:
-      tags: [slurm, slurm_facts, slurm_config]
+- name: Slurm | Fallback per-host facts for templating
+  ansible.builtin.set_fact:
+    slurm_node_name: "{{ inventory_hostname }}"
+    slurm_cpus: "{{ ansible_facts.processor_vcpus | default(1) | int }}"
+    slurm_sockets: "{{ ansible_facts.processor_count | default(1) | int }}"
+    slurm_cores_per_socket: "{{ ansible_facts.processor_cores | default(1) | int }}"
+    slurm_threads_per_core: "{{ ansible_facts.processor_threads_per_core | default(1) | int }}"
+    slurm_real_memory: "{{ [ (ansible_facts.memtotal_mb | default(2048) | int) - (slurm_mem_reserve_mb | default(1024) | int), 1024 ] | max }}"
   when: >
     slurm_node_name is not defined or
     slurm_cpus is not defined or
     slurm_real_memory is not defined or
-    slurm_node_gres is not defined
-  tags: [slurm, slurm_facts, slurm_config]
+    slurm_sockets is not defined or
+    slurm_cores_per_socket is not defined or
+    slurm_threads_per_core is not defined
+  tags: [slurm, slurm_facts]
 
 - name: Slurm | Check firewalld is active (controller)
   ansible.builtin.command: systemctl is-active firewalld

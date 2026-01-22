@@ -185,16 +185,21 @@ SlurmdLogFile=/var/log/slurm/slurmd.log
 {% set _af = hostvars[h].get('ansible_facts', {}) -%}
 
 {# NodeName: por defecto SIEMPRE el inventario #}
-{% set hn = hostvars[h].get('slurm_node_name_override', h) -%}
+{% set hn      = hostvars[h].get('slurm_node_name', h) -%}
 
 {# CPU/Mem: preferir slurm_* si existe; si no, usar ansible_facts; si no, defaults seguros #}
-{% set cpus = hostvars[h].get('slurm_cpus', _af.get('processor_vcpus', 1)) -%}
+{% set cpus    = hostvars[h].get('slurm_cpus', 1) -%}
+{% set sockets = hostvars[h].get('slurm_sockets', 1) -%}
+{% set cores   = hostvars[h].get('slurm_cores_per_socket', 1) -%}
+{% set threads = hostvars[h].get('slurm_threads_per_core', 1) -%}
+
+
 {% set memtotal = (_af.get('memtotal_mb', 1024) | int) -%}
 {% set reserve = (hostvars[h].get('slurm_mem_reserve_mb', 1024) | int) -%}
-{% set mem = hostvars[h].get('slurm_real_memory', [memtotal - reserve, 1024] | max) -%}
+{% set mem     = hostvars[h].get('slurm_real_memory', 1024) -%}
 
-{% set gres = hostvars[h].get('slurm_node_gres', '') -%}
-NodeName={{ hn }} CPUs={{ cpus }} RealMemory={{ mem }}{% if gres %} Gres={{ gres }}{% endif %} State=UNKNOWN
+{% set gres    = hostvars[h].get('slurm_node_gres', '') -%}
+NodeName={{ hn }} CPUs={{ cpus }} Sockets={{ sockets }} CoresPerSocket={{ cores }} ThreadsPerCore={{ threads }} RealMemory={{ mem }}{% if gres %} Gres={{ gres }}{% endif %} State=UNKNOWN
 {% endfor -%}
 
 

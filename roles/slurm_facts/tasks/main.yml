@@ -6,7 +6,6 @@
 
 - name: Slurm facts | Set node identity + CPU + RealMemory
   ansible.builtin.set_fact:
-    # NodeName = inventario por defecto (evita duplicados tipo sistemas-Precision-3440)
     slurm_node_name: "{{ slurm_node_name | default(inventory_hostname) }}"
     slurm_cpus: >-
       {{
@@ -16,8 +15,10 @@
           (ansible_facts.processor_threads_per_core | default(1) | int)
         )) | default(1) | int
       }}
+    slurm_sockets: "{{ ansible_facts.processor_count | default(1) | int }}"
+    slurm_cores_per_socket: "{{ ansible_facts.processor_cores | default(1) | int }}"
+    slurm_threads_per_core: "{{ ansible_facts.processor_threads_per_core | default(1) | int }}"
     slurm_real_memory: "{{ [ (ansible_facts.memtotal_mb | int) - (slurm_mem_reserve_mb | int), 1024 ] | max }}"
-  tags: [slurm, slurm_facts, slurm_config]
 
 - name: Slurm facts | Detect GPU count (nvidia-smi)
   ansible.builtin.command: nvidia-smi -L
