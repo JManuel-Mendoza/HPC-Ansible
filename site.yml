@@ -78,7 +78,7 @@
     - { role: slurm_controller, tags: ["slurm", "slurm_config"] }
 
 - name: Configuración de SLURM en nodos workers
-  hosts: workers
+  hosts: slurm_compute
   become: true
   roles:
     - role: slurm_install

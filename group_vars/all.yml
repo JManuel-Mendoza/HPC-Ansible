@@ -80,10 +80,10 @@ slurm_cgroup_conf: |
 slurm_control_machine: "master"     # nombre de inventario del master
 slurm_mem_reserve_mb: 1024          # reserva RAM para el SO (MB)
 
-# Define particiones por grupos de inventario (recomendado)
+# Define particiones por grupos de inventario
 slurm_partitions:
   - name: debug
-    groups: ["slurm_all"]
+    groups: ["slurm_compute"]
     default: true
     max_time: "INFINITE"
     state: "UP"

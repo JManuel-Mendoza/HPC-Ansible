@@ -180,8 +180,7 @@ SlurmdLogFile=/var/log/slurm/slurmd.log
 #
 #
 # COMPUTE NODES (ANSIBLE MANAGED)
-{# No dependemos de ansible_play_hosts_all (varía según el play). #}
-{% set _slurm_host_list = slurm_host_list | default(groups['all']) -%}
+{% set _slurm_host_list = slurm_host_list | default(groups.get('slurm_compute', groups.get('slurm_all', []))) -%}
 {% for h in (_slurm_host_list | sort) -%}
 {% set _af = hostvars[h].get('ansible_facts', {}) -%}
 
