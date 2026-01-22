@@ -124,3 +124,8 @@
   ansible.builtin.debug:
     var: llm_smoke.stdout_lines
   when: validate_llm | bool
+
+- name: Validate | Slurm checks
+  ansible.builtin.include_tasks: slurm.yml
+  tags: [validate, validate_slurm]
+
