@@ -1,0 +1,43 @@
+# Ansible managed
+# Default working directory for Slurm client commands when user doesn't provide --chdir/-D
+export SLURM_DEFAULT_CHDIR="{{ slurm_default_chdir | default('/tmp') }}"
+
+_slurm_has_chdir() {
+  local prev=""
+  for a in "$@"; do
+    # handles: --chdir DIR  or  -D DIR
+    if [[ "$prev" == "--chdir" || "$prev" == "-D" ]]; then
+      return 0
+    fi
+    # handles: --chdir=DIR or -D or --chdir
+    case "$a" in
+      --chdir=*|--chdir|-D) return 0 ;;
+    esac
+    prev="$a"
+  done
+  return 1
+}
+
+srun() {
+  if _slurm_has_chdir "$@"; then
+    command srun "$@"
+  else
+    command srun --chdir="${SLURM_DEFAULT_CHDIR}" "$@"
+  fi
+}
+
+sbatch() {
+  if _slurm_has_chdir "$@"; then
+    command sbatch "$@"
+  else
+    command sbatch --chdir="${SLURM_DEFAULT_CHDIR}" "$@"
+  fi
+}
+
+salloc() {
+  if _slurm_has_chdir "$@"; then
+    command salloc "$@"
+  else
+    command salloc --chdir="${SLURM_DEFAULT_CHDIR}" "$@"
+  fi
+}

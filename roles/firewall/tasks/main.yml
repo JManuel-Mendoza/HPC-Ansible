@@ -16,3 +16,51 @@
     permanent: true
     state: enabled
     immediate: true
+
+# -------------------------------------------------------------------
+# Slurm - allow controller <-> compute traffic only from internal CIDR
+# Ports:
+# - 6817/tcp: slurmctld (controller on master)
+# - 6818/tcp: slurmd (daemon on compute nodes)
+# -------------------------------------------------------------------
+
+- name: Firewall | Slurm | Allow slurmctld (6817/tcp) from internal network (masters)
+  ansible.posix.firewalld:
+    zone: "{{ slurm_firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+    rich_rule: >-
+      rule family="ipv4"
+      source address="{{ slurm_internal_cidr }}"
+      port port="{{ slurmctld_port }}" protocol="tcp"
+      accept
+  when:
+    - slurm_internal_cidr is defined
+    - inventory_hostname in groups.get('hpc_master', [])
+  tags: [firewall, slurm, slurm_firewall]
+
+- name: Firewall | Slurm | Allow slurmd (6818/tcp) from internal network (compute)
+  ansible.posix.firewalld:
+    zone: "{{ slurm_firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+    rich_rule: >-
+      rule family="ipv4"
+      source address="{{ slurm_internal_cidr }}"
+      port port="{{ slurmd_port }}" protocol="tcp"
+      accept
+  when:
+    - slurm_internal_cidr is defined
+    # Ajusta el grupo según tu inventario actual:
+    - inventory_hostname in (groups.get('workers_r', []) + groups.get('workers', []))
+  tags: [firewall, slurm, slurm_firewall]
+
+- name: Firewall | Slurm | Show rich rules (debug)
+  ansible.builtin.command: firewall-cmd --zone={{ slurm_firewalld_zone }} --list-rich-rules
+  changed_when: false
+  when:
+    - slurm_internal_cidr is defined
+    - inventory_hostname in (groups.get('hpc_master', []) + groups.get('workers_r', []) + groups.get('workers', []))
+  tags: [firewall, slurm, slurm_firewall, slurm_validate]

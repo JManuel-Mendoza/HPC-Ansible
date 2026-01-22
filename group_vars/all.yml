@@ -51,6 +51,17 @@ llm_python_packages:
   - transformers
 
 # =====================
+# Firewall Rules
+# =====================
+
+# Slurm firewall
+slurm_firewalld_zone: "public"
+slurm_internal_cidr: "192.168.34.0/24"
+slurmctld_port: 6817
+slurmd_port: 6818
+
+
+# =====================
 # SLURM-Munge settings
 # =====================
 
@@ -95,3 +106,6 @@ slurm_partitions:
     shared: "YES"
 
 slurm_srun_port_range: "60001-60100"
+
+# Slurm: directorio por defecto para srun/sbatch/salloc cuando NO se pasa --chdir/-D
+slurm_default_chdir: "/tmp"

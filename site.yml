@@ -85,3 +85,6 @@
       tags: [slurm, slurm_config]
     - role: slurm_compute
       tags: [slurm, slurm_config]
+
+- import_playbook: playbooks/validate-slurm.yml
+  tags: [slurm, slurm_validate]
