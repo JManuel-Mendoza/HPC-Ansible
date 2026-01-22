@@ -1,4 +1,23 @@
 ---
+- name: Slurm | Gather service facts (compute)
+  ansible.builtin.service_facts:
+  tags: [slurm, slurmd]
+
+- name: Slurm | Decide whether to manage slurmd on this host (compute)
+  ansible.builtin.set_fact:
+    slurm_manage_slurmd: >-
+      {{
+        ('slurmd.service' in (ansible_facts.services | default({}))) or
+        ('slurmd' in (ansible_facts.services | default({})))
+      }}
+  tags: [slurm, slurmd]
+
+- name: Slurm | Skip slurmd management if unit is absent (compute)
+  ansible.builtin.debug:
+    msg: "slurmd.service no existe en este nodo todavía; se omite start/restart (esperable en Ubuntu sin paquetes)."
+  when: not (slurm_manage_slurmd | bool)
+  tags: [slurm, slurmd]
+
 - name: Slurm | Ensure log dir exists (compute)
   ansible.builtin.file:
     path: "{{ slurm_log_dir }}"
@@ -36,11 +55,14 @@
     name: slurmd
     enabled: true
     state: started
+  when: slurm_manage_slurmd | bool
   tags: [slurm, slurmd]
 
 - name: Slurm | Restart slurmd if slurm.conf changed (compute)
   ansible.builtin.systemd:
     name: slurmd
     state: restarted
-  when: slurm_conf_changed | default(false)
+  when:
+    - slurm_manage_slurmd | bool
+    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false))
   tags: [slurm, slurmd]

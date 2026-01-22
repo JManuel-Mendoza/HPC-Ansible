@@ -50,6 +50,10 @@ SlurmctldPort=6817
 SlurmdPidFile=/var/run/slurm/slurmd.pid
 #SlurmdPidFile=/var/run/slurmd.pid
 SlurmdPort=6818
+
+# srun uses a return TCP port range on the submitting host (controller/login)
+SrunPortRange={{ slurm_srun_port_range | default('60001-60100') }}
+
 SlurmdSpoolDir=/var/spool/slurmd
 SlurmUser=slurm
 #
@@ -177,14 +181,22 @@ SlurmdLogFile=/var/log/slurm/slurmd.log
 #
 # COMPUTE NODES (ANSIBLE MANAGED)
 {# No dependemos de ansible_play_hosts_all (varía según el play). #}
-{% set _slurm_host_list = slurm_host_list | default(groups['all']) %}
-{% for h in (_slurm_host_list | sort) %}
-{% set hn   = hostvars[h].get('slurm_node_name', h) %}
-{% set cpus = hostvars[h].get('slurm_cpus', 1) %}
-{% set mem  = hostvars[h].get('slurm_real_memory', 1024) %}
-{% set gres = hostvars[h].get('slurm_node_gres', '') %}
+{% set _slurm_host_list = slurm_host_list | default(groups['all']) -%}
+{% for h in (_slurm_host_list | sort) -%}
+{% set _af = hostvars[h].get('ansible_facts', {}) -%}
+
+{# NodeName: por defecto SIEMPRE el inventario #}
+{% set hn = hostvars[h].get('slurm_node_name_override', h) -%}
+
+{# CPU/Mem: preferir slurm_* si existe; si no, usar ansible_facts; si no, defaults seguros #}
+{% set cpus = hostvars[h].get('slurm_cpus', _af.get('processor_vcpus', 1)) -%}
+{% set memtotal = (_af.get('memtotal_mb', 1024) | int) -%}
+{% set reserve = (hostvars[h].get('slurm_mem_reserve_mb', 1024) | int) -%}
+{% set mem = hostvars[h].get('slurm_real_memory', [memtotal - reserve, 1024] | max) -%}
+
+{% set gres = hostvars[h].get('slurm_node_gres', '') -%}
 NodeName={{ hn }} CPUs={{ cpus }} RealMemory={{ mem }}{% if gres %} Gres={{ gres }}{% endif %} State=UNKNOWN
-{% endfor %}
+{% endfor -%}
 
 
 # PARTITIONS (ANSIBLE MANAGED)
@@ -192,7 +204,7 @@ NodeName={{ hn }} CPUs={{ cpus }} RealMemory={{ mem }}{% if gres %} Gres={{ gres
 {% set nodes = [] %}
 {% for g in (p.groups | default([])) %}
 {% for h in (groups.get(g, [])) %}
-{% set _ = nodes.append(hostvars[h].get('slurm_node_name', h)) %}
+{% set _ = nodes.append(hostvars[h].get('slurm_node_name_override', h)) %}
 {% endfor %}
 {% endfor %}
 {% if nodes | length > 0 %}

@@ -93,3 +93,5 @@ slurm_partitions:
     max_time: "INFINITE"
     state: "UP"
     shared: "YES"
+
+slurm_srun_port_range: "60001-60100"

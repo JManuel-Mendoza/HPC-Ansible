@@ -1,0 +1,14 @@
+# COMPUTE GRES (ANSIBLE MANAGED)
+# Mapeo de GPUs NVIDIA a GRES "gpu"
+# Se genera por nodo a partir de slurm_gpu_count / slurm_node_name
+
+{% set node = slurm_node_name | default(inventory_hostname) %}
+{% set n = slurm_gpu_count | default(0) | int %}
+
+{% if n > 0 %}
+{% for i in range(0, n) -%}
+NodeName={{ node }} Name=gpu File=/dev/nvidia{{ i }}
+{% endfor -%}
+{% else %}
+# NodeName={{ node }} (sin GPUs detectadas)
+{% endif %}

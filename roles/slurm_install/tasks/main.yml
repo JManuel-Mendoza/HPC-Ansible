@@ -125,6 +125,24 @@
     - inventory_hostname not in groups.get('hpc_master', [])
   tags: [slurm, slurm_install]
 
+- name: Slurm | Install packages (Debian/Ubuntu) [disabled by default]
+  ansible.builtin.apt:
+    name: >-
+      {{
+        (inventory_hostname in groups.get('hpc_master', []))
+          | ternary(
+              (slurm_debian_master_packages | default(['slurmctld','slurmdbd','slurmd','slurm-client'])),
+              (slurm_debian_worker_packages | default(['slurmd','slurm-client']))
+            )
+      }}
+    state: present
+    update_cache: true
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - slurm_debian_enable | default(false)
+  tags: [slurm, slurm_install]
+
+
 - name: Slurm | Ensure /etc/slurm exists
   ansible.builtin.file:
     path: "{{ slurm_etc_dir }}"
@@ -143,16 +161,54 @@
     content: "{{ slurm_cgroup_conf }}"
   tags: [slurm, slurm_config]
 
-- name: Slurm | Fallback per-host facts for templating
-  ansible.builtin.set_fact:
-    slurm_node_name: "{{ ansible_facts.hostname }}"
-    slurm_cpus: "{{ ansible_facts.processor_vcpus | default(1) | int }}"
-    slurm_real_memory: "{{ [ (ansible_facts.memtotal_mb | default(2048) | int) - (slurm_mem_reserve_mb | default(1024) | int), 1024 ] | max }}"
-  when: slurm_node_name is not defined or slurm_cpus is not defined or slurm_real_memory is not defined
-  tags: [slurm, slurm_facts]
+- name: Slurm | Ensure SLURM facts exist for templating (reuse slurm_facts)
+  ansible.builtin.include_role:
+    name: slurm_facts
+    apply:
+      tags: [slurm, slurm_facts, slurm_config]
+  when: >
+    slurm_node_name is not defined or
+    slurm_cpus is not defined or
+    slurm_real_memory is not defined or
+    slurm_node_gres is not defined
+  tags: [slurm, slurm_facts, slurm_config]
+
+- name: Slurm | Check firewalld is active (controller)
+  ansible.builtin.command: systemctl is-active firewalld
+  register: _firewalld_active
+  changed_when: false
+  failed_when: false
+  when: inventory_hostname in groups.get('hpc_master', [])
+  tags: [slurm, slurm_firewall]
+
+- name: Slurm | Allow SrunPortRange on controller firewall (firewalld)
+  ansible.builtin.command: "firewall-cmd --permanent --query-port={{ slurm_srun_port_range }}/tcp"
+  register: _srun_port_query
+  changed_when: false
+  failed_when: false
+  when:
+    - inventory_hostname in groups.get('hpc_master', [])
+    - _firewalld_active.rc == 0
+  tags: [slurm, slurm_firewall]
+
+- name: Slurm | Add SrunPortRange to controller firewall (firewalld)
+  ansible.builtin.command: "firewall-cmd --permanent --add-port={{ slurm_srun_port_range }}/tcp"
+  when:
+    - inventory_hostname in groups.get('hpc_master', [])
+    - _firewalld_active.rc == 0
+    - _srun_port_query.rc != 0
+  tags: [slurm, slurm_firewall]
+
+- name: Slurm | Reload firewalld if SrunPortRange was added (controller)
+  ansible.builtin.command: firewall-cmd --reload
+  when:
+    - inventory_hostname in groups.get('hpc_master', [])
+    - _firewalld_active.rc == 0
+    - _srun_port_query.rc != 0
+  tags: [slurm, slurm_firewall]
 
 
-- name: Slurm | Install slurm.conf (templated from facts)
+- name: Slurm | Install slurm.conf (templated from facts) [master only]
   ansible.builtin.template:
     src: slurm.conf.j2
     dest: "{{ slurm_etc_dir }}/slurm.conf"
@@ -160,9 +216,82 @@
     group: root
     mode: "0644"
   register: _slurm_conf_copy
+  when: inventory_hostname in groups.get('hpc_master', [])
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Detect NVIDIA GPU device files (/dev/nvidia[0-9]) for gres.conf
+  ansible.builtin.find:
+    paths: /dev
+    patterns: "nvidia[0-9]*"
+    file_type: char
+  register: _slurm_nvidia_gpu_devs
+  changed_when: false
+  failed_when: false
+  tags: [slurm, slurm_config, slurm_gres]
+
+- name: Slurm | Install gres.conf from detected NVIDIA devices
+  ansible.builtin.copy:
+    dest: "{{ slurm_etc_dir }}/gres.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {% for d in (_slurm_nvidia_gpu_devs.files | default([]) | sort(attribute='path')) %}
+      Name=gpu File={{ d.path }}
+      {% endfor %}
+  register: _slurm_gres_copy
+  when:
+    - slurm_node_gres | default('') is match('^gpu:')
+  tags: [slurm, slurm_config, slurm_gres]
+
+
+- name: Slurm | Check controller slurm.conf exists before copying (workers)
+  ansible.builtin.stat:
+    path: "{{ slurm_etc_dir }}/slurm.conf"
+  delegate_to: localhost
+  register: _slurm_conf_controller
+  when: inventory_hostname not in groups.get('hpc_master', [])
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Fail if controller slurm.conf is missing (workers)
+  ansible.builtin.fail:
+    msg: >-
+      slurm.conf no existe en el controller ({{ slurm_etc_dir }}/slurm.conf).
+      Ejecuta primero el play/tag slurm_config incluyendo el master.
+  when:
+    - inventory_hostname not in groups.get('hpc_master', [])
+    - not _slurm_conf_controller.stat.exists
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Install slurm.conf (copied from controller master) [workers]
+  ansible.builtin.copy:
+    src: "{{ slurm_etc_dir }}/slurm.conf"
+    dest: "{{ slurm_etc_dir }}/slurm.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: _slurm_conf_copy
+  when:
+    - inventory_hostname not in groups.get('hpc_master', [])
+    - _slurm_conf_controller.stat.exists
   tags: [slurm, slurm_config]
 
 - name: Slurm | Record slurm.conf change flag
   ansible.builtin.set_fact:
-    slurm_conf_changed: "{{ _slurm_conf_copy.changed }}"
+    slurm_conf_changed: "{{ (_slurm_conf_copy.changed | default(false)) or (_slurm_gres_copy.changed | default(false)) }}"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Install gres.conf (per-node, templated from facts)
+  ansible.builtin.template:
+    src: gres.conf.j2
+    dest: "{{ slurm_etc_dir }}/gres.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  register: _slurm_gres_conf_copy
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Record gres.conf change flag
+  ansible.builtin.set_fact:
+    slurm_gres_conf_changed: "{{ _slurm_gres_conf_copy.changed }}"
   tags: [slurm, slurm_config]
