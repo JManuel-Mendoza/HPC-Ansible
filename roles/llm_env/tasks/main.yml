@@ -8,6 +8,18 @@
       - ca-certificates
     state: present
     update_cache: true
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: LLM Env | Ensure base packages (Ubuntu)
+  ansible.builtin.apt:
+    name:
+      - bzip2
+      - tar
+      - curl
+      - ca-certificates
+    state: present
+    update_cache: true
+  when: ansible_facts['os_family'] == 'Debian'
 
 - name: LLM Env | Ensure micromamba root exists
   ansible.builtin.file:

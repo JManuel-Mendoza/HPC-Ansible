@@ -17,3 +17,24 @@ nvidia_cuda_prereq_packages:
   - make
   - elfutils-libelf-devel
   - pciutils
+
+nvidia_cuda_repo_ubuntu_distro: "ubuntu{{ ansible_distribution_version | default('22.04') | regex_replace('\\.', '') }}"
+nvidia_cuda_repo_ubuntu_baseurl: "https://developer.download.nvidia.com/compute/cuda/repos/{{ nvidia_cuda_repo_ubuntu_distro }}/x86_64/"
+nvidia_cuda_repo_ubuntu_key_url: "{{ nvidia_cuda_repo_ubuntu_baseurl }}cuda-archive-keyring.gpg"
+nvidia_cuda_repo_ubuntu_keyring: "/usr/share/keyrings/cuda-archive-keyring.gpg"
+nvidia_cuda_repo_ubuntu_pin_url: "{{ nvidia_cuda_repo_ubuntu_baseurl }}cuda-{{ nvidia_cuda_repo_ubuntu_distro }}.pin"
+nvidia_cuda_repo_ubuntu_pin_file: "/etc/apt/preferences.d/cuda-repository-pin-600"
+nvidia_cuda_repo_file_ubuntu: "/etc/apt/sources.list.d/cuda-{{ nvidia_cuda_repo_ubuntu_distro }}.list"
+
+nvidia_cuda_driver_packages_ubuntu:
+  - "nvidia-driver-{{ nvidia_driver_stream.split('-')[0] }}"
+
+nvidia_cuda_prereq_packages_ubuntu:
+  - dkms
+  - gcc
+  - g++
+  - gcc-12
+  - g++-12
+  - make
+  - libelf-dev
+  - pciutils

@@ -1,7 +1,15 @@
 ---
-- name: Rebuild initramfs
+- name: Rebuild initramfs (RHEL)
   ansible.builtin.command: dracut --force
   changed_when: true
+  when: ansible_facts['os_family'] == 'RedHat'
+  listen: Rebuild initramfs
+
+- name: Rebuild initramfs (Ubuntu)
+  ansible.builtin.command: update-initramfs -u
+  changed_when: true
+  when: ansible_facts['os_family'] == 'Debian'
+  listen: Rebuild initramfs
 
 - name: Reboot node
   ansible.builtin.reboot:
