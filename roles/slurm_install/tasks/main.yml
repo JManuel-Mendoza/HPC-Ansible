@@ -309,3 +309,8 @@
     group: root
     mode: "0644"
   tags: [slurm, slurm_config, slurm_env]
+
+- name: SlurmDBD | Higiene de /run y pidfile
+  ansible.builtin.import_tasks: slurmdbd_hygiene.yml
+  when: inventory_hostname in groups.get('hpc_master', [])
+  tags: [slurmdbd_hygiene]

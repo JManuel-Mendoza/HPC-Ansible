@@ -868,3 +868,13 @@ master | CHANGED | rc=0 >>
 **Validation:** rerun `ansible-playbook -i inventario.ini site.yml -b --limit 'worker1:worker2' --tags 'slurm_install,slurm_config,slurmd' --diff`, luego `systemctl status slurmd` en workers (esperar activo).
 **Rollback:** revertir los cambios en `roles/slurm_install/tasks/main.yml` y `roles/slurm_compute/tasks/main.yml`; si es necesario, desinstalar los RPMs de Slurm en workers.
 **Notes:** la verificación de `slurm-slurmd` sirve como guardrail para detectar fallos silenciosos en la instalación.
+
+## 2026-01-23 18:38 (-05) — higiene slurmdbd (pidfile en /run)
+**Context:** host: master; playbook: site.yml; tags: slurmdbd_hygiene; branch: llm.
+**Symptom:** `slurmdbd` advertía problemas de permisos con el pidfile y fallaba al escribir en `/run` después de reinicios.
+**Root cause:** `/run` es tmpfs y no garantiza la existencia de `/run/slurm`; además `slurmdbd.conf` no forzaba `PidFile`/`SlurmUser` de forma consistente.
+**Fix:** crear `/etc/tmpfiles.d/slurm-run.conf` para asegurar `/run/slurm` en cada arranque, crear `/run/slurm` en caliente, y forzar `PidFile=/run/slurm/slurmdbd.pid` + `SlurmUser=slurm`; agregar handlers para aplicar tmpfiles y reiniciar `slurmdbd`.
+**Files changed:** `roles/slurm_install/tasks/slurmdbd_hygiene.yml`, `roles/slurm_install/handlers/main.yml`, `roles/slurm_install/tasks/main.yml`, `docs/bitacora_codex.md`.
+**Validation:** `ansible-playbook -i inventario.ini site.yml --limit master --tags slurmdbd_hygiene`; luego `systemctl status slurmdbd --no-pager` (activo, sin warning de pidfile) y `ss -lntp | egrep ':6819|slurmdbd'` (escuchando en 6819).
+**Rollback:** eliminar `/etc/tmpfiles.d/slurm-run.conf`, revertir las líneas en `/etc/slurm/slurmdbd.conf` y deshacer los tasks/handlers agregados en el rol `slurm_install`.
+**Notes:** el warning "Not running as root. Can't drop supplementary groups" es esperado cuando `slurmdbd` corre como usuario `slurm`.

@@ -1,0 +1,9 @@
+---
+- name: SlurmDBD | Aplicar tmpfiles
+  ansible.builtin.command: systemd-tmpfiles --create
+  changed_when: false
+
+- name: SlurmDBD | Reiniciar slurmdbd
+  ansible.builtin.service:
+    name: slurmdbd
+    state: restarted
