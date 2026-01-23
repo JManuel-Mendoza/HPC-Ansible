@@ -11,13 +11,13 @@
     - { role: nvidia_cuda, tags: ["cuda"] }
     - { role: llm_env, tags: ["llm"] }
 
-- name: Configuración NFS en master
-  hosts: hpc_master
-  become: true
-  gather_facts: true
-  roles:
-    - { role: nfs_server, tags: ["nfs"] }
-    - { role: llm_project, tags: ["llm_project"] }
+# - name: Configuración NFS en master
+#   hosts: hpc_master
+#   become: true
+#   gather_facts: true
+#   roles:
+#     - { role: nfs_server, tags: ["nfs"] }
+#     - { role: llm_project, tags: ["llm_project"] }
 
 - name: MariaDB en master
   hosts: hpc_master
@@ -88,3 +88,10 @@
 
 - import_playbook: playbooks/validate-slurm.yml
   tags: [slurm, slurm_validate]
+
+- name: Slurm validation (no config changes)
+  hosts: master
+  become: true
+  roles:
+    - role: slurm_validate
+      tags: [slurm_validate]

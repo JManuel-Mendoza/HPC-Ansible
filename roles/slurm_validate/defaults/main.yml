@@ -1,0 +1,16 @@
+slurm_validate_partitions:
+  cpu: "debug"
+  gpu: "gpu"
+
+slurm_validate_smoke:
+  enabled: true
+  workdir: "/tmp"
+  timeout_seconds: 180
+  poll_delay_seconds: 3
+
+# torch.enabled: "auto" intenta import torch; si falla, omite el test (no falla el rol)
+slurm_validate_torch:
+  enabled: "auto"   # auto|true|false
+  python: "python3"
+  # Si necesitas activar un env (micromamba/conda/module), colócalo aquí:
+  prelude: ""

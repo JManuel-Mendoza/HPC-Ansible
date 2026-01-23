@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH -J smoke-cpu
+#SBATCH -p {{ slurm_validate_partitions.cpu }}
+#SBATCH -N 1
+#SBATCH -n 1
+#SBATCH -c 1
+#SBATCH -t 00:01:00
+#SBATCH --chdir={{ slurm_validate_smoke.workdir }}
+#SBATCH -o {{ slurm_validate_smoke.workdir }}/smoke-cpu-%j.out
+#SBATCH -e {{ slurm_validate_smoke.workdir }}/smoke-cpu-%j.err
+
+set -euo pipefail
+echo "=== CPU smoke ==="
+date
+hostname
+uname -r
+uptime
+echo "OK"
