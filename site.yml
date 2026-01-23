@@ -86,11 +86,8 @@
     - role: slurm_compute
       tags: [slurm, slurm_config]
 
-- import_playbook: playbooks/validate-slurm.yml
-  tags: [slurm, slurm_validate]
-
-- name: Slurm validation (no config changes)
-  hosts: master
+- name: Validacion Slurm (sin cambios de configuracion)
+  hosts: hpc_master
   become: true
   roles:
     - role: slurm_validate

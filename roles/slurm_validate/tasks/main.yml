@@ -2,13 +2,13 @@
 # Nota: este rol asume que corre en el master (controller) para ejecutar sinfo/srun/sbatch.
 # No cambia configuración. Todo es "changed_when: false".
 
-- name: Validate Slurm CLI reachable (sinfo)
+- name: Validar CLI de Slurm (sinfo)
   ansible.builtin.command: sinfo --version
   register: _sinfo_ver
   changed_when: false
   tags: [slurm_validate]
 
-- name: List partitions (normalized)
+- name: Listar particiones (normalizado)
   ansible.builtin.shell: |
     set -euo pipefail
     sinfo -h -o "%P" | tr -d '*' | tr ' ' '\n' | sed '/^$/d' | sort -u
@@ -18,21 +18,21 @@
   changed_when: false
   tags: [slurm_validate]
 
-- name: Assert CPU partition exists
+- name: Verificar particion CPU
   ansible.builtin.assert:
     that:
       - slurm_validate_partitions.cpu in _parts.stdout_lines
     fail_msg: "Missing CPU partition '{{ slurm_validate_partitions.cpu }}'. Got: {{ _parts.stdout_lines }}"
   tags: [slurm_validate]
 
-- name: Assert GPU partition exists
+- name: Verificar particion GPU
   ansible.builtin.assert:
     that:
       - slurm_validate_partitions.gpu in _parts.stdout_lines
     fail_msg: "Missing GPU partition '{{ slurm_validate_partitions.gpu }}'. Got: {{ _parts.stdout_lines }}"
   tags: [slurm_validate]
 
-- name: Ensure no nodes are DOWN/DRAIN/FAIL (basic)
+- name: Asegurar que no hay nodos DOWN/DRAIN/FAIL (basico)
   ansible.builtin.shell: |
     set -euo pipefail
     sinfo -N -h -o "%N %t" | awk '{print $2}' | egrep -i 'down|drain|fail'
@@ -43,53 +43,56 @@
   failed_when: _bad_states.rc == 0
   tags: [slurm_validate]
 
-- name: srun hostname (CPU partition)
+- name: srun hostname (particion CPU)
   ansible.builtin.command: >
     srun -N1 -n1 -p {{ slurm_validate_partitions.cpu }} hostname
   register: _srun_cpu_hostname
   changed_when: false
   tags: [slurm_validate]
 
-- name: srun nvidia-smi -L (GPU partition)
+- name: srun nvidia-smi -L (particion GPU)
   ansible.builtin.command: >
     srun -N1 -n1 -p {{ slurm_validate_partitions.gpu }} --gres=gpu:1 nvidia-smi -L
   register: _srun_gpu_nvsmi_l
   changed_when: false
   tags: [slurm_validate]
 
-- name: Torch import probe on GPU node (auto mode)
-  ansible.builtin.shell: |
-    set -euo pipefail
-    srun -N1 -n1 -p {{ slurm_validate_partitions.gpu }} --gres=gpu:1 bash -lc '
-      set -euo pipefail
-      {{ slurm_validate_torch.prelude }}
-      {{ slurm_validate_torch.python }} -c "import torch; print(torch.__version__)"
-    '
-  args:
-    executable: /bin/bash
+- name: Sonda de importacion de Torch en nodo GPU (auto)
+  ansible.builtin.command:
+    argv:
+      - srun
+      - -N1
+      - -n1
+      - -p
+      - "{{ slurm_validate_partitions.gpu }}"
+      - --gres=gpu:1
+      - bash
+      - -lc
+      - |
+          set -euo pipefail
+          {{ slurm_validate_torch.prelude }}
+          {{ slurm_validate_torch.python }} -c "import torch; print('torch:', torch.__version__)"
   register: _torch_probe
   changed_when: false
   failed_when: false
   when: slurm_validate_torch.enabled in ["auto", "true"]
   tags: [slurm_validate]
 
-- name: PyTorch CUDA smoke (runs only if probe succeeded or enabled=true)
-  ansible.builtin.shell: |
-    set -euo pipefail
-    srun -N1 -n1 -p {{ slurm_validate_partitions.gpu }} --gres=gpu:1 bash -lc '
-      set -euo pipefail
-      {{ slurm_validate_torch.prelude }}
-      {{ slurm_validate_torch.python }} - << "PY"
-    import torch
-    print("torch:", torch.__version__)
-    print("torch.version.cuda:", torch.version.cuda)
-    print("cuda_available:", torch.cuda.is_available())
-    if torch.cuda.is_available():
-        print("gpu:", torch.cuda.get_device_name(0))
-    PY
-        '
-  args:
-    executable: /bin/bash
+- name: Smoke PyTorch CUDA (solo si sonda OK o enabled=true)
+  ansible.builtin.command:
+    argv:
+      - srun
+      - -N1
+      - -n1
+      - -p
+      - "{{ slurm_validate_partitions.gpu }}"
+      - --gres=gpu:1
+      - bash
+      - -lc
+      - |
+          set -euo pipefail
+          {{ slurm_validate_torch.prelude }}
+          {{ slurm_validate_torch.python }} -c "import torch; print('torch:', torch.__version__); print('torch.version.cuda:', torch.version.cuda); print('cuda_available:', torch.cuda.is_available()); torch.cuda.is_available() and print('gpu:', torch.cuda.get_device_name(0))"
   register: _torch_smoke
   changed_when: false
   when: >
@@ -97,7 +100,7 @@
     or (slurm_validate_torch.enabled == "auto" and _torch_probe is defined and _torch_probe.rc == 0)
   tags: [slurm_validate]
 
-- name: Render smoke scripts (CPU/GPU)
+- name: Renderizar scripts smoke (CPU/GPU)
   ansible.builtin.template:
     src: "{{ item.src }}"
     dest: "{{ slurm_validate_smoke.workdir }}/{{ item.dest }}"
@@ -109,7 +112,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Submit CPU smoke job
+- name: Enviar job smoke CPU
   ansible.builtin.command: >
     sbatch --parsable {{ slurm_validate_smoke.workdir }}/slurm-smoke-cpu.sbatch
   register: _cpu_jobid
@@ -117,7 +120,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Wait CPU job leaves queue
+- name: Esperar salida de cola del job CPU
   ansible.builtin.shell: |
     set -euo pipefail
     squeue -h -j {{ _cpu_jobid.stdout }} | wc -l
@@ -131,7 +134,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Check CPU job sacct state
+- name: Verificar estado sacct del job CPU
   ansible.builtin.shell: |
     set -euo pipefail
     sacct -n -P -j {{ _cpu_jobid.stdout }} -o JobID,State,ExitCode | awk -F'|' '$1=="{{ _cpu_jobid.stdout }}" {print $2"|" $3; exit}'
@@ -142,7 +145,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Assert CPU job COMPLETED with 0:0
+- name: Validar job CPU COMPLETED con 0:0
   ansible.builtin.assert:
     that:
       - _cpu_sacct.stdout is match("^COMPLETED\\|0:0")
@@ -150,7 +153,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Submit GPU smoke job
+- name: Enviar job smoke GPU
   ansible.builtin.command: >
     sbatch --parsable {{ slurm_validate_smoke.workdir }}/slurm-smoke-gpu.sbatch
   register: _gpu_jobid
@@ -158,7 +161,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Wait GPU job leaves queue
+- name: Esperar salida de cola del job GPU
   ansible.builtin.shell: |
     set -euo pipefail
     squeue -h -j {{ _gpu_jobid.stdout }} | wc -l
@@ -172,7 +175,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Check GPU job sacct state
+- name: Verificar estado sacct del job GPU
   ansible.builtin.shell: |
     set -euo pipefail
     sacct -n -P -j {{ _gpu_jobid.stdout }} -o JobID,State,ExitCode | awk -F'|' '$1=="{{ _gpu_jobid.stdout }}" {print $2"|" $3; exit}'
@@ -183,7 +186,7 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Assert GPU job COMPLETED with 0:0
+- name: Validar job GPU COMPLETED con 0:0
   ansible.builtin.assert:
     that:
       - _gpu_sacct.stdout is match("^COMPLETED\\|0:0")
