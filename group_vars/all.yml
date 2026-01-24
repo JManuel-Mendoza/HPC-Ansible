@@ -103,6 +103,30 @@ slurm_srun_port_range: "60001-60100"
 # Slurm: directorio por defecto para srun/sbatch/salloc cuando NO se pasa --chdir/-D
 slurm_default_chdir: "/tmp"
 
+# =====================
+# Slurm - Overwrites simples de recursos (por host o por grupo)
+# =====================
+# Para ajustar recursos visibles a Slurm en cualquier nodo o grupo, define
+# variables en:
+# - host_vars/<hostname>.yml (override por nodo)
+# - group_vars/<group>.yml  (override por grupo: p.ej. slurm_gpu, slurm_compute)
+#
+# Variables soportadas:
+#   slurm_cpus, slurm_sockets, slurm_cores_per_socket, slurm_threads_per_core,
+#   slurm_real_memory, slurm_node_gres
+#
+# Ejemplo por nodo (host_vars/worker1.yml):
+#   slurm_cpus: 12
+#   slurm_real_memory: 48000
+#   slurm_node_gres: "gpu:quadro_p1000:1"
+#
+# Ejemplo por grupo (group_vars/slurm_gpu.yml):
+#   slurm_real_memory: 56000
+#   slurm_node_gres: "gpu:quadro_p1000:1"
+#
+# Nota: si defines slurm_node_gres manualmente, Slurm usara ese valor aunque
+# NVML detecte mas GPUs. AutoDetect=nvml sigue habilitado para detalles.
+
 # Slurm validate: activar micromamba y entorno llm para pruebas de torch
 slurm_validate_torch:
   enabled: "auto"

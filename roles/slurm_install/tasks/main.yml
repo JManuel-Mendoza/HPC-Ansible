@@ -289,8 +289,11 @@
       }}
     slurm_node_gres: >-
       {{
-        (_gpu_names | length > 0)
-        | ternary('gpu:' ~ (slurm_gpu_type_nvml | default('gpu')) ~ ':' ~ (_gpu_names | length), '')
+        slurm_node_gres | default(
+          (_gpu_names | length > 0)
+          | ternary('gpu:' ~ (slurm_gpu_type_nvml | default('gpu')) ~ ':' ~ (_gpu_names | length), ''),
+          true
+        )
       }}
   vars:
     _gpu_names: "{{ _slurm_gpu_names_fallback.stdout_lines | default([]) | map('trim') | reject('equalto', '') | list }}"

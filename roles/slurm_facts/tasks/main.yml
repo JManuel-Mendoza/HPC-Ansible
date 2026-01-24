@@ -7,7 +7,13 @@
 - name: Slurm facts | Set node identity + CPU + RealMemory
   ansible.builtin.set_fact:
     slurm_node_name: "{{ slurm_node_name | default(inventory_hostname) }}"
-    slurm_cpus: >-
+    slurm_cpus: "{{ slurm_cpus | default(_computed_cpus, true) }}"
+    slurm_sockets: "{{ slurm_sockets | default(_computed_sockets, true) }}"
+    slurm_cores_per_socket: "{{ slurm_cores_per_socket | default(_computed_cores, true) }}"
+    slurm_threads_per_core: "{{ slurm_threads_per_core | default(_computed_threads, true) }}"
+    slurm_real_memory: "{{ slurm_real_memory | default(_computed_real_memory, true) }}"
+  vars:
+    _computed_cpus: >-
       {{
         (ansible_facts.processor_vcpus | default(
           (ansible_facts.processor_count | int) *
@@ -15,10 +21,10 @@
           (ansible_facts.processor_threads_per_core | default(1) | int)
         )) | default(1) | int
       }}
-    slurm_sockets: "{{ ansible_facts.processor_count | default(1) | int }}"
-    slurm_cores_per_socket: "{{ ansible_facts.processor_cores | default(1) | int }}"
-    slurm_threads_per_core: "{{ ansible_facts.processor_threads_per_core | default(1) | int }}"
-    slurm_real_memory: "{{ [ (ansible_facts.memtotal_mb | int) - (slurm_mem_reserve_mb | int), 1024 ] | max }}"
+    _computed_sockets: "{{ ansible_facts.processor_count | default(1) | int }}"
+    _computed_cores: "{{ ansible_facts.processor_cores | default(1) | int }}"
+    _computed_threads: "{{ ansible_facts.processor_threads_per_core | default(1) | int }}"
+    _computed_real_memory: "{{ [ (ansible_facts.memtotal_mb | int) - (slurm_mem_reserve_mb | int), 1024 ] | max }}"
 
 - name: Slurm facts | Consultar modelos de GPU con NVML (nvidia-smi)
   ansible.builtin.command: nvidia-smi --query-gpu=name --format=csv,noheader
@@ -72,13 +78,13 @@
 
 - name: Slurm facts | Definir GRES desde NVML
   ansible.builtin.set_fact:
-    slurm_node_gres: "gpu:{{ slurm_gpu_type_nvml | default('gpu') }}:{{ slurm_gpu_count }}"
+    slurm_node_gres: "{{ slurm_node_gres | default('gpu:' ~ (slurm_gpu_type_nvml | default('gpu')) ~ ':' ~ slurm_gpu_count, true) }}"
   when: slurm_gpu_count | int > 0
   tags: [slurm, slurm_facts, slurm_config]
 
 - name: Slurm facts | Limpiar GRES si no hay GPU
   ansible.builtin.set_fact:
-    slurm_node_gres: ""
+    slurm_node_gres: "{{ slurm_node_gres | default('', true) }}"
   when: slurm_gpu_count | int == 0
   tags: [slurm, slurm_facts, slurm_config]
 
