@@ -613,6 +613,47 @@
     - ansible_facts['os_family'] == 'Debian'
     - _nvidia_smi_path.rc != 0
 
+- name: NVIDIA/CUDA | Buscar libnvidia-ml.so.1 (NVML)
+  ansible.builtin.find:
+    paths:
+      - /lib64
+      - /usr/lib64
+      - /usr/lib64/nvidia
+      - /usr/lib/x86_64-linux-gnu
+      - /usr/lib
+    patterns: "libnvidia-ml.so.1"
+    file_type: any
+  register: _nvml_libs
+  changed_when: false
+  failed_when: false
+  when: _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Verificar symlink libnvidia-ml.so
+  ansible.builtin.stat:
+    path: "{{ item.path | dirname }}/libnvidia-ml.so"
+    follow: false
+  loop: "{{ _nvml_libs.files | default([]) }}"
+  register: _nvml_symlink_stats
+  changed_when: false
+  when: _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Crear symlink libnvidia-ml.so si falta
+  ansible.builtin.file:
+    src: "{{ item.item.path }}"
+    dest: "{{ item.item.path | dirname }}/libnvidia-ml.so"
+    state: link
+  loop: "{{ _nvml_symlink_stats.results | default([]) }}"
+  register: _nvml_symlink_create
+  when:
+    - _nvidia_gpu_present
+    - not item.stat.exists or item.stat.islnk
+
+- name: NVIDIA/CUDA | Ejecutar ldconfig si se creo symlink NVML
+  ansible.builtin.command: ldconfig
+  changed_when: false
+  when: >
+    (_nvml_symlink_create.results | default([]) | selectattr('changed') | list | length) > 0
+
 - name: NVIDIA/CUDA | Ejecutar nvidia-smi
   ansible.builtin.command: nvidia-smi
   register: _nvidia_smi_full

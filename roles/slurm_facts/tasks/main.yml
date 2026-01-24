@@ -42,24 +42,9 @@
       }}
   tags: [slurm, slurm_facts, slurm_config]
 
-- name: Slurm facts | Inicializar tipos cortos de GPU
+- name: Slurm facts | Derivar tipos cortos de GPU
   ansible.builtin.set_fact:
-    slurm_gpu_types_short: []
-  tags: [slurm, slurm_facts, slurm_config]
-
-- name: Slurm facts | Derivar tipo corto por GPU
-  ansible.builtin.set_fact:
-    slurm_gpu_types_short: >-
-      {{
-        slurm_gpu_types_short + [
-          (_gpu_name | lower | regex_search('([a-z]+\\d{1,4}|\\d{3,4})'))
-          | default('gpu', true)
-        ]
-      }}
-  loop: "{{ slurm_gpu_names }}"
-  vars:
-    _gpu_name: "{{ item }}"
-  when: slurm_gpu_names | length > 0
+    slurm_gpu_types_short: "{{ slurm_gpu_names | default([]) | map('lower') | map('regex_findall', '([a-z]{1,3}\\\\d{1,4}[a-z]?|\\\\d{3,4})') | map('first') | map('default', 'gpu') | list }}"
   tags: [slurm, slurm_facts, slurm_config]
 
 - name: Slurm facts | Definir tipo corto del nodo (mixed si aplica)
