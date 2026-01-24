@@ -1,0 +1,8 @@
+---
+slurm_controller_reconfigure_on_change: true
+
+slurm_controller_autoresume_enabled: true
+slurm_controller_autoresume_states:
+  - DRAIN
+  - INVALID_REG
+slurm_controller_autoresume_reason_regex: ".*"
