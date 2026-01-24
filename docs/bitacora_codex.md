@@ -56,6 +56,16 @@
 
 `micromamba run -n llm python -c "import torch; print('torch', torch.__version__); print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"`
 ```
+
+## 2026-01-24 11:19 (America/Bogota) — Slurm NVML GRES mismatch and DRAIN
+**Context:** hosts: master, worker1, worker2; playbook: site.yml; tags: cuda, slurm_facts, slurm_config, slurmd; branch: llm
+**Symptom:** nodes in DRAIN/INVALID_REG with `Reason=gres/gpu count reported lower than configured (0 < 1)`; `sinfo` shows `gpu:1(S:0)`; `slurmd` logs show NVML not found and GRES type normalization errors.
+**Root cause:** NVML lib missing via `libnvidia-ml.so` symlink; `slurmd` not restarted after NVML fix; mismatch between `gres.conf` and `slurm.conf` GRES type caused `_normalize_sys_gres_types` to set type NULL and controller to keep stale DRAIN reason.
+**Fix:** ensure `libnvidia-ml.so` symlink and run `ldconfig`; restart `slurmd` when NVML symlink changes; set `gres.conf` to `AutoDetect=nvml` only; set `slurm.conf` to `Gres=gpu:<nvml_type>:<count>` based on NVML name; run `scontrol reconfigure`; user manually cleared DRAIN with `scontrol update ... State=resume`.
+**Files changed:** roles/nvidia_cuda/tasks/main.yml, roles/slurm_compute/tasks/main.yml, roles/slurm_facts/tasks/main.yml, roles/slurm_install/tasks/main.yml, roles/slurm_install/templates/gres.conf.j2, docs/bitacora_codex.md
+**Validation:** `slurmd -G` shows `Type=quadro_p1000 Count=1`; `sinfo -N -h -o "%N %t %G"` shows `gpu:quadro_p1000:1`; `srun -N1 -w worker1 -p gpu --gres=gpu:1 nvidia-smi -L` succeeds.
+**Rollback:** revert the listed file changes; remove `libnvidia-ml.so` symlink; restart `slurmd`; reset `slurm.conf` GRES; reapply node state if needed.
+**Notes:** `S:0` still appears in `sinfo` but GPU jobs run correctly; further investigation can remove the suffix if needed.
 torch <version>
 cuda False
 no-gpu

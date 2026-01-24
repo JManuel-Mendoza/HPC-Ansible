@@ -5,7 +5,6 @@
 {% set n = slurm_gpu_count | default(0) | int %}
 {% if n > 0 %}
 AutoDetect=nvml
-Name=gpu Type={{ slurm_gpu_type_short | default('gpu') }}
 {% else %}
 # AutoDetect=nvml (sin GPUs detectadas)
 {% endif %}

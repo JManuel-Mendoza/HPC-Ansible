@@ -42,6 +42,20 @@
       }}
   tags: [slurm, slurm_facts, slurm_config]
 
+- name: Slurm facts | Normalizar tipo NVML de GPU
+  ansible.builtin.set_fact:
+    slurm_gpu_type_nvml: >-
+      {{
+        (
+          (slurm_gpu_names | default([]) | first | default(''))
+          | lower
+          | regex_replace('[^a-z0-9]+', '_')
+          | regex_replace('^_+|_+$', '')
+        ) | default('gpu', true)
+      }}
+  when: slurm_gpu_count | int > 0
+  tags: [slurm, slurm_facts, slurm_config]
+
 - name: Slurm facts | Derivar tipos cortos de GPU
   ansible.builtin.set_fact:
     slurm_gpu_types_short: "{{ slurm_gpu_names | default([]) | map('lower') | map('regex_findall', '([a-z]{1,3}\\\\d{1,4}[a-z]?|\\\\d{3,4})') | map('first') | map('default', 'gpu') | list }}"
@@ -58,7 +72,7 @@
 
 - name: Slurm facts | Definir GRES desde NVML
   ansible.builtin.set_fact:
-    slurm_node_gres: "gpu:{{ slurm_gpu_type_short }}:{{ slurm_gpu_count }}"
+    slurm_node_gres: "gpu:{{ slurm_gpu_type_nvml | default('gpu') }}:{{ slurm_gpu_count }}"
   when: slurm_gpu_count | int > 0
   tags: [slurm, slurm_facts, slurm_config]
 

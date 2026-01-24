@@ -273,6 +273,15 @@
   ansible.builtin.set_fact:
     slurm_gpu_names: "{{ _gpu_names }}"
     slurm_gpu_count: "{{ _gpu_names | length }}"
+    slurm_gpu_type_nvml: >-
+      {{
+        (
+          (_gpu_names | first | default(''))
+          | lower
+          | regex_replace('[^a-z0-9]+', '_')
+          | regex_replace('^_+|_+$', '')
+        ) | default('gpu', true)
+      }}
     slurm_gpu_type_short: >-
       {{
         (_gpu_types | unique | length > 1)
@@ -281,7 +290,7 @@
     slurm_node_gres: >-
       {{
         (_gpu_names | length > 0)
-        | ternary('gpu:' ~ slurm_gpu_type_short ~ ':' ~ (_gpu_names | length), '')
+        | ternary('gpu:' ~ (slurm_gpu_type_nvml | default('gpu')) ~ ':' ~ (_gpu_names | length), '')
       }}
   vars:
     _gpu_names: "{{ _slurm_gpu_names_fallback.stdout_lines | default([]) | map('trim') | reject('equalto', '') | list }}"

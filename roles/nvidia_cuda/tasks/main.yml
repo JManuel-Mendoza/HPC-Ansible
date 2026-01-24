@@ -637,16 +637,23 @@
   changed_when: false
   when: _nvidia_gpu_present
 
-- name: NVIDIA/CUDA | Crear symlink libnvidia-ml.so si falta
+- name: NVIDIA/CUDA | Asegurar symlink libnvidia-ml.so
   ansible.builtin.file:
     src: "{{ item.item.path }}"
     dest: "{{ item.item.path | dirname }}/libnvidia-ml.so"
     state: link
+    force: true
   loop: "{{ _nvml_symlink_stats.results | default([]) }}"
   register: _nvml_symlink_create
   when:
     - _nvidia_gpu_present
     - not item.stat.exists or item.stat.islnk
+
+- name: NVIDIA/CUDA | Marcar cambio de symlink NVML
+  ansible.builtin.set_fact:
+    slurm_nvml_symlink_changed: true
+  when: >
+    (_nvml_symlink_create.results | default([]) | selectattr('changed') | list | length) > 0
 
 - name: NVIDIA/CUDA | Ejecutar ldconfig si se creo symlink NVML
   ansible.builtin.command: ldconfig

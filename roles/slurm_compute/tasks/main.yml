@@ -58,11 +58,20 @@
   when: slurm_manage_slurmd | bool
   tags: [slurm, slurmd]
 
-- name: Slurm | Restart slurmd if slurm.conf changed (compute)
+- name: Slurm | Restart slurmd si cambia config o NVML (compute)
   ansible.builtin.systemd:
     name: slurmd
     state: restarted
+    no_block: true
   when:
     - slurm_manage_slurmd | bool
-    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false))
+    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
+  tags: [slurm, slurmd]
+
+- name: Slurm | Verificar slurmd activo (compute)
+  ansible.builtin.command: systemctl is-active slurmd
+  register: _slurmd_active
+  changed_when: false
+  failed_when: (_slurmd_active.stdout | trim) != 'active'
+  when: slurm_manage_slurmd | bool
   tags: [slurm, slurmd]
