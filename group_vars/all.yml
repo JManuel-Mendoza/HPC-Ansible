@@ -102,3 +102,13 @@ slurm_srun_port_range: "60001-60100"
 
 # Slurm: directorio por defecto para srun/sbatch/salloc cuando NO se pasa --chdir/-D
 slurm_default_chdir: "/tmp"
+
+# Slurm validate: activar micromamba y entorno llm para pruebas de torch
+slurm_validate_torch:
+  enabled: "auto"
+  python: "python3"
+  prelude: |
+    set +u
+    eval "$(micromamba shell hook --shell bash)"
+    micromamba activate llm
+    set -u

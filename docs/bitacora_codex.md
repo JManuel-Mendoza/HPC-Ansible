@@ -66,6 +66,18 @@
 **Validation:** `slurmd -G` shows `Type=quadro_p1000 Count=1`; `sinfo -N -h -o "%N %t %G"` shows `gpu:quadro_p1000:1`; `srun -N1 -w worker1 -p gpu --gres=gpu:1 nvidia-smi -L` succeeds.
 **Rollback:** revert the listed file changes; remove `libnvidia-ml.so` symlink; restart `slurmd`; reset `slurm.conf` GRES; reapply node state if needed.
 **Notes:** `S:0` still appears in `sinfo` but GPU jobs run correctly; further investigation can remove the suffix if needed.
+
+## 2026-01-24 12:58 (America/Bogota) — slurm_validate: torch prelude + node state check
+**Context:** host: master; playbook: site.yml; tags: slurm_validate; branch: llm
+**Symptom:** Torch probe in GPU job failed; slurm_validate could miss sinfo failures in DOWN/DRAIN/FAIL check.
+**Root cause:** micromamba activation runs under `set -u` and hits `MKL_INTERFACE_LAYER` unbound; node state check only failed on `egrep` match and ignored `sinfo` errors.
+**Fix:** wrap micromamba activation with `set +u`/`set -u` in `slurm_validate_torch.prelude`; split node state validation into `sinfo` command + filter to ensure failures surface.
+**Files changed:** group_vars/all.yml, roles/slurm_validate/tasks/main.yml, docs/bitacora_codex.md
+**Validation:** `ansible-playbook -i inventario.ini site.yml --tags slurm_validate`
+**Output (torch):** probe rc=0; smoke rc=0; `torch.version.cuda: 12.4`, `cuda_available: True`, `gpu: Quadro P1000`.
+**Output (smoke jobs):** CPU/GPU `sacct` shows `COMPLETED|0:0`.
+**Rollback:** revert the prelude change in `group_vars/all.yml` and restore the single-step `sinfo` check in `roles/slurm_validate/tasks/main.yml`.
+**Notes:** warnings about `ansible.posix` version do not affect the run.
 torch <version>
 cuda False
 no-gpu
