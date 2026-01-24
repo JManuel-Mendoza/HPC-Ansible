@@ -114,11 +114,16 @@ slurm_default_chdir: "/tmp"
 # Variables soportadas:
 #   slurm_cpus, slurm_sockets, slurm_cores_per_socket, slurm_threads_per_core,
 #   slurm_real_memory, slurm_node_gres
+#   slurm_core_spec_count (cores reservados), slurm_mem_spec_limit_mb (mem reservada)
 #
 # Ejemplo por nodo (host_vars/worker1.yml):
+#   # Opcion A: limitar recursos visibles (puede causar INVALID_REG si no coincide con slurmd)
 #   slurm_cpus: 12
 #   slurm_real_memory: 48000
 #   slurm_node_gres: "gpu:quadro_p1000:1"
+#   # Opcion B (recomendada): reservar recursos sin mismatch
+#   slurm_core_spec_count: 2
+#   slurm_mem_spec_limit_mb: 8000
 #
 # Ejemplo por grupo (group_vars/slurm_gpu.yml):
 #   slurm_real_memory: 56000

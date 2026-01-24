@@ -72,6 +72,7 @@
 - name: Slurm | Reconfigurar controlador si cambia configuracion (master)
   ansible.builtin.command: scontrol reconfigure
   changed_when: false
+  become: true
   when:
     - slurm_controller_reconfigure_on_change | bool
     - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
@@ -81,6 +82,7 @@
   ansible.builtin.command: scontrol show node -o
   register: _slurm_nodes
   changed_when: false
+  become: true
   when:
     - slurm_controller_autoresume_enabled | bool
     - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
@@ -115,6 +117,7 @@
 
 - name: Slurm | Reanudar nodos con GRES corregido (master)
   ansible.builtin.command: "scontrol update NodeName={{ item }} State=resume"
+  become: true
   loop: "{{ slurm_nodes_to_resume | default([]) }}"
   when:
     - slurm_controller_autoresume_enabled | bool

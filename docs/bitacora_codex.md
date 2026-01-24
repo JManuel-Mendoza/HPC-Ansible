@@ -78,6 +78,18 @@
 **Output (smoke jobs):** CPU/GPU `sacct` shows `COMPLETED|0:0`.
 **Rollback:** revert the prelude change in `group_vars/all.yml` and restore the single-step `sinfo` check in `roles/slurm_validate/tasks/main.yml`.
 **Notes:** warnings about `ansible.posix` version do not affect the run.
+
+## 2026-01-24 15:50 (America/Bogota) — reservas de recursos con CoreSpec/MemSpec
+**Context:** hosts: master, worker1; playbook: site.yml; tags: slurm; limit: hpc_master,worker1; branch: llm
+**Symptom:** `worker1` en `DRAIN+INVALID_REG` con `Reason=Low socket*core*thread count, Low CPUs` al limitar CPUs en slurm.conf.
+**Root cause:** mismatch entre recursos reportados por `slurmd -C` (20 CPUs/10 cores) y recursos limitados en `slurm.conf`.
+**Fix:** usar `CoreSpecCount` y `MemSpecLimit` para reservar recursos sin alterar el conteo reportado; agregar soporte en `slurm.conf` y ejemplo en `host_vars/worker1.yml`; ejecutar `scontrol reconfigure` y `scontrol update ... State=resume` con `become`.
+**Files changed:** roles/slurm_install/templates/slurm.conf.j2, group_vars/all.yml, host_vars/worker1.yml, roles/slurm_controller/tasks/main.yml, docs/bitacora_codex.md
+**Validation:** 
+  - `ansible-playbook -i inventario.ini site.yml --tags slurm --limit hpc_master,worker1`
+  - `scontrol show node -o worker1` (State=IDLE, CoreSpecCount=2, MemSpecLimit=8000, CfgTRES=cpu=16)
+**Rollback:** revert CoreSpec/MemSpec changes and remove `host_vars/worker1.yml` overrides.
+**Notes:** `scontrol reconfigure` requiere `become` (Invalid user id sin elevación).
 torch <version>
 cuda False
 no-gpu

@@ -199,7 +199,9 @@ SlurmdLogFile=/var/log/slurm/slurmd.log
 {% set mem     = hostvars[h].get('slurm_real_memory', 1024) -%}
 
 {% set gres    = hostvars[h].get('slurm_node_gres', '') -%}
-NodeName={{ hn }} CPUs={{ cpus }} Sockets={{ sockets }} CoresPerSocket={{ cores }} ThreadsPerCore={{ threads }} RealMemory={{ mem }}{% if gres %} Gres={{ gres }}{% endif %} State=UNKNOWN
+{% set corespec = hostvars[h].get('slurm_core_spec_count') -%}
+{% set memspec  = hostvars[h].get('slurm_mem_spec_limit_mb') -%}
+NodeName={{ hn }} CPUs={{ cpus }} Sockets={{ sockets }} CoresPerSocket={{ cores }} ThreadsPerCore={{ threads }} RealMemory={{ mem }}{% if corespec is not none %} CoreSpecCount={{ corespec }}{% endif %}{% if memspec is not none %} MemSpecLimit={{ memspec }}{% endif %}{% if gres %} Gres={{ gres }}{% endif %} State=UNKNOWN
 {% endfor -%}
 
 

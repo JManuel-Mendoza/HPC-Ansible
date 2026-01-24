@@ -1,8 +1,5 @@
-# Limites visibles para Slurm en worker1 (reserva para administracion).
-# Ajusta estos valores cuando necesites reservar recursos del nodo.
-slurm_cpus: 16
-slurm_sockets: 1
-slurm_cores_per_socket: 8
-slurm_threads_per_core: 2
-slurm_real_memory: 56000
+# Reservas para administracion sin causar INVALID_REG.
+# Slurm mantiene los totales reales, pero no asigna estos recursos.
+slurm_core_spec_count: 2
+slurm_mem_spec_limit_mb: 8000
 slurm_node_gres: "gpu:quadro_p1000:1"
