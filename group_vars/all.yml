@@ -20,13 +20,6 @@ ssh_permit_root_login: "yes"
 ssh_password_authentication: "yes"
 
 # =====================
-# NFS / LLM paths
-# =====================
-llm_nfs_export_dir: "/export/llm-project"
-llm_nfs_mount_dir: "/mnt/llm-project"
-llm_internal_cidr: "192.168.34.0/24"
-
-# =====================
 # LLM env (micromamba)
 # =====================
 llm_conda_packages:

@@ -4,15 +4,15 @@
     _llm_owner_user: "{{ (llm_project_owner | default('') | trim | length > 0) | ternary(llm_project_owner, ansible_user_id) }}"
     _llm_owner_group: "{{ (llm_project_group | default('') | trim | length > 0) | ternary(llm_project_group, ansible_user_gid | string) }}"
 
-- name: LLM Project | Ensure export base dir exists
+- name: LLM Project | Ensure project destination dir exists
   ansible.builtin.file:
-    path: "{{ llm_nfs_export_dir }}"
+    path: "{{ llm_project_dst_dir }}"
     state: directory
     owner: "{{ _llm_owner_user }}"
     group: "{{ _llm_owner_group }}"
     mode: "0775"
 
-- name: LLM Project | Copy llm-project to NFS export (controller -> master)
+- name: LLM Project | Copy llm-project to destination (controller -> master)
   ansible.builtin.copy:
     src: "{{ llm_project_src_dir }}/"
     dest: "{{ llm_project_dst_dir }}/"

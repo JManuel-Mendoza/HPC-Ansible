@@ -35,7 +35,7 @@ Expected outputs:
 
 Troubleshooting:
 - If `cuda_available False`, ensure the driver stream is `nvidia-driver:580-dkms`, and re-run `--tags cuda` + `--tags llm`.
-- If the smoke script is missing, verify the NFS mount/export path contains `scripts/00_smoke_gpu.py`.
+- If the smoke script is missing, verify the project path contains `scripts/00_smoke_gpu.py`.
 
 ## Flujo mínimo
 

@@ -5,7 +5,7 @@ Automatización de un clúster HPC (master + workers) usando Ansible y roles.
 ## Estructura
 
 - `site.yml`: playbook principal
-- `roles/`: roles por capa (common, ssh, firewall, NFS, llm_env, validate)
+- `roles/`: roles por capa (common, ssh, firewall, llm_env, validate)
 - `group_vars/`: variables por grupo
 - `inventario.ini`: inventario de nodos (ajustar según entorno)
 

@@ -1,5 +1,5 @@
 ---
-- name: Storage survey and NFS path verification
+- name: Storage survey
   hosts: all
   become: true
   gather_facts: true
@@ -66,47 +66,6 @@
       register: ss_disks
       changed_when: false
 
-    - name: Storage Survey | Master exportfs -v
-      ansible.builtin.command: exportfs -v
-      register: ss_exportfs
-      changed_when: false
-      failed_when: false
-      when: inventory_hostname in groups.get('hpc_master', [])
-
-    - name: Storage Survey | Master export df
-      ansible.builtin.command: df -hT {{ llm_nfs_export_dir }}
-      register: ss_export_df
-      changed_when: false
-      failed_when: false
-      when: inventory_hostname in groups.get('hpc_master', [])
-
-    - name: Storage Survey | Master export ls
-      ansible.builtin.command: ls -la {{ llm_nfs_export_dir }}
-      register: ss_export_ls
-      changed_when: false
-      failed_when: false
-      when: inventory_hostname in groups.get('hpc_master', [])
-
-    - name: Storage Survey | Worker findmnt for NFS mount
-      ansible.builtin.command: findmnt {{ llm_nfs_mount_dir }}
-      register: ss_worker_findmnt
-      changed_when: false
-      failed_when: false
-      when: inventory_hostname in groups.get('workers', [])
-
-    - name: Storage Survey | Worker df for NFS mount
-      ansible.builtin.command: df -hT {{ llm_nfs_mount_dir }}
-      register: ss_worker_df
-      changed_when: false
-      failed_when: false
-      when: inventory_hostname in groups.get('workers', [])
-
-    - name: Storage Survey | Worker mount grep NFS
-      ansible.builtin.command: /bin/sh -c "mount | grep -E ' type nfs| type nfs4' || true"
-      register: ss_worker_mounts
-      changed_when: false
-      failed_when: false
-      when: inventory_hostname in groups.get('workers', [])
 
     - name: Storage Survey | Write report file
       ansible.builtin.copy:
@@ -141,23 +100,6 @@
           --- lvs ---
           {{ ss_lvs.stdout | default('') }}
 
-          --- master exportfs -v ---
-          {{ ss_exportfs.stdout | default('') }}
-
-          --- master df export ---
-          {{ ss_export_df.stdout | default('') }}
-
-          --- master ls export ---
-          {{ ss_export_ls.stdout | default('') }}
-
-          --- worker findmnt mount ---
-          {{ ss_worker_findmnt.stdout | default('') }}
-
-          --- worker df mount ---
-          {{ ss_worker_df.stdout | default('') }}
-
-          --- worker NFS mounts ---
-          {{ ss_worker_mounts.stdout | default('') }}
       changed_when: false
 
     - name: Storage Survey | Fetch report to controller
@@ -188,18 +130,14 @@
           # Storage Survey Summary
           Generated: {{ lookup('pipe', 'date -Is') }}
 
-          | Host | Kernel | Disks (nvme) | Disks (sata/other) | NFS export mount (master) | NFS mount (workers) | /scratch recommendation | /data recommendation |
-          | --- | --- | --- | --- | --- | --- | --- | --- |
+          | Host | Kernel | Disks (nvme) | Disks (sata/other) | /scratch recommendation | /data recommendation |
+          | --- | --- | --- | --- | --- | --- |
           {% for host in groups['all'] | sort %}
           {% set disks = hostvars[host].ss_disks.stdout_lines | default([]) %}
           {% set nvme = disks | select('match', '^nvme') | list %}
           {% set other = disks | reject('match', '^nvme') | list %}
           {% set nvme_present = (nvme | length) > 0 %}
           {% set other_present = (other | length) > 0 %}
-          {% set nfs_export = hostvars[host].ss_export_df.stdout | default('') %}
-          {% set nfs_mount_raw = hostvars[host].ss_worker_findmnt.stdout | default('') %}
-          {% set nfs_mount_present = (nfs_mount_raw | trim | length) > 0 %}
-          {% set nfs_mount = nfs_mount_raw if nfs_mount_present else 'not mounted' %}
-          | {{ host }} | {{ hostvars[host].ansible_kernel | default('') }} | {{ nvme_present | ternary(nvme | join('<br>'), 'none') }} | {{ other_present | ternary(other | join('<br>'), 'none') }} | {{ nfs_export | default('') | replace('\n','<br>') }} | {{ nfs_mount | default('') | replace('\n','<br>') }} | {{ nvme_present | ternary('nvme scratch', 'no nvme detected') }} | {{ other_present | ternary('sata/other data', 'no sata detected') }} |
+          | {{ host }} | {{ hostvars[host].ansible_kernel | default('') }} | {{ nvme_present | ternary(nvme | join('<br>'), 'none') }} | {{ other_present | ternary(other | join('<br>'), 'none') }} | {{ nvme_present | ternary('nvme scratch', 'no nvme detected') }} | {{ other_present | ternary('sata/other data', 'no sata detected') }} |
           {% endfor %}
       changed_when: false

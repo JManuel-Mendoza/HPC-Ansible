@@ -1,6 +1,6 @@
 # Guías del repositorio (AGENTS.md)
 
-Este repositorio aprovisiona y opera un clúster HPC (master + workers) con Ansible, incluyendo Slurm, firewall, NFS, CUDA/GPUs y validaciones.
+Este repositorio aprovisiona y opera un clúster HPC (master + workers) con Ansible, incluyendo Slurm, firewall, CUDA/GPUs y validaciones.
 
 ## 0) Modo de trabajo con agentes (Codex/LLM)
 Por defecto, el agente debe operar en modo **auditoría/verificación**:
@@ -13,15 +13,15 @@ Por defecto, el agente debe operar en modo **auditoría/verificación**:
 - **No hagas commits** salvo instrucción explícita del usuario.
 
 ## 1) Estructura del proyecto y organización
-- `site.yml` es el playbook principal (baseline, NFS, validación); `base.yml` es un pre-flight ligero.
-- `roles/` contiene roles en capas (`common`, `users_ssh`, `firewall`, `nvidia_cuda`, `llm_env`, `nfs_server`, `nfs_client`, `llm_project`, `validate`, etc.), cada uno con estructura estándar (`tasks/`, `defaults/`, `vars/`, `handlers/`, `templates/`, `files/` según aplique).
+- `site.yml` es el playbook principal (baseline, validación); `base.yml` es un pre-flight ligero.
+- `roles/` contiene roles en capas (`common`, `users_ssh`, `firewall`, `nvidia_cuda`, `llm_env`, `llm_project`, `validate`, etc.), cada uno con estructura estándar (`tasks/`, `defaults/`, `vars/`, `handlers/`, `templates/`, `files/` según aplique).
 - Variables:
-  - `group_vars/all.yml`, `group_vars/hpc_master.yml`, `group_vars/workers.yml` concentran defaults por alcance.
+- `group_vars/all.yml` y `group_vars/hpc_master.yml` concentran defaults por alcance.
   - Overrides específicos por host en `host_vars/<hostname>.yml`.
 - Inventarios:
   - `inventario.ini` es el inventario por defecto (referenciado por `ansible.cfg`).
   - `inventario_glob.ini` existe para agrupaciones alternas.
-- Material ad-hoc y artefactos: `playbooks sueltos/` y `llm-project/` (configs/scripts compartidos por NFS).
+- Material ad-hoc y artefactos: `playbooks sueltos/` y `llm-project/` (configs/scripts compartidos).
 
 ## 2) Principios operativos (Ansible + HPC)
 - Cambios **mínimos y reversibles**: preferir diffs pequeños y bien acotados.
@@ -113,7 +113,7 @@ Recomendación operativa:
   - un solo worker (`--limit worker1`) o un grupo reducido.
 
 ## 6) Convenciones de tags
-- Mantener tags alineados con roles/playbooks: `common`, `ssh`, `firewall`, `cuda`, `llm`, `nfs`, `llm_project`, `validate`.
+- Mantener tags alineados con roles/playbooks: `common`, `ssh`, `firewall`, `cuda`, `llm`, `llm_project`, `validate`.
 - Si se añade un rol de validación nuevo (p. ej. `slurm_validate`), incluir tag propio y evitar colisiones con tags existentes.
 
 ## 7) Guías de testing (qué reportar)
@@ -123,7 +123,7 @@ Antes de proponer cambios o abrir PR:
   - inventario utilizado,
   - límites (`--limit`),
   - tags ejecutados,
-  - salida relevante de validaciones (NFS/CUDA/Slurm según aplique).
+  - salida relevante de validaciones (CUDA/Slurm según aplique).
 - Evitar ruido: incluir solo evidencia útil (no dumps completos sin necesidad).
 
 ## 8) Commits y Pull Requests

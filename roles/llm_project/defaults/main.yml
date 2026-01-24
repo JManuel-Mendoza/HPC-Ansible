@@ -1,5 +1,5 @@
 ---
 llm_project_src_dir: "{{ playbook_dir }}/llm-project"
-llm_project_dst_dir: "{{ llm_nfs_export_dir }}/llm-project"
+llm_project_dst_dir: "/opt/llm-project"
 llm_project_owner: ""
 llm_project_group: ""
