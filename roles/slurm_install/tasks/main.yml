@@ -224,32 +224,6 @@
   when: inventory_hostname in groups.get('hpc_master', [])
   tags: [slurm, slurm_config]
 
-- name: Slurm | Detect NVIDIA GPU device files (/dev/nvidia[0-9]) for gres.conf
-  ansible.builtin.find:
-    paths: /dev
-    patterns: "nvidia[0-9]*"
-    file_type: char
-  register: _slurm_nvidia_gpu_devs
-  changed_when: false
-  failed_when: false
-  tags: [slurm, slurm_config, slurm_gres]
-
-- name: Slurm | Install gres.conf from detected NVIDIA devices
-  ansible.builtin.copy:
-    dest: "{{ slurm_etc_dir }}/gres.conf"
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      {% for d in (_slurm_nvidia_gpu_devs.files | default([]) | sort(attribute='path')) %}
-      Name=gpu File={{ d.path }}
-      {% endfor %}
-  register: _slurm_gres_copy
-  when:
-    - slurm_node_gres | default('') is match('^gpu:')
-  tags: [slurm, slurm_config, slurm_gres]
-
-
 - name: Slurm | Check controller slurm.conf exists before copying (workers)
   ansible.builtin.stat:
     path: "{{ slurm_etc_dir }}/slurm.conf"
@@ -283,7 +257,7 @@
 
 - name: Slurm | Record slurm.conf change flag
   ansible.builtin.set_fact:
-    slurm_conf_changed: "{{ (_slurm_conf_copy.changed | default(false)) or (_slurm_gres_copy.changed | default(false)) }}"
+    slurm_conf_changed: "{{ _slurm_conf_copy.changed | default(false) }}"
   tags: [slurm, slurm_config]
 
 - name: Slurm | Install gres.conf (per-node, templated from facts)

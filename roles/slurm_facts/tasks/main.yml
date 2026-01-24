@@ -20,21 +20,73 @@
     slurm_threads_per_core: "{{ ansible_facts.processor_threads_per_core | default(1) | int }}"
     slurm_real_memory: "{{ [ (ansible_facts.memtotal_mb | int) - (slurm_mem_reserve_mb | int), 1024 ] | max }}"
 
-- name: Slurm facts | Detect GPU count (nvidia-smi)
-  ansible.builtin.command: nvidia-smi -L
-  register: _nvidia_smi
+- name: Slurm facts | Consultar modelos de GPU con NVML (nvidia-smi)
+  ansible.builtin.command: nvidia-smi --query-gpu=name --format=csv,noheader
+  register: _nvidia_smi_names
   changed_when: false
   failed_when: false
   tags: [slurm, slurm_facts, slurm_config]
 
-- name: Slurm facts | Set GRES string if GPU exists
+- name: Slurm facts | Normalizar lista de modelos de GPU
   ansible.builtin.set_fact:
-    slurm_gpu_count: "{{ 0 if _nvidia_smi.rc != 0 else (_nvidia_smi.stdout_lines | length) }}"
-    slurm_node_gres: "{{ ('gpu:' ~ (0 if _nvidia_smi.rc != 0 else (_nvidia_smi.stdout_lines | length))) }}"
+    slurm_gpu_names: "{{ _gpu_names }}"
+    slurm_gpu_count: "{{ _gpu_names | length }}"
+  vars:
+    _gpu_names: >-
+      {{
+        _nvidia_smi_names.stdout_lines
+        | default([])
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
   tags: [slurm, slurm_facts, slurm_config]
 
-- name: Slurm facts | Clear GRES if no GPU
+- name: Slurm facts | Inicializar tipos cortos de GPU
+  ansible.builtin.set_fact:
+    slurm_gpu_types_short: []
+  tags: [slurm, slurm_facts, slurm_config]
+
+- name: Slurm facts | Derivar tipo corto por GPU
+  ansible.builtin.set_fact:
+    slurm_gpu_types_short: >-
+      {{
+        slurm_gpu_types_short + [
+          (_gpu_name | lower | regex_search('([a-z]+\\d{1,4}|\\d{3,4})'))
+          | default('gpu', true)
+        ]
+      }}
+  loop: "{{ slurm_gpu_names }}"
+  vars:
+    _gpu_name: "{{ item }}"
+  when: slurm_gpu_names | length > 0
+  tags: [slurm, slurm_facts, slurm_config]
+
+- name: Slurm facts | Definir tipo corto del nodo (mixed si aplica)
+  ansible.builtin.set_fact:
+    slurm_gpu_type_short: >-
+      {{
+        (slurm_gpu_types_short | unique | length > 1)
+        | ternary('mixed', (slurm_gpu_types_short | first | default('gpu')))
+      }}
+  tags: [slurm, slurm_facts, slurm_config]
+
+- name: Slurm facts | Definir GRES desde NVML
+  ansible.builtin.set_fact:
+    slurm_node_gres: "gpu:{{ slurm_gpu_type_short }}:{{ slurm_gpu_count }}"
+  when: slurm_gpu_count | int > 0
+  tags: [slurm, slurm_facts, slurm_config]
+
+- name: Slurm facts | Limpiar GRES si no hay GPU
   ansible.builtin.set_fact:
     slurm_node_gres: ""
   when: slurm_gpu_count | int == 0
+  tags: [slurm, slurm_facts, slurm_config]
+
+- name: Slurm facts | Advertir mezcla de modelos en el nodo
+  ansible.builtin.debug:
+    msg: >-
+      GPUs mixtas detectadas en el nodo: {{ slurm_gpu_names | unique }}.
+      Tipos cortos: {{ slurm_gpu_types_short | unique }}.
+  when: slurm_gpu_types_short | unique | length > 1
   tags: [slurm, slurm_facts, slurm_config]

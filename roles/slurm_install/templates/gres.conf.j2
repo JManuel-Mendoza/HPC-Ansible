@@ -1,14 +1,11 @@
 # COMPUTE GRES (ANSIBLE MANAGED)
-# Mapeo de GPUs NVIDIA a GRES "gpu"
-# Se genera por nodo a partir de slurm_gpu_count / slurm_node_name
+# AutoDetect=nvml habilita detección de GPUs y exposición de detalles vía NVML.
+# El tipo se reduce a un identificador corto para scheduling (ej: a100, 3090).
 
-{% set node = slurm_node_name | default(inventory_hostname) %}
 {% set n = slurm_gpu_count | default(0) | int %}
-
 {% if n > 0 %}
-{% for i in range(0, n) -%}
-NodeName={{ node }} Name=gpu File=/dev/nvidia{{ i }}
-{% endfor -%}
+AutoDetect=nvml
+Name=gpu Type={{ slurm_gpu_type_short | default('gpu') }}
 {% else %}
-# NodeName={{ node }} (sin GPUs detectadas)
+# AutoDetect=nvml (sin GPUs detectadas)
 {% endif %}
