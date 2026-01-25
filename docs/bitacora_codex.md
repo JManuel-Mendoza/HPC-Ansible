@@ -90,6 +90,15 @@
   - `scontrol show node -o worker1` (State=IDLE, CoreSpecCount=2, MemSpecLimit=8000, CfgTRES=cpu=16)
 **Rollback:** revert CoreSpec/MemSpec changes and remove `host_vars/worker1.yml` overrides.
 **Notes:** `scontrol reconfigure` requiere `become` (Invalid user id sin elevación).
+
+## 2026-01-24 19:05 (America/Bogota) — reservas por nodo (master/worker1/worker2)
+**Context:** hosts: master, worker1, worker2; playbook: site.yml; tags: slurm; limit: hpc_master,worker1,worker2; branch: llm
+**Symptom:** configuraciones personalizadas inconsistentes; `CoreSpecCount` invalido en master y `worker2` en DRAIN/INVALID_REG.
+**Root cause:** `CoreSpecCount` fuera de rango en master; cambios no aplicados en caliente sin `scontrol reconfigure` y `State=resume`.
+**Fix:** definir reservas por nodo con `CoreSpecCount`/`MemSpecLimit` en `host_vars` (master=1/16000, worker1=2/8000, worker2=3/12000); ejecutar `scontrol reconfigure` y `scontrol update ... State=resume`.
+**Files changed:** host_vars/master.yml, host_vars/worker1.yml, host_vars/worker2.yml, docs/bitacora_codex.md
+**Validation:** `scontrol show node -o` muestra `State=IDLE` y `CfgTRES` reducida (master=18, worker1=16, worker2=14) con `CoreSpecCount` y `MemSpecLimit` activos.
+**Rollback:** eliminar overrides en `host_vars/*` y reconfigurar slurmctld.
 torch <version>
 cuda False
 no-gpu
