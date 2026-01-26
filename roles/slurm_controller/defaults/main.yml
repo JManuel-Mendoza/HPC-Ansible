@@ -1,5 +1,6 @@
 ---
 slurm_controller_reconfigure_on_change: true
+slurm_controller_reconfigure_always: true
 
 slurm_controller_autoresume_enabled: true
 slurm_controller_autoresume_states:

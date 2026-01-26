@@ -330,13 +330,10 @@
     slurm_gres_conf_changed: "{{ _slurm_gres_conf_copy.changed }}"
   tags: [slurm, slurm_config]
 
-- name: Slurm | Install default chdir wrappers for srun/sbatch/salloc
-  ansible.builtin.template:
-    src: slurm-defaults.sh.j2
-    dest: /etc/profile.d/slurm-defaults.sh
-    owner: root
-    group: root
-    mode: "0644"
+- name: Slurm | Eliminar wrapper de chdir por defecto (srun/sbatch/salloc)
+  ansible.builtin.file:
+    path: /etc/profile.d/slurm-defaults.sh
+    state: absent
   tags: [slurm, slurm_config, slurm_env]
 
 - name: SlurmDBD | Higiene de /run y pidfile

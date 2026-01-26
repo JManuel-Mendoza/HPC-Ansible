@@ -100,9 +100,6 @@ slurm_partitions:
 
 slurm_srun_port_range: "60001-60100"
 
-# Slurm: directorio por defecto para srun/sbatch/salloc cuando NO se pasa --chdir/-D
-slurm_default_chdir: "/tmp"
-
 # =====================
 # Slurm - Overwrites simples de recursos (por host o por grupo)
 # =====================

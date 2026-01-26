@@ -3,17 +3,17 @@
 #SBATCH -p {{ slurm_validate_partitions.gpu }}
 #SBATCH -N 1
 #SBATCH -n 1
+#SBATCH -o gpu_%j.out
+#SBATCH -e gpu_%j.err
 #SBATCH -c 2
 #SBATCH --gres=gpu:1
 #SBATCH -t 00:02:00
-#SBATCH --chdir={{ slurm_validate_smoke.workdir }}
-#SBATCH -o {{ slurm_validate_smoke.workdir }}/smoke-gpu-%j.out
-#SBATCH -e {{ slurm_validate_smoke.workdir }}/smoke-gpu-%j.err
 
 set -euo pipefail
 echo "=== GPU smoke ==="
 date
 hostname
+pwd
 nvidia-smi -L
 nvidia-smi
 echo "OK"

@@ -69,13 +69,16 @@
   when: slurm_conf_changed | default(false)
   tags: [slurm, slurmctld]
 
-- name: Slurm | Reconfigurar controlador si cambia configuracion (master)
+- name: Slurm | Reconfigurar controlador al finalizar configuracion (master)
   ansible.builtin.command: scontrol reconfigure
   changed_when: false
   become: true
   when:
     - slurm_controller_reconfigure_on_change | bool
-    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
+    - slurm_controller_reconfigure_always | default(false) or
+      (slurm_conf_changed | default(false)) or
+      (slurm_gres_conf_changed | default(false)) or
+      (slurm_nvml_symlink_changed | default(false))
   tags: [slurm]
 
 - name: Slurm | Obtener estado de nodos (master)

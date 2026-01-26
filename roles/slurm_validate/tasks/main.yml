@@ -174,33 +174,63 @@
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
-- name: Verificar archivos de salida del job CPU
-  ansible.builtin.stat:
-    path: "{{ slurm_validate_smoke.workdir }}/smoke-cpu-{{ _cpu_jobid.stdout | trim }}{{ item }}"
-  loop:
-    - ".out"
-    - ".err"
-  register: _cpu_job_files
+- name: Obtener detalles del job CPU (stdout/stderr/host)
+  ansible.builtin.command: "scontrol show job -o {{ _cpu_jobid.stdout | trim }}"
+  register: _cpu_job_detail
   changed_when: false
   when: slurm_validate_smoke.enabled | bool
   tags: [slurm_validate, slurm_validate_smoke]
 
+- name: Parsear salida y host del job CPU
+  ansible.builtin.set_fact:
+    slurm_cpu_job_stdout_path: "{{ _cpu_job_detail.stdout | regex_findall('StdOut=([^ ]+)') | first | default('') }}"
+    slurm_cpu_job_stderr_path: "{{ _cpu_job_detail.stdout | regex_findall('StdErr=([^ ]+)') | first | default('') }}"
+    slurm_cpu_job_batch_host: "{{ _cpu_job_detail.stdout | regex_findall('BatchHost=([^ ]+)') | first | default('') }}"
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar stdout del job CPU en el batch host
+  ansible.builtin.stat:
+    path: "{{ slurm_cpu_job_stdout_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
+  register: _cpu_job_out_stat
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - slurm_cpu_job_stdout_path | length > 0
+    - slurm_cpu_job_batch_host | length > 0
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar stderr del job CPU en el batch host
+  ansible.builtin.stat:
+    path: "{{ slurm_cpu_job_stderr_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
+  register: _cpu_job_err_stat
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - slurm_cpu_job_stderr_path | length > 0
+    - slurm_cpu_job_batch_host | length > 0
+  tags: [slurm_validate, slurm_validate_smoke]
+
 - name: Leer salida del job CPU (stdout)
-  ansible.builtin.command: "cat {{ slurm_validate_smoke.workdir }}/smoke-cpu-{{ _cpu_jobid.stdout | trim }}.out"
+  ansible.builtin.command: "cat {{ slurm_cpu_job_stdout_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
   register: _cpu_job_out
   changed_when: false
   when:
     - slurm_validate_smoke.enabled | bool
-    - (_cpu_job_files.results[0].stat.exists | default(false))
+    - (_cpu_job_out_stat.stat.exists | default(false))
   tags: [slurm_validate, slurm_validate_smoke]
 
 - name: Leer salida del job CPU (stderr)
-  ansible.builtin.command: "cat {{ slurm_validate_smoke.workdir }}/smoke-cpu-{{ _cpu_jobid.stdout | trim }}.err"
+  ansible.builtin.command: "cat {{ slurm_cpu_job_stderr_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
   register: _cpu_job_err
   changed_when: false
   when:
     - slurm_validate_smoke.enabled | bool
-    - (_cpu_job_files.results[1].stat.exists | default(false))
+    - (_cpu_job_err_stat.stat.exists | default(false))
   tags: [slurm_validate, slurm_validate_smoke]
 
 - name: Mostrar salida del job CPU
