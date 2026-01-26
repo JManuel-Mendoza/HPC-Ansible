@@ -3,6 +3,16 @@
 ## Table of Contents
 - TBD
 
+## 2026-01-26 17:39 (UTC-05) — agregar numba al env llm
+**Context:** hosts: all; playbook: site.yml; tags: llm; branch: llm
+**Symptom:** N/A (solicitud de paquete)
+**Root cause:** N/A
+**Fix:** añadir `numba` a `llm_conda_packages` para el entorno micromamba `llm`.
+**Files changed:** group_vars/all.yml, docs/bitacora_codex.md
+**Validation:** `ansible-playbook -i inventario.ini site.yml --syntax-check` (warning: ansible.posix no soporta Ansible 2.14.18)
+**Rollback:** retirar `numba` de `llm_conda_packages` en `group_vars/all.yml` y reaplicar el playbook.
+**Notes:** none.
+
 ## 2026-01-16 11:04 (America/Bogota) — micromamba missing on PATH
 **Context:** hosts: all; playbook: site.yml; tags: llm; branch: codex
 **Symptom:** bash: micromamba: command not found

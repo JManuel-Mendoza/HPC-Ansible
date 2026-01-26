@@ -1,0 +1,38 @@
+---
+nfs_hpc_share_dir: "/nfs-hpc"
+
+# Habilitacion por nodo/grupo:
+# - Por defecto todos los nodos montan el share (client_enabled: true).
+# - Para excluir un grupo/host, define nfs_hpc_client_enabled: false en group_vars/ o host_vars/.
+nfs_hpc_server_enabled: false
+nfs_hpc_client_enabled: true
+
+nfs_hpc_server_host: "{{ slurm_control_machine | default('master') }}"
+nfs_hpc_allowed_clients: "{{ slurm_internal_cidr | default('*') }}"
+nfs_hpc_export_opts: "rw,sync,no_subtree_check"
+nfs_hpc_export_file: "/etc/exports.d/hpc-nfs.exports"
+
+nfs_hpc_nfs_version: "4.2"
+nfs_hpc_fstype: "nfs"
+nfs_hpc_mount_point: "{{ nfs_hpc_share_dir }}"
+nfs_hpc_mount_opts: "rw,relatime,vers={{ nfs_hpc_nfs_version }},_netdev"
+
+nfs_hpc_firewall_manage: true
+
+# Permisos del share
+nfs_hpc_write_group: "hpcusers"
+nfs_hpc_write_group_gid: null
+nfs_hpc_write_group_users: []
+nfs_hpc_share_mode: "0777"
+
+nfs_hpc_server_packages:
+  RedHat: ["nfs-utils"]
+  Debian: ["nfs-kernel-server"]
+
+nfs_hpc_client_packages:
+  RedHat: ["nfs-utils"]
+  Debian: ["nfs-common"]
+
+nfs_hpc_server_service:
+  RedHat: "nfs-server"
+  Debian: "nfs-kernel-server"

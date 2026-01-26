@@ -1,6 +1,9 @@
 # MariaDB module stream (Rocky/RHEL)
 mariadb_module_stream: "10.11"
 
+# NFS HPC (servidor)
+nfs_hpc_server_enabled: true
+
 # SlurmDB MariaDB settings
 slurmdb_mysql_db: "slurm_acct_db"
 slurmdb_mysql_user: "slurm"

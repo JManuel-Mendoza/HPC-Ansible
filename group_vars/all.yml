@@ -7,8 +7,10 @@ common_packages:
   - tar
   - unzip
   - htop
+  - btop
   - tmux
   - jq
+  - tree
 
 enable_chrony: true
 
@@ -29,6 +31,8 @@ llm_conda_packages:
   - torchvision
   - torchaudio
   - pytorch-cuda
+  - numba
+  - cudatoolkit
 
 llm_pip_packages:
   - transformers

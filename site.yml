@@ -8,6 +8,7 @@
     - { role: users_ssh, tags: ["ssh"] }
     - { role: firewall, tags: ["firewall"] }
     - { role: network_internal, tags: ["network_internal"] }
+    - { role: nfs_hpc, tags: ["nfs"] }
     - { role: nvidia_cuda, tags: ["cuda"] }
     - { role: llm_env, tags: ["llm"] }
 
