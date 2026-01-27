@@ -1,0 +1,1000 @@
+   27  sinfo -lN
+   28  squeue
+   29  ansible-playbook -i inventario.ini site.yml --tags slurm
+   30  sinfo -lN
+   31  squeue
+   32  srun -N1 -w worker1 --chdir=/tmp hostname
+   33  srun -N1 -w worker2 --chdir=/tmp hostname
+   34  srun -N1 -w worker1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+   35  srun -N1 -w worker2 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+   36  scontrol show node master | egrep 'NodeName=|Gres=|State=|Partitions='
+   37  systemctl is-active slurmd || true
+   38  nvidia-smi -L || true
+   39  ansible-playbook -i inventario.ini site.yml --tags slurm
+   40  sinfo -lN
+   41  squeue
+   42  scontrol show node master | egrep 'NodeName=|Gres=|State=|Partitions='
+   43  systemctl is-active slurmd || true
+   44  nvidia-smi -L || true
+   45  clear
+   46  ansible-playbook -i inventario.ini site.yml   --limit 'hpc_master:workers_r'   --tags 'munge,slurm_facts,slurm_install,slurm_config,slurmctld,slurmd'
+   47  srun -N2 -n2 --partition=debug --chdir=/tmp hostname
+   48  srun -N1 -w worker1 --partition=gpu --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+   49  srun -N5 -n5 --partition=debug --chdir=/tmp hostname
+   50  srun -N2 -n2 --partition=debug --chdir=/tmp hostname
+   51  srun -N2 -n3 --partition=debug --chdir=/tmp hostname
+   52  srun -N3 -n3 --partition=debug --chdir=/tmp hostname
+   53  cat > /tmp/smoke.sbatch <<'EOF'
+   54  #!/bin/bash
+   55  #SBATCH -p debug
+   56  #SBATCH -N 1
+   57  #SBATCH -t 00:01:00
+   58  hostname
+   59  EOF
+   60  sbatch /tmp/smoke.sbatch
+   61  squeue -u $USER
+   62  cat > /tmp/smoke.sbatch <<'EOF'
+   63  #!/bin/bash
+   64  #SBATCH -p debug
+   65  #SBATCH -N 1
+   66  #SBATCH -t 00:01:00
+   67  hostname
+   68  EOF
+   69  sbatch /tmp/smoke.sbatch
+   70  squeue -u $USER
+   71  sinfo -N -p debug,gpu -o "%P %.20N %.10t %c %m %G %E"
+   72  sinfo -N -p debug,gpu -t idle,alloc,mix -o "%P %.20N %.10t %c %m %G"
+   73  sinfo -N -p debug,gpu -h -o "%N" | sort | uniq -c
+   74  scontrol show nodes -o
+   75  scontrol show nodes -o | egrep 'NodeName=|State=|CPUTot=|RealMemory=|Gres=|NodeAddr=|Reason='
+   76  scontrol show nodes -o
+   77  scontrol show node master
+   78  ansible -i inventario.ini master,worker1,worker2 -b -o -m command -a "lscpu | egrep 'CPU\\(s\\):|Socket\\(s\\):|Core\\(s\\) per socket:|Thread\\(s\\) per core:'"
+   79  slurmd -C
+   80  sinfo -IN
+   81  sinfo -|N
+   82  sinfo -lN
+   83  slurmd -G
+   84  sudo slurmd -G
+   85  cat /etc/slurm/cgroup.conf
+   86  slurmd -D -vvv
+   87  su -
+   88  ansible -i inventario.ini master,worker1,worker2 -b -o -m command -a "lscpu | egrep 'CPU\\(s\\):|Socket\\(s\\):|Core\\(s\\) per socket:|Thread\\(s\\) per core:'"
+   89  ansible -i inventario.ini master,worker1,worker2 -b -o   -m setup   -a "filter=ansible_processor_vcpus,ansible_processor_count,ansible_processor_cores,ansible_processor_threads_per_core"
+   90  scontrol show -h
+   91  scontrol show -a
+   92  scontrol show node -a
+   93  ansible -i inventario.ini master,worker1,worker2 -b -o   -m setup   -a "filter=ansible_processor_vcpus,ansible_processor_count,ansible_processor_cores,ansible_processor_threads_per_core"
+   94  scontrol show node -a
+   95  ansible-playbook -i inventario.ini site.yml --tags slurm_facts,slurm_config,slurmd --limit master,worker1,worker2 --diff
+   96  scontrol show nodes -o | egrep 'NodeName=|Sockets=|CoresPerSocket=|ThreadsPerCore='
+   97  scontrol show nodes -a
+   98  sinfo -o "%P %a %D %t %N"
+   99  srun -p debug -N1 -w worker1 --chdir=/tmp hostname
+  100  srun -p gpu   -N1 -w worker1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+  101  clear
+  102  codex
+  103  clear
+  104  git status
+  105  git branch
+  106  git branch -r
+  107  git switch clean
+  108  git status
+  109  git branch
+  110  git branch -r
+  111  git branch -d codex
+  112  git branch
+  113  git branch -r
+  114  git remote remove origin
+  115  git branch
+  116  git branch -r
+  117  git fetch
+  118  clear
+  119  git status
+  120  clear
+  121  exit
+  122  clear
+  123  cd hpc-ansible/
+  124  codex
+  125  sudo npm install -g @openai/codex
+  126  codex
+  127  clear
+  128  exit
+  129  clear
+  130  sinfo -o "%P %a %D %t %N"
+  131  srun -p debug -N1 -w worker1 --chdir=/tmp hostname
+  132  srun -p gpu   -N1 -w worker1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+  133  cd hpc-ansible/
+  134  git status
+  135  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  136  git fetch
+  137  git switch -c dev origin/codex/inicial
+  138  git status
+  139  ansible-playbook -i inventario.ini site.yml --tags slurm_env --limit master,worker1,worker2 --diff
+  140  source /etc/profile.d/slurm-defaults.sh
+  141  type srun
+  142  srun -N1 -w worker1 hostname
+  143  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  144  ansible-playbook -i inventario.ini site.yml --tags slurm_firewall --diff
+  145  tree -L 2 roles | egrep -i 'slurm|munge'
+  146  ls -l /etc/slurm/ /etc/munge/
+  147  sudo ls -l /etc/slurm/ /etc/munge/
+  148  tree -L 2 roles | egrep -i 'slurm|munge'
+  149  sudo ls -l /etc/slurm/ /etc/munge/
+  150  head -n 80 /etc/slurm/slurm.conf
+  151  sinfo -R && scontrol ping && scontrol show nodes | head
+  152  ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit master,worker1,worker2
+  153  sudo firewall-cmd --zone=public --list-rich-rules
+  154  ansible -i inventario.ini hpc_master,workers_r -b -o -m command -a "firewall-cmd --zone=public --list-rich-rules"
+  155  ansible -i inventario.ini hpc_master -b -o -m command -a "ss -lntp | egrep ':6817|:6819' || true"
+  156  ansible -i inventario.ini workers_r -b -o -m command -a "ss -lntp | egrep ':6818' || true"
+  157  ansible -i inventario.ini workers_r -b -o -m command -a "timeout 2 bash -lc '>/dev/tcp/192.168.34.1/6817 && echo OK || echo FAIL'"
+  158  ansible -i inventario.ini hpc_master -b -o -m command -a "for ip in 192.168.34.2 192.168.34.18; do timeout 2 bash -lc \">/dev/tcp/$ip/6818\" && echo \"$ip OK\" || echo \"$ip FAIL\"; done"
+  159  sinfo -lN
+  160  scontrol show nodes -o
+  161  ansible -i inventario.ini hpc_master -b -o -m shell -a "ss -lntp | egrep ':(6817|6819)\b' || true"
+  162  ansible -i inventario.ini workers_r -b -o -m shell -a "ss -lntp | egrep ':(6818)\b' || true"
+  163  ansible -i inventario.ini workers_r -b -o -m shell -a "timeout 2 bash -lc '>/dev/tcp/192.168.34.1/6817' && echo OK || echo FAIL"
+  164  ansible -i inventario.ini hpc_master -b -o -m shell -a "for ip in 192.168.34.2 192.168.34.18; do timeout 2 bash -lc \">/dev/tcp/$ip/6818\" && echo \"$ip OK\" || echo \"$ip FAIL\"; done"
+  165  ansible -i inventario.ini worker2 -b -o -m shell -a "ip route get 192.168.34.1; ip a | egrep '192\.168\.34\.' -n || true"
+  166  ansible -i inventario.ini hpc_master -b -o -m shell -a "ip neigh show | egrep '192\.168\.34\.18' || true"
+  167  ansible -i inventario.ini workers_r -b -o -m shell -a 'master_ip=$(getent hosts master | awk "{print \$1; exit}"); echo "master_ip=$master_ip"; timeout 2 bash -lc ">/dev/tcp/${master_ip}/6817" && echo OK || echo FAIL'
+  168  ansible -i inventario.ini hpc_master -b -o -m shell -a 'for ip in 192.168.34.2 192.168.34.18; do timeout 2 bash -lc ">/dev/tcp/${ip}/6818" && echo "${ip} OK" || echo "${ip} FAIL"; done'
+  169  ansible-playbook -i inventario.ini site.yml --tags validate_slurm
+  170  sudo scontrol show config | egrep -i 'MailProg|SlurmctldHost|SlurmUser'
+  171  command -v mail || command -v mailx || command -v sendmail || echo "no mail program"
+  172  systemctl is-active postfix 2>/dev/null || echo "postfix not active"
+  173  clear
+  174  git status
+  175  git branch
+  176  git switch clean
+  177  git status
+  178  ls
+  179  git branch -r
+  180  git remote remove origin
+  181  git branch -r
+  182  git branch
+  183  git branch -d dev
+  184  git branch -D dev
+  185  git branch
+  186  git status
+  187  git branch -r
+  188  git fetch
+  189  git branch -r
+  190  clear
+  191  exit
+  192  cd hpc-ansible/
+  193  sudo scontrol show config | egrep -i 'MailProg|Mail'
+  194  ls -l /usr/bin/slurm-spool-mail
+  195  sudo ls -l /usr/bin/slurm-spool-mail
+  196  command -v sendmail || rpm -q postfix exim nullmailer msmtp 2>/dev/null || true
+  197  systemctl is-active postfix 2>/dev/null || true
+  198  scontrol show config | egrep -i 'MailProg|MailDomain|SlurmctldHost'
+  199  sinfo -lN
+  200  scontrol show nodes -o
+  201  squeue
+  202  srun -p debug -N1 -n1 --chdir=/tmp hostname
+  203  srun -p debug -N1 -w worker1 -n1 --chdir=/tmp hostname
+  204  srun -p debug -N1 -w worker2 -n1 --chdir=/tmp hostname
+  205  ls
+  206  clear
+  207  git status
+  208  clear
+  209  exit
+  210  clear
+  211  sinfo -lN
+  212  scontrol show nodes -o
+  213  squeue
+  214  clear
+  215  scontrol nodes show -a
+  216  scontrol node show -a
+  217  scontrol show node -a
+  218  clear
+  219  scontrol show node -a
+  220  clear
+  221  scontrol show node master
+  222  scontrol show node worker1
+  223  scontrol show node worker2
+  224  clear
+  225  srun -p debug -N1 -n1 --chdir=/tmp hostname
+  226  srun -p debug -N1 -w worker1 -n1 --chdir=/tmp hostname
+  227  srun -p debug -N1 -w worker2 -n1 --chdir=/tmp hostname
+  228  clear
+  229  cd hpc-ansible/
+  230  ls
+  231  git status
+  232  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  233  git fetch
+  234  git branch -r
+  235  git branch
+  236  git switch -c dev origin/codex/inicial
+  237  git status
+  238  clear
+  239  cat > /tmp/slurm_test_cpu.sh <<'EOF'
+  240  #!/usr/bin/env bash
+  241  #SBATCH -J cpu_test
+  242  #SBATCH -p debug
+  243  #SBATCH -N 1
+  244  #SBATCH -n 1
+  245  #SBATCH --chdir=/tmp
+  246  #SBATCH -o /tmp/%x-%j.out
+  247  #SBATCH -e /tmp/%x-%j.err
+  248  set -euo pipefail
+  249  echo "date=$(date -Is)"
+  250  echo "host=$(hostname)"
+  251  echo "pwd=$(pwd)"
+  252  echo "slurm_job_id=$SLURM_JOB_ID"
+  253  sleep 2
+  254  EOF
+  255  chmod +x /tmp/slurm_test_cpu.sh
+  256  sbatch /tmp/slurm_test_cpu.sh
+  257  squeue
+  258  # cuando termine:
+  259  ls -l /tmp/cpu_test-*.out /tmp/cpu_test-*.err
+  260  cat /tmp/cpu_test-*.out
+  261  cat /tmp/cpu_test-*.err
+  262  clear
+  263  sbatch /tmp/slurm_test_cpu.sh
+  264  squeue
+  265  ls -l /tmp/cpu_test-*.out /tmp/cpu_test-*.err
+  266  cat /tmp/cpu_test-*.out
+  267  cat /tmp/cpu_test-*.err
+  268  srun -p gpu -N1 -n1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+  269  srun -p gpu -N1 -w worker1 -n1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+  270  srun -p gpu -N1 -w worker2 -n1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+  271  srun -p gpu -N1 -n1 --gres=gpu:1 --chdir=/tmp bash -lc 'python3 - <<PY
+  272  import torch
+  273  print("torch", torch.__version__)
+  274  print("cuda_available", torch.cuda.is_available())
+  275  print("device_count", torch.cuda.device_count())
+  276  if torch.cuda.is_available():
+  277      x=torch.randn(1024,1024, device="cuda")
+  278      y=x@x
+  279      print("ok", y[0,0].item())
+  280  PY'
+  281  clear
+  282  eval "$(micromamba shell hook --shell bash)"
+  283  micromamba activate llm
+  284  srun -p gpu -N1 -n1 --gres=gpu:1 --chdir=/tmp bash -lc 'python3 - <<PY
+  285  import torch
+  286  print("torch", torch.__version__)
+  287  print("cuda_available", torch.cuda.is_available())
+  288  print("device_count", torch.cuda.device_count())
+  289  if torch.cuda.is_available():
+  290      x=torch.randn(1024,1024, device="cuda")
+  291      y=x@x
+  292      print("ok", y[0,0].item())
+  293  PY'
+  294  sacct -S today -o JobID,JobName,Partition,AllocCPUS,State,Elapsed,NodeList%30
+  295  sinfo -lN
+  296  squeue
+  297  clear
+  298  mamba deactivate
+  299  micromamba deactivate
+  300  clear
+  301  micromamba activate llm
+  302  micromamba deactivate
+  303  clear
+  304  exit
+  305  clear
+  306  micromamba
+  307  micromamba activate llm
+  308  clear
+  309  sinfo -lN
+  310  scontrol show nodes -o
+  311  squeue
+  312  clear
+  313  sinfo -h
+  314  sinfo --help
+  315  sinfo -N
+  316  sinfo -lN
+  317  clear
+  318  sinfo -lN
+  319  scontrol show nodes --help
+  320  scontrol show nodes
+  321  clear
+  322  sinfo -lN
+  323  scontrol show nodes
+  324  squeue
+  325  sinfo -lN
+  326  squeue
+  327  srun -p debug -N1 -n1 --chdir=/tmp hostname
+  328  srun -p debug -N1 -w worker1 -n1 --chdir=/tmp hostname
+  329  srun -p gpu -N1 -n1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+  330  srun -p gpu -N1 -w worker2 -n1 --gres=gpu:1 --chdir=/tmp nvidia-smi -L
+  331  eval "$(micromamba shell hook --shell bash)"
+  332  micromamba activate llm
+  333  srun -p gpu -N1 -n1 --gres=gpu:1 --chdir=/tmp bash -lc 'python3 - <<PY
+  334  import torch
+  335  print("torch", torch.__version__)
+  336  print("cuda_available", torch.cuda.is_available())
+  337  print("device_count", torch.cuda.device_count())
+  338  if torch.cuda.is_available():
+  339      x=torch.randn(1024,1024, device="cuda")
+  340      y=x@x
+  341      print("ok", y[0,0].item())
+  342  PY'
+  343  sacct -S today -o JobID,JobName,Partition,AllocCPUS,State,Elapsed,NodeList%30
+  344  ip a
+  345  clear
+  346  ip a
+  347  micromamba deactivate
+  348  clear
+  349  cd hpc-ansible/
+  350  ansible-playbook -i inventario.ini site.yml --tags llm --limit workers_u --diff
+  351  clear
+  352  codex
+  353  sreport
+  354  sreport topusers
+  355  man sreport
+  356  sreport -a
+  357  cd /etc/
+  358  cd slurm/
+  359  ll
+  360  cat cgroup.conf
+  361  cat gres.conf 
+  362  nvidia-smi
+  363  cat gres.conf 
+  364  ip a
+  365  clear
+  366  df -h
+  367  sinfo
+  368  sinfo -lN
+  369  sacct 
+  370  dnf -y install epel-release
+  371  yum -y install epel-release
+  372  sudo yum -y install epel-release
+  373  sudo -y upgrade
+  374  sudo dnf -y upgrade
+  375  dnf -y install remmina
+  376  sudo yum -y install remmina
+  377  slurmd -G
+  378  sudo slurmd -G
+  379  sudo su
+  380  nvidia-smi
+  381  cd hpc-ansible/
+  382  ansible-playbook -i inventario.ini site.yml --tags cuda --diff
+  383  ssh worker1
+  384  codex
+  385  clear
+  386  cd hpc-ansible/
+  387  codex
+  388  clear
+  389  git status
+  390  git push
+  391  git branhc
+  392  git branch
+  393  git switch clean
+  394  git status
+  395  git -d dev
+  396  git branch -d dev
+  397  git branch -d llm
+  398  clear
+  399  git status
+  400  git branch
+  401  git branch -r
+  402  git remote remove origin
+  403  git branch -r
+  404  ls
+  405  clear
+  406  exit
+  407  nvidia-smi
+  408  ssh worker2
+  409  cd hpc-ansible/
+  410  ansible-playbook -i inventario.ini site.yml --tags slurm --limit master,worker2 --diff
+  411  slurmd -G
+  412  sudo su
+  413  sinfo -lM
+  414  sinfo -lN
+  415  cuda-toolkit
+  416  cat /etc/slurm/gres.conf 
+  417  cd hpc-ansible/
+  418  ls
+  419  git status
+  420  git remote add https://github.com/JManuel-Mendoza/HPC-Ansible
+  421  git remotr add origin https://github.com/JManuel-Mendoza/HPC-Ansible
+  422  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible
+  423  clear
+  424  git branch
+  425  git branch -r
+  426  git fetch
+  427  git switch -c llm llm
+  428  git switch -c llm origin/llm
+  429  ls
+  430  ansible-playbook -i inventario.ini site.yml --tags slurm --diff
+  431  ssh worker1
+  432  ansible-playbook -i inventario.ini site.yml --tags slurm --diff
+  433  sinfo -lN
+  434  scontrol show nodes -o
+  435  squeue
+  436  srun -p debug -N1 -n1 --chdir=/tmp hostname
+  437  srun -p debug -N1 -w worker1 -n1 --chdir=/tmp hostname
+  438  srun -p debug -N1 -w worker2 -n1 --chdir=/tmp hostname
+  439  exit
+  440  clear
+  441  ssh worker4
+  442  clear
+  443  ssh worker1
+  444  clear
+  445  cd hpc-ansible/
+  446  codex
+  447  clear
+  448  nano /tmp/slurm-smoke-cpu.sbatch 
+  449  nano /tmp/slurm-smoke-gpu.sbatch 
+  450  clear
+  451  ansible-playbook -i inventario.ini playbooks/validate-slurm.yml --tags slurm_validate
+  452  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  453  clear
+  454  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  455  ansible-playbook -i inventario.ini site.yml --tags slurm
+  456  ansible-playbook -i inventario.ini site.yml
+  457  clear
+  458  ansible-playbook -i inventario.ini site.yml
+  459  sinfo -lN
+  460  sinfo -R
+  461  scontrol show node worker1
+  462  sudo journalctl -u slurmctld -S "today" --no-pager | tail -n 200
+  463  # o si usas logs a archivo:
+  464  sudo tail -n 200 /var/log/slurm/slurmctld.log
+  465  ping -c 2 worker1
+  466  ssh worker1 "hostname; uptime"
+  467  nc -zv worker1 6818
+  468  slurmd -G
+  469  sudo slurmd -G
+  470  nc -zv worker1 6818
+  471  scontrol show node worker1 | egrep 'State=|Reason=|Gres='
+  472  scontrol update nodename=worker1 state=resume reason=""
+  473  sinfo -N -l | egrep 'NODELIST|worker1'
+  474  sudo su
+  475  ansible-playbook -i inventario.ini site.yml
+  476  systemctl status slurmdbd
+  477  ansible-playbook -i inventario.ini site.yml --tags munge --diff
+  478  ansible-playbook -i inventario.ini site.yml --tags mariadb --diff
+  479  ansible-playbook -i inventario.ini site.yml --tags slurm_config --diff
+  480  ansible-playbook -i inventario.ini site.yml --tags slurm_validate --diff
+  481  scontrol show node worker1 | egrep 'State=|Reason=|Gres='
+  482  sinfo -N -o "%N %t %G %E" | egrep "NODELIST|worker1" || true
+  483  srun -N1 -n1 -w worker1 -p gpu --gres=gpu:1 nvidia-smi -L
+  484  sudo systemctl status slurmdbd --no-pager
+  485  sudo ss -lntp | egrep ':6819|slurmdbd' || true
+  486  sudo journalctl -u slurmdbd -b --no-pager | tail -n 200
+  487  sudo systemctl restart mariadb
+  488  sudo systemctl restart slurmdbd
+  489  sudo systemctl enable --now slurmdbd
+  490  sudo ss -lntp | egrep ':6819|slurmdbd' || true
+  491  sacct -n -P -S now-10minutes -o JobID,State,ExitCode | head
+  492  sudo systemctl cat slurmdbd | sed -n '1,200p'
+  493  sudo grep -nE '^(SlurmUser|PidFile|StorageType|StorageHost|StorageLoc|LogFile)=' /etc/slurm/slurmdbd.conf || true
+  494  sudo systemctl edit slurmdbd
+  495  sudo systemctl daemon-reload
+  496  sudo systemctl enable --now mariadb
+  497  sudo systemctl status mariadb --no-pager
+  498  sudo mariadb-upgrade
+  499  sudo mariadb -e "CHECK TABLE mysql.proc;"
+  500  sudo systemctl restart slurmdbd
+  501  sudo systemctl status slurmdbd --no-pager
+  502  sudo ss -lntp | egrep ':6819|slurmdbd' || true
+  503  sacct -n -P -S now-10minutes -o JobID,State,ExitCode | head
+  504  rg -n "PidFile|SlurmUser|AccountingStorage" /etc/slurm/slurmdbd.conf
+  505  ls -ld /run /run/slurmdbd /run/slurmdbd.pid
+  506  mariadb -e "CHECK TABLE mysql.proc;"
+  507  sudo mariadb -e "CHECK TABLE mysql.proc;"
+  508  mariadb -e "SHOW VARIABLES LIKE 'version%';"
+  509  sudo mariadb -e "SHOW VARIABLES LIKE 'version%';"
+  510  sudo systemctl restart slurmdbd
+  511  sudo systemctl status slurmdbd --no-pager
+  512  sudo ss -lntp | egrep ':6819|slurmdbd' || true
+  513  sudo systemctl status slurmdbd --no-pagerss -ltnp | rg 6819
+  514  ss -ltnp | rg 6819
+  515  ss -ltnp | grep 6819
+  516  sacct -n -P -j <JOBID_RECIENTE> -o JobID,State,ExitCode
+  517  sinfo -lN
+  518  sacct -n -P -S now-10minutes -o JobID,State,ExitCode | head
+  519  sudo systemctl status mariadb --no-pager
+  520  sudo mariadb -e "CHECK TABLE mysql.proc;"
+  521  sudo systemctl restart slurmdbd
+  522  sudo systemctl status slurmdbd --no-pager
+  523  sudo ss -lntp | egrep ':6819|slurmdbd' || true
+  524  sacct -n -P -S now-10minutes -o JobID,State,ExitCode | head
+  525  jid=$(sbatch --parsable -p debug -N1 -n1 -t 00:01:00 --wrap 'hostname; sleep 1')
+  526  echo "JobID=$jid"
+  527  squeue -j "$jid"
+  528  # Espera a que termine (o re-ejecuta hasta que ya no aparezca)
+  529  sacct -n -P -j "$jid" -o JobID,State,ExitCode
+  530  jid=$(sbatch --parsable -p debug -N1 -n1 -t 00:01:00 --wrap 'hostname; sleep 1')
+  531  echo "JobID=$jid"
+  532  squeue -j "$jid"
+  533  sacct -n -P -j "$jid" -o JobID,State,ExitCode
+  534  sudo systemctl status slurmdbd --no-pager
+  535  sudo ss -lntp | egrep ':6819|slurmdbd' || true
+  536  ansible-playbook -i inventario.ini site.yml --tags slurm
+  537  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  538  squeue -j <JOBID> -o "%.18i %.9P %.8T squeue -j "$jid"%.10M %.6D %R"
+  539  squeue -j "$jid"
+  540  ansible-playbook -i inventario.ini site.yml --tags slurm_validate --diff
+  541  sudo systemctl status slurmdbd --no-pager | sed -n '1,25p'
+  542  sudo ss -lntp | egrep ':6819|slurmdbd' || true
+  543  ansible-playbook -i inventario.ini site.yml --syntax-check
+  544  ansible-playbook -i inventario.ini site.yml --check --diff --tags slurm,slurm_facts,slurm_config --limit worker1
+  545  scontrol show node worker1
+  546  ansible-playbook -i inventario.ini site.yml --check --diff --tags slurm,slurm_facts,slurm_config --limit hpc_master,workers_r
+  547  sinfo -lN
+  548  scontrol show node
+  549  sinfo -o "%N %G"
+  550  scontrol show node
+  551  ansible-playbook -i inventario.ini site.yml --limit hpc_master --tags slurm_validate
+  552  exit
+  553  exit
+  554  clear
+  555  scontrol update NodeName=worker1 State=RESUME
+  556  sinfo -lN
+  557  scontrol update NodeName=worker1 State=RESUME
+  558  clear
+  559  slurmd -C
+  560  cd hpc-ansible/
+  561  ansible-playbook -i inventario.ini site.yml --tags slurm_config --diff
+  562  sinfo -lN
+  563  clear
+  564  codex
+  565  clear
+  566  git branch
+  567  git switch clean
+  568  git status
+  569  git switch llm
+  570  git branch
+  571  git status
+  572  git switch clean
+  573  git branch -d llm
+  574  git branch
+  575  git remote remove origin
+  576  git branch -r
+  577  codex
+  578  exit
+  579  clear
+  580  cd hpc-ansible/
+  581  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  582  git fetch
+  583  git switch -c llm origin/llm
+  584  ls
+  585  exit
+  586  sinfo -lN
+  587  scontrol show nodes
+  588  exit
+  589  clear
+  590  codex
+  591  clear
+  592  cd hpc-ansible/
+  593  clear
+  594  sinfo -lN
+  595  scontrol show nodes
+  596  nvidia-smi
+  597  clear
+  598  codex
+  599  clear
+  600  git status
+  601  git switch clean
+  602  git branch -d llm
+  603  git remote remove origin
+  604  git branch -r
+  605  git fetch
+  606  git branch -r
+  607  ls
+  608  clear
+  609  exit
+  610  cd hpc-ansible/
+  611  ansible-playbook -i inventario.ini site.yml --limit hpc_master,worker1,worker2 --tags slurm_config,slurmd
+  612  sinfo
+  613  sinfo -lN
+  614  ansible -i inventario.ini hpc_master,worker1,worker2 -m shell -a "set -euo pipefail; echo '=='; hostname; grep
+  615    -E 'Gres=' /etc/slurm/slurm.conf; echo '---'; cat /etc/slurm/gres.conf"
+  616  ansible -i inventario.ini hpc_master,worker1,worker2 -m shell -a "set -euo pipefail; echo '=='; hostname; grep -E 'Gres=' /etc/slurm/slurm.conf; echo '---'; cat /etc/slurm/gres.conf"
+  617  ansible -i inventario.ini hpc_master -m command -a "sinfo -N -h -o '%N %t %G'"
+  618  sinfo -lN
+  619  nano /etc/slurm/slurm.conf
+  620  sinfo -lN
+  621  nano /etc/slurm/gres.conf 
+  622  sinfo -N -h -o '%N %t %G'
+  623  slurmd -C
+  624  systemctl restart slurmd
+  625  systemctl status slurmd
+  626  systemctl status slurmd --no-pager
+  627  systemctl status -l slurmd --no-pager
+  628  sinfo -lN
+  629  sudo slurmd -G
+  630  scontrol show node -o | egrep 'NodeName=(master|worker1|
+  631      worker2)'
+  632  scontrol show node
+  633  set -euo pipefail; scontrol show node -o | egrep
+  634  scontrol show node
+  635  set -euo pipefail; scontrol update NodeName=master
+  636  jid=$(sbatch --parsable /tmp/slurm-smoke-gpu.sbatch)
+  637  echo "GPU JobID=$jid"
+  638  squeue -j "$jid"
+  639  sacct -j "$jid" --format=JobID,State,ExitCode%20 -n
+  640  clea
+  641  clear
+  642  cd hpc-ansible/
+  643  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  644  ansible-playbook -i inventario.ini site.yml --tags slurm --limit hpc_master,worker1
+  645  sinfo -lN
+  646  ansible-playbook -i inventario.ini site.yml --tags slurm --limit hpc_master,worker1
+  647  sinfo -lN
+  648  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate --limit hpc_master,worker1
+  649  scontrol reconfigure
+  650  sudo scontrol reconfigure
+  651  sinfo -lN
+  652  sudo scontrol update NodeName=worker1 State=resume
+  653  sinfo -lN
+  654  ansible-playbook -i inventario.ini site.yml --tags slurm, slurm_validate
+  655  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate
+  656  sinfo -lN
+  657  scontrol shownodes
+  658  scontrol show nodes
+  659  ansible-playbook -i inventario.ini site.yml 
+  660  sinfo -lN
+  661  ansible-playbook -i inventario.ini site.yml --slurm
+  662  ansible-playbook -i inventario.ini site.yml --tags slurm
+  663  sinfo -lN
+  664  scontrol show node worker2
+  665  ansible-playbook -i inventario.ini site.yml --tags slurm
+  666  sinfo -lN
+  667  scontrol reconfigure
+  668  sudo su
+  669  exit
+  670  pwd
+  671  sudo su
+  672  cd hpc-ansible/
+  673  ansible-playbook -i inventario.ini site.yml --tags slurm --limit hpc_master
+  674  sinfo -lN
+  675  scontrol show nodes
+  676  ansible-playbook -i inventario.ini site.yml --tags slurm
+  677  sinfo -jN
+  678  sinfo -lN
+  679  scontrol show nodes
+  680  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  681  systemctl status slurmd
+  682  systemctl status slurmd --no-pager
+  683  systemctl status slurmd -l --no-pager
+  684  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  685  jid=$(sbatch --parsable /tmp/slurm-smoke-cpu.sbatch)
+  686  echo "CPU JobID=$jid"
+  687  squeue -j "$jid"
+  688  sacct -j "$jid" --format=JobID,State,ExitCode%20 -n
+  689  jid=$(sbatch --parsable /tmp/slurm-smoke-gpu.sbatch)
+  690  echo "GPU JobID=$jid"
+  691  squeue -j "$jid"
+  692  sacct -j "$jid" --format=JobID,State,ExitCode%20 -n
+  693  clear
+  694  git status
+  695  git status --short
+  696  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  697  cd /tmp
+  698  ls
+  699  cat smoke-cpu-146.out 
+  700  jid=$(sbatch --parsable /tmp/slurm-smoke-gpu.sbatch)
+  701  echo "GPU JobID=$jid"
+  702  squeue -j "$jid"
+  703  sacct -j "$jid" --format=JobID,State,ExitCode%20 -n
+  704   
+  705  ls | grep 154
+  706  ls | gpu
+  707  ls | grep gpu
+  708  ls | grep cpu
+  709  ls -o | grep cpu
+  710  ssh worker1
+  711  exit
+  712  ssh worker2
+  713  exit
+  714  clear
+  715  cd hpc-ansible/
+  716  nvidia-smi
+  717  sinfo -lN
+  718  clear
+  719  ls
+  720  tree .
+  721  clear
+  722  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  723  git fetch
+  724  git switch -c llm origin/llm
+  725  git status
+  726  ls
+  727  clear
+  728  git log
+  729  clear
+  730  codex
+  731  clear
+  732  git status
+  733  git push
+  734  git status
+  735  git switch clean
+  736  git branch -d llm
+  737  git remote remove origin
+  738  git status
+  739  ls
+  740  clear
+  741  git branch -r
+  742  git fetch
+  743  clear
+  744  exit
+  745  clear
+  746  scontrol show nodes
+  747  scontrol reconfigure
+  748  sudo su
+  749  cd hpc-ansible/
+  750  ansible-playbook -i inventario.ini site.yml --tags slurm 
+  751  sinfo -lN
+  752  sudo scontrol reconfigure worker1
+  753  sinfo -lN
+  754  sudo scontrol update NodeName=worker1 State=resume
+  755  sinfo -lN
+  756  scontrol show nodes
+  757  sudo scontrol reconfigure
+  758  sinfo -lN
+  759  ansible-playbook -i inventario.ini site.yml --tags validate,slurm_validate
+  760  sinfo -lN
+  761  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate 
+  762  sinfo -lN
+  763  scontrol show nodes
+  764  ansible-playbook -i inventario.ini site.yml --tags slurm
+  765  sinfo -lN
+  766  scontrol show nodes
+  767  scontrol reconfigure
+  768  sudo scontrol reconfigure
+  769  sinfo -lN
+  770  scontrol show nodes
+  771  scontrol reconfigure
+  772  ansible-playbook -i inventario.ini site.yml --tags slurm
+  773  sinfo
+  774  sinfo -lN
+  775  scontrol
+  776  scontrol -C
+  777  scontrol show nodes
+  778  slurmd -C
+  779  slurmd -G
+  780  sudo su
+  781  exit
+  782  ssh worker1
+  783  exit
+  784  scontrol show node -o | egrep 'NodeName=worker1|CPUTot|RealMemory|Gres'
+  785  sudo su
+  786  cd hpc-ansible/
+  787  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate
+  788  sinfo -lN
+  789  scontrol show nodes
+  790  nano /etc/slurm/slurm.conf
+  791  ssh worker2
+  792  ansible-playbook -i inventario.ini site.yml --tags slurm --limit master,worker2
+  793  sinfo -lN
+  794  ssh worker2
+  795  exit
+  796  clear
+  797  cd hpc-ansible/
+  798  git remote add https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  799  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  800  git fetch
+  801  git switch -c llm origin/llm
+  802  git status
+  803  clear
+  804  codex
+  805  clear
+  806  git status
+  807  git push
+  808  git status
+  809  clear
+  810  git status
+  811  git switch clean
+  812  git status
+  813  ls
+  814  git branch -d llm
+  815  git remote remove origin
+  816  git branch
+  817  git branch -r
+  818  clear
+  819  ls
+  820  rm -r artifacts/
+  821  ls
+  822  clear
+  823  git branch -r
+  824  git fetch
+  825  git branch -r
+  826  clear
+  827  exit
+  828  clear
+  829  cd hpc-ansible/
+  830  sinfo -lN
+  831  scontrol show nodes
+  832  scontrol reconfigure
+  833  sudo scontrol reconfigure
+  834  sinfo -lN
+  835  scontrol update State=resume
+  836  scontrol update gpu State=resume
+  837  scontrol update partitionname=gpu State=resume
+  838  scontrol update partitionname=gpu State=RESUME
+  839  sinfo -lN
+  840  sudo su
+  841  exit
+  842  clear
+  843  cd hpc-ansible/
+  844  ls
+  845  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  846  git fetch
+  847  git switch -c llm origin/llm
+  848  ls
+  849  clear
+  850  sinfo -lN
+  851  scontrol show --help
+  852  scontrol show nodes
+  853  scontrol -h
+  854  scontrol ping -h
+  855  scontrol ping -help
+  856  scontrol ping
+  857  clear
+  858  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate
+  859  sinfo -lN
+  860  scontrol show nodes
+  861  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate
+  862  sinfo -lN
+  863  scontrol show nodes
+  864  cat /etc/slurm/slurm.conf
+  865  ls /tmp
+  866  cat /tmp/smoke-cpu-172.out 
+  867  scontrol reconfigure
+  868  sudo scontrol reconfigure
+  869  sinfo -lN
+  870  scontrol show nodes
+  871  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  872  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate
+  873  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  874  cat /etc/slurm/slurm.conf
+  875  cat /etc/slurm/gres.conf 
+  876  scontrol show nodes
+  877  rm /tmp/smoke*
+  878  rm -h
+  879  rm --help
+  880  clear
+  881  rm -f /tmp/smoke*
+  882  sudo rm -f /tmp/smoke*
+  883  ls /tmp
+  884  clear
+  885  git status
+  886  git switch clean
+  887  git remote remove origin
+  888  git branch
+  889  git branch -r
+  890  git branch -d llm
+  891  git branch -D llm
+  892  clear
+  893  git log
+  894  clear
+  895  git status
+  896  git branch
+  897  git branch -r
+  898  clear
+  899  exit
+  900  clear
+  901  cd test-gpu/
+  902  git clone https://github.com/elangovana/gpu-demo
+  903  ls
+  904  ssh worker1
+  905  cd hpc-ansible/
+  906  ansible-playbook -i inventario.ini site.yml --tags cuda --limit worker1 --diff
+  907  ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_validate
+  908  systemctl restart restart slurmd
+  909  systemctl restart slurmctld.service
+  910  systemctl restart restart slurmd
+  911  cat /tmp/gpu_249.out
+  912  ls /tmp
+  913  ssh worker2
+  914  cd /etc/profile.d/
+  915  ls
+  916  nano slurm-defaults.sh 
+  917  rm slurm-defaults.sh 
+  918  sudo rm -f slurm-defaults.sh 
+  919  ll
+  920  clear
+  921  cd $home
+  922  cd hpc-ansible/
+  923  clear
+  924  ansible-playbook -i inventario.ini site.yml --tags slurm_env --limit hpc_master,slurm_compute
+  925  ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_master
+  926  ll
+  927  cd /
+  928  ls
+  929  cd root/
+  930  sudo cd root
+  931  ls
+  932  sudo su
+  933  cd $home
+  934  cd test-slurm/
+  935  ls
+  936  cat slurm-test.sh 
+  937  watch -n 1 jqueue
+  938  watch -n 1 squeue
+  939  /etc/hosts
+  940  cat /etc/hosts
+  941  clear
+  942  cd hpc-ansible/
+  943  ansible-palybook -i inventario.ini site.yml --tags slurm_validate
+  944  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  945  ll
+  946  ansible-playbook -i inventario.ini site.yml --tags slurm_validate
+  947  cd ../test-slurm/
+  948  ls
+  949  sbash
+  950  sbatch
+  951  sbatch slurm-test.sh 
+  952  scontrol show job -o 273
+  953  scontrol show job 273
+  954  ls
+  955  cd ../hpc-ansible/
+  956  anisble-playbook -i inventario.ini site.yml --tags common
+  957  ansible-playbook -i inventario.ini site.yml --tags common
+  958  sinfo -lN
+  959  sudo su
+  960  cd hpc-ansible/
+  961  git remote add origin https://github.com/JManuel-Mendoza/HPC-Ansible.git
+  962  git fectch
+  963  git fetch
+  964  git switch -c llm origin/llm
+  965  git status
+  966  codex
+  967  sudo npm install -g @openai/codex
+  968  clear
+  969  codex
+  970  git status
+  971  clear
+  972  git switch clean
+  973  git status
+  974  git pull
+  975  git pull rebase
+  976  git pull --rebase
+  977  git reset --soft
+  978  git reset --soft llm
+  979  git reset --mixed
+  980  git reset --mixed llm
+  981  git reset --soft HEAD~1
+  982  git status
+  983  git pull
+  984  git pull origin llm
+  985  git push origin llm
+  986  git pull origin llm
+  987  git status
+  988  git switch clean
+  989  ls
+  990  git branch -d llm
+  991  git remote remove origin
+  992  git branch
+  993  git branch -r
+  994  clear
+  995  ls
+  996  exit
+  997  cd hpc-ansible/
+  998  ls
+  999  git remote add ori https://github.com/JManuel-Mendoza/HPC-Ansible.git
+ 1000  git fetch
+ 1001  git switch -c ori/llm
+ 1002  clear
+ 1003  cd ..
+ 1004  l
+ 1005  ls
+ 1006  rm -r test-gpu/
+ 1007  sudo rm -rf test-gpu/
+ 1008  ls
+ 1009  mkdir tests
+ 1010  cd tests
+ 1011  git clone https://github.com/elangovana/gpu-demo.git
+ 1012  ls
+ 1013  git clone --branch hpc --single-branch https://github.com/elangovana/gpu-demo.git
+ 1014  sudo rm -f gpu-demo/
+ 1015  sudo rm -rf gpu-demo/
+ 1016  git clone --depth 1 https://github.com/elangovana/gpu-demo.git
+ 1017  ls
+ 1018  clear
+ 1019  ls
+ 1020  cd ..
+ 1021  rm -rf tests/
+ 1022  ll
+ 1023  ls -a
+ 1024  clear
+ 1025  history
+ 1026  history > historial-comandos-master-26-01.txt
