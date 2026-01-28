@@ -142,3 +142,14 @@ slurm_validate_torch:
     eval "$(micromamba shell hook --shell bash)"
     micromamba activate llm
     set -u
+
+# Red interna HPC (superred usada para confianza en firewall)
+hpc_internal_supernet: "192.168.34.0/24"
+
+# Segmentación actual por enlaces punto-a-punto al master (cada NIC del master es un /28)
+# Agregar/quitar subredes según cambie el cluster.
+hpc_internal_subnets:
+  - "192.168.34.0/28"
+  - "192.168.34.16/28"
+  - "192.168.34.32/28"
+  - "192.168.34.48/28"
