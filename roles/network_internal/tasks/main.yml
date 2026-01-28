@@ -1,9 +1,27 @@
 ---
+- name: Red Interna | Definir conexiones internas esperadas
+  ansible.builtin.set_fact:
+    network_internal_expected_conns: >-
+      {%- if inventory_hostname == 'master' -%}
+      {{ network_internal_links.keys() | map('regex_replace', '^(.*)$', 'int-\\1') | list }}
+      {%- elif inventory_hostname in network_internal_links -%}
+      {{ ['int-master'] }}
+      {%- else -%}
+      {{ [] }}
+      {%- endif -%}
+  when: network_internal_links is defined
+
 - name: Red Interna | Obtener conexiones NM distintas de {{ network_internal_keep_if }}
   ansible.builtin.shell: |
     nmcli -t -f NAME,DEVICE con show | awk -F: '$2 != "{{ network_internal_keep_if }}" && $2 != "" {print $1}'
   register: nmcli_conns
   changed_when: false
+
+- name: Red Interna | Listar conexiones NM (nombres)
+  ansible.builtin.command: nmcli -g NAME con show
+  register: nmcli_conn_names
+  changed_when: false
+  failed_when: false
 
 - name: Red Interna | Filtrar conexiones a borrar (excluir Tailscale)
   ansible.builtin.set_fact:
@@ -15,7 +33,8 @@
       {%- set dev = (parts | length > 1) | ternary(parts[1], '') -%}
       {%- set is_excluded_iface = dev in network_internal_exclude_ifaces -%}
       {%- set is_excluded_name = (name | regex_search(network_internal_exclude_conn_regex)) is not none -%}
-      {%- if dev and dev != network_internal_keep_if and not is_excluded_iface and not is_excluded_name -%}
+      {%- set is_expected_conn = name in (network_internal_expected_conns | default([])) -%}
+      {%- if dev and dev != network_internal_keep_if and not is_excluded_iface and not is_excluded_name and not is_expected_conn -%}
       {%-   set _ = out.append(name) -%}
       {%- endif -%}
       {%- endfor -%}
@@ -49,31 +68,96 @@
         _worker_link: "{{ network_internal_links[inventory_hostname] }}"
 
     - name: Red Interna | Verificar conexion int-master
-      ansible.builtin.command: nmcli -t -f NAME con show int-master
-      register: worker_link_exists
-      changed_when: false
-      failed_when: false
+      ansible.builtin.set_fact:
+        worker_link_exists: "{{ 'int-master' in (nmcli_conn_names.stdout_lines | default([])) }}"
 
     - name: Red Interna | Crear conexion int-master
       ansible.builtin.command: >-
         nmcli con add type ethernet ifname {{ _worker_link.worker_if }} con-name int-master
         ipv4.method manual ipv4.addresses {{ _worker_link.worker_ip }} ipv6.method ignore
-      when: worker_link_exists.rc != 0
+      when: not (worker_link_exists | bool)
+      register: _worker_link_created
 
-    - name: Red Interna | Leer parametros int-master
-      ansible.builtin.command: nmcli -g ipv4.addresses,ipv4.method,ipv6.method con show int-master
-      register: worker_link_settings
+    - name: Red Interna | Leer ipv4.addresses int-master
+      ansible.builtin.command: nmcli -g ipv4.addresses con show int-master
+      register: worker_link_ipv4
+      changed_when: false
+
+    - name: Red Interna | Leer ipv4.method int-master
+      ansible.builtin.command: nmcli -g ipv4.method con show int-master
+      register: worker_link_ipv4_method
+      changed_when: false
+
+    - name: Red Interna | Leer ipv6.method int-master
+      ansible.builtin.command: nmcli -g ipv6.method con show int-master
+      register: worker_link_ipv6_method
       changed_when: false
 
     - name: Red Interna | Calcular ajustes int-master
       ansible.builtin.set_fact:
-        _worker_link_needs_mod: "{{ worker_link_settings.stdout | trim != (_worker_link.worker_ip ~ ':manual:ignore') }}"
+        _worker_link_needs_mod: >-
+          {%- set _ipv4 = (worker_link_ipv4.stdout_lines | select('match', '.+') | list | first | default('')) -%}
+          {%- set _ipv4_method = (worker_link_ipv4_method.stdout_lines | select('match', '.+') | list | first | default('')) -%}
+          {%- set _ipv6_method = (worker_link_ipv6_method.stdout_lines | select('match', '.+') | list | first | default('')) -%}
+          {{ _ipv4 != _worker_link.worker_ip
+             or _ipv4_method != 'manual'
+             or _ipv6_method != 'ignore' }}
 
     - name: Red Interna | Ajustar int-master
       ansible.builtin.command: >-
         nmcli con mod int-master ipv4.addresses {{ _worker_link.worker_ip }} ipv4.method manual ipv6.method ignore
       when: _worker_link_needs_mod
+      register: _worker_link_modified
+
+    - name: Red Interna | Definir si la conexion int-master cambio
+      ansible.builtin.set_fact:
+        _worker_link_changed: >-
+          {{ (not (worker_link_exists | bool)) or (_worker_link_needs_mod | default(false)) }}
 
     - name: Red Interna | Activar int-master
       ansible.builtin.command: nmcli con up int-master
       changed_when: false
+      when: _worker_link_changed | default(false)
+
+- name: Red Interna | Construir lineas /etc/hosts con nodos internos
+  ansible.builtin.set_fact:
+    network_internal_hosts_lines: >-
+      {%- set lines = [] -%}
+      {%- set master_ip = '' -%}
+      {%- if inventory_hostname == 'master' -%}
+      {%- set _mi = (network_internal_links | dict2items | first).value.master_ip | default('') -%}
+      {%- set master_ip = _mi | regex_replace('/.*$', '') -%}
+      {%- elif inventory_hostname in network_internal_links -%}
+      {%- set master_ip = (network_internal_links[inventory_hostname].master_ip | regex_replace('/.*$', '')) -%}
+      {%- endif -%}
+      {%- if master_ip | length > 0 -%}
+      {%- set _ = lines.append(master_ip ~ ' master') -%}
+      {%- endif -%}
+      {%- for host, link in network_internal_links.items() -%}
+      {%- set _ = lines.append((link.worker_ip | regex_replace('/.*$', '')) ~ ' ' ~ host) -%}
+      {%- endfor -%}
+      {{ lines | unique }}
+  when: network_internal_links is defined
+
+- name: Red Interna | Asegurar /etc/hosts con bloque Red interna HPC
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} Red interna HPC"
+    block: |
+      {% for line in network_internal_hosts_lines | default([]) -%}
+      {{ line }}
+      {% endfor %}
+  become: true
+  when: network_internal_hosts_lines is defined
+
+- name: Red Interna | Obtener estado de conexiones (nmcli)
+  ansible.builtin.command: nmcli -t -f NAME,DEVICE,TYPE,STATE con show --active
+  register: nmcli_status
+  changed_when: false
+  failed_when: false
+
+- name: Red Interna | Mostrar estado de conexiones internas
+  ansible.builtin.debug:
+    msg: |
+      {{ inventory_hostname }} conexiones internas:
+      {{ (nmcli_status.stdout_lines | default([])) | select('search', '^int-') | list }}
