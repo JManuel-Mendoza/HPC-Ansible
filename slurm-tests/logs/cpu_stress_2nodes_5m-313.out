@@ -1,0 +1,18 @@
+=== CPU STRESS 2 NODES (stress-ng) ===
+Wed Jan 28 13:13:46 -05 2026
+JobID=313
+NodeList=worker[1-2]
+Tasks=  CpusPerTask=8
+--- host=worker1 start=Wed Jan 28 13:13:47 -05 2026 ---
+stress-ng: info:  [147054] setting to a 5 mins run per stressor
+stress-ng: info:  [147054] dispatching hogs: 8 cpu
+stress-ng: info:  [147054] note: /proc/sys/kernel/sched_autogroup_enabled is 1 and this can impact scheduling throughput for processes not attached to a tty. Setting this to 0 may improve performance metrics
+stress-ng: metrc: [147054] stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+stress-ng: metrc: [147054]                           (secs)    (secs)    (secs)   (real time) (usr+sys time)
+stress-ng: metrc: [147054] cpu             1393723    299.99   1197.04      0.01      4645.87        1164.30
+stress-ng: info:  [147054] skipped: 0
+stress-ng: info:  [147054] passed: 8: cpu (8)
+stress-ng: info:  [147054] failed: 0
+stress-ng: info:  [147054] metrics untrustworthy: 0
+stress-ng: info:  [147054] successful run completed in 5 mins
+--- host=worker1 end=Wed Jan 28 13:18:47 -05 2026 ---

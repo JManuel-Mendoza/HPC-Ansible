@@ -1,0 +1,33 @@
+=== CPU STRESS 2 NODES (stress-ng) ===
+Wed Jan 28 17:12:15 -05 2026
+JobID=327
+NodeList=worker[1-2]
+Tasks=2  CpusPerTask=8
+--- host=worker1 start=Wed Jan 28 17:12:15 -05 2026 ---
+--- host=worker2 start=Wed Jan 28 17:12:15 -05 2026 ---
+stress-ng: info:  [162638] setting to a 5 mins run per stressor
+stress-ng: info:  [162638] dispatching hogs: 8 cpu
+stress-ng: info:  [162638] note: /proc/sys/kernel/sched_autogroup_enabled is 1 and this can impact scheduling throughput for processes not attached to a tty. Setting this to 0 may improve performance metrics
+stress-ng: info:  [855190] setting to a 5 mins run per stressor
+stress-ng: info:  [855190] dispatching hogs: 8 cpu
+stress-ng: info:  [855190] note: /proc/sys/kernel/sched_autogroup_enabled is 1 and this can impact scheduling throughput for processes not attached to a tty. Setting this to 0 may improve performance metrics
+stress-ng: metrc: [162638] stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+stress-ng: metrc: [162638]                           (secs)    (secs)    (secs)   (real time) (usr+sys time)
+stress-ng: metrc: [162638] cpu             1426126    299.99   1197.09      0.00      4753.86        1191.32
+stress-ng: info:  [162638] skipped: 0
+stress-ng: info:  [162638] passed: 8: cpu (8)
+stress-ng: info:  [162638] failed: 0
+stress-ng: info:  [162638] metrics untrustworthy: 0
+stress-ng: info:  [162638] successful run completed in 5 mins
+stress-ng: metrc: [855190] stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+stress-ng: metrc: [855190]                           (secs)    (secs)    (secs)   (real time) (usr+sys time)
+stress-ng: metrc: [855190] cpu             1644361    300.00   1795.64      0.01      5481.23         915.75
+stress-ng: info:  [855190] skipped: 0
+stress-ng: info:  [855190] passed: 8: cpu (8)
+stress-ng: info:  [855190] failed: 0
+stress-ng: info:  [855190] metrics untrustworthy: 0
+stress-ng: info:  [855190] successful run completed in 5 mins
+--- host=worker1 end=Wed Jan 28 17:17:15 -05 2026 ---
+--- host=worker2 end=Wed Jan 28 17:17:15 -05 2026 ---
+DONE
+Wed Jan 28 17:17:15 -05 2026

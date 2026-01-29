@@ -1,0 +1,21 @@
+host=worker1 iface=enp3s0f1 ip=192.168.34.2 10.195.20.52 100.119.9.37 fd7a:115c:a1e0::b332:925  rank=6/8
+host=master iface=enp3s0f0 ip=192.168.34.49 192.168.34.1 192.168.34.17 192.168.34.33 10.195.34.17 100.98.68.22  rank=2/8
+host=worker1 iface=enp3s0f1 ip=192.168.34.2 10.195.20.52 100.119.9.37 fd7a:115c:a1e0::b332:925  rank=4/8
+host=worker1 iface=enp3s0f1 ip=192.168.34.2 10.195.20.52 100.119.9.37 fd7a:115c:a1e0::b332:925  rank=5/8
+host=worker1 iface=enp3s0f1 ip=192.168.34.2 10.195.20.52 100.119.9.37 fd7a:115c:a1e0::b332:925  rank=7/8
+host=master iface=enp3s0f0 ip=192.168.34.49 192.168.34.1 192.168.34.17 192.168.34.33 10.195.34.17 100.98.68.22  rank=3/8
+host=master iface=enp3s0f0 ip=192.168.34.49 192.168.34.1 192.168.34.17 192.168.34.33 10.195.34.17 100.98.68.22  rank=0/8
+host=master iface=enp3s0f0 ip=192.168.34.49 192.168.34.1 192.168.34.17 192.168.34.33 10.195.34.17 100.98.68.22  rank=1/8
+[rank 0/8] host=master backend=gloo
+allreduce_sum=28 expected=28 OK
+allreduce size=1024 bytes avg=5.745 ms  approx_effective=0.2 MB/s
+allreduce size=65536 bytes avg=9.230 ms  approx_effective=7.1 MB/s
+allreduce size=1048576 bytes avg=20.914 ms  approx_effective=50.1 MB/s
+allreduce size=4194304 bytes avg=71.196 ms  approx_effective=58.9 MB/s
+[rank 1/8] host=master backend=gloo
+[rank 4/8] host=worker1 backend=gloo
+[rank 5/8] host=worker1 backend=gloo
+[rank 3/8] host=master backend=gloo
+[rank 2/8] host=master backend=gloo
+[rank 7/8] host=worker1 backend=gloo
+[rank 6/8] host=worker1 backend=gloo

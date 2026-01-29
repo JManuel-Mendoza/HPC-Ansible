@@ -1,0 +1,9 @@
+=== HELLO 2 NODES ===
+Wed Jan 28 17:08:15 -05 2026
+JobID=326 NodeList=worker[1-2] ntasks=2 ntasks_per_node=1
+
+0: worker1
+1: worker2
+
+DONE
+Wed Jan 28 17:08:15 -05 2026

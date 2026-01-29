@@ -11,6 +11,8 @@ common_packages:
   - tmux
   - jq
   - tree
+  - mpich
+  - mpich-devel
 
 enable_chrony: true
 

@@ -1,0 +1,8 @@
+=== CPU STRESS (stress-ng) ===
+Tue Jan 27 16:24:45 -05 2026
+worker1
+SLURM_JOB_ID=290
+CPUS_ON_NODE=8
+CPUS_PER_TASK=8
+DONE
+Tue Jan 27 16:24:45 -05 2026

@@ -1,0 +1,37 @@
+=== CPU STRESS 2 NODES (stress-ng) ===
+Wed Jan 28 19:23:56 -05 2026
+JobID=340
+NodeList=worker[1-2]
+Tasks=2  CpusPerTask=8
+--- host=worker2 start=Wed Jan 28 19:23:56 -05 2026 ---
+--- host=worker1 start=Wed Jan 28 19:23:56 -05 2026 ---
+Cpus_allowed_list=0-19
+Cpus_allowed_list=0-19
+pid 214578's current affinity mask: fffff
+pid 10912's current affinity mask: fffff
+stress-ng: info:  [214610] setting to a 1 min run per stressor
+stress-ng: info:  [10940] setting to a 1 min run per stressor
+stress-ng: info:  [214610] dispatching hogs: 8 cpu
+stress-ng: info:  [214610] note: /proc/sys/kernel/sched_autogroup_enabled is 1 and this can impact scheduling throughput for processes not attached to a tty. Setting this to 0 may improve performance metrics
+stress-ng: info:  [10940] dispatching hogs: 8 cpu
+stress-ng: info:  [10940] note: /proc/sys/kernel/sched_autogroup_enabled is 1 and this can impact scheduling throughput for processes not attached to a tty. Setting this to 0 may improve performance metrics
+stress-ng: metrc: [10940] stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+stress-ng: metrc: [10940]                           (secs)    (secs)    (secs)   (real time) (usr+sys time)
+stress-ng: metrc: [10940] cpu               85613     59.99     59.93      0.00      1427.23        1428.53
+stress-ng: info:  [10940] skipped: 0
+stress-ng: info:  [10940] passed: 8: cpu (8)
+stress-ng: info:  [10940] failed: 0
+stress-ng: info:  [10940] metrics untrustworthy: 0
+stress-ng: info:  [10940] successful run completed in 1 min
+--- host=worker2 end=Wed Jan 28 19:24:56 -05 2026 ---
+stress-ng: metrc: [214610] stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s
+stress-ng: metrc: [214610]                           (secs)    (secs)    (secs)   (real time) (usr+sys time)
+stress-ng: metrc: [214610] cpu               99833     60.00     59.94      0.00      1663.93        1665.47
+stress-ng: info:  [214610] skipped: 0
+stress-ng: info:  [214610] passed: 8: cpu (8)
+stress-ng: info:  [214610] failed: 0
+stress-ng: info:  [214610] metrics untrustworthy: 0
+stress-ng: info:  [214610] successful run completed in 1 min
+--- host=worker1 end=Wed Jan 28 19:24:56 -05 2026 ---
+DONE
+Wed Jan 28 19:24:56 -05 2026

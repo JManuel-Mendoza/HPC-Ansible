@@ -1,0 +1,34 @@
+JobID=367 NodeList=master,worker1
+NNodes=2 NTasks=8 cpus-per-task=1
+rank=6 host=worker1 nproc=2
+rank=3 host=master nproc=2
+rank=7 host=worker1 nproc=2
+rank=4 host=worker1 nproc=2
+rank=5 host=worker1 nproc=2
+Cpus_allowed_list:	2,12
+Mems_allowed_list:	0
+Cpus_allowed_list:	3,13
+Mems_allowed_list:	0
+Cpus_allowed_list:	0,10
+Mems_allowed_list:	0
+Cpus_allowed_list:	1,11
+Mems_allowed_list:	0
+pid 643378's current affinity list: 2,12
+pid 643379's current affinity list: 3,13
+pid 643376's current affinity list: 0,10
+pid 643377's current affinity list: 1,11
+rank=1 host=master nproc=2
+rank=2 host=master nproc=2
+rank=0 host=master nproc=2
+Cpus_allowed_list:	3,13
+Mems_allowed_list:	0
+Cpus_allowed_list:	1,11
+Mems_allowed_list:	0
+Cpus_allowed_list:	2,12
+Mems_allowed_list:	0
+Cpus_allowed_list:	0,10
+Mems_allowed_list:	0
+pid 178732's current affinity list: 3,13
+pid 178730's current affinity list: 1,11
+pid 178731's current affinity list: 2,12
+pid 178729's current affinity list: 0,10

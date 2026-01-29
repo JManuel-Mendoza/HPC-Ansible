@@ -1,0 +1,25 @@
+=== NAMECHECK ===
+Tue Jan 27 17:13:57 -05 2026
+host=worker2
+NodeList=worker2
+
+---- /etc/hosts (relevante) ----
+3:192.168.34.17 master
+
+---- nsswitch.conf (hosts) ----
+57:hosts:      files dns myhostname
+
+---- getent hosts ----
+getent hosts master:
+192.168.34.17   master
+getent hosts worker1:
+(NOT FOUND) exit=2
+getent hosts worker2:
+fe80::a6bb:6dff:fece:bb3c worker2
+
+---- ping corto ----
+ping worker1 FAIL
+ping worker2 OK
+
+DONE
+Tue Jan 27 17:13:57 -05 2026

@@ -1,0 +1,134 @@
+6: Traceback (most recent call last):
+6:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 67, in <module>
+6:     main()
+6:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 24, in main
+6:     dist.init_process_group(backend=backend, init_method="env://", rank=rank, world_size=world)
+6:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 79, in wrapper
+6:     return func(*args, **kwargs)
+6:            ^^^^^^^^^^^^^^^^^^^^^
+6:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 93, in wrapper
+6:     func_return = func(*args, **kwargs)
+6:                   ^^^^^^^^^^^^^^^^^^^^^
+6:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py", line 1361, in init_process_group
+6:     store, rank, world_size = next(rendezvous_iterator)
+6:                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+6:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 258, in _env_rendezvous_handler
+6:     store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv)
+6:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 185, in _create_c10d_store
+6:     return TCPStore(
+6:            ^^^^^^^^^
+6: RuntimeError: The server socket has failed to listen on any local network address. useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+4: Traceback (most recent call last):
+4:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 67, in <module>
+4:     main()
+4:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 24, in main
+4:     dist.init_process_group(backend=backend, init_method="env://", rank=rank, world_size=world)
+4:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 79, in wrapper
+4:     return func(*args, **kwargs)
+4:            ^^^^^^^^^^^^^^^^^^^^^
+4:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 93, in wrapper
+4:     func_return = func(*args, **kwargs)
+4:                   ^^^^^^^^^^^^^^^^^^^^^
+4:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py", line 1361, in init_process_group
+4:     store, rank, world_size = next(rendezvous_iterator)
+4:                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+4:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 258, in _env_rendezvous_handler
+4:     store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv)
+4:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 185, in _create_c10d_store
+4:     return TCPStore(
+4:            ^^^^^^^^^
+4: RuntimeError: The server socket has failed to listen on any local network address. useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+5: Traceback (most recent call last):
+5:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 67, in <module>
+5:     main()
+5:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 24, in main
+5:     dist.init_process_group(backend=backend, init_method="env://", rank=rank, world_size=world)
+5:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 79, in wrapper
+5:     return func(*args, **kwargs)
+5:            ^^^^^^^^^^^^^^^^^^^^^
+5:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 93, in wrapper
+5:     func_return = func(*args, **kwargs)
+5:                   ^^^^^^^^^^^^^^^^^^^^^
+5:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py", line 1361, in init_process_group
+5:     store, rank, world_size = next(rendezvous_iterator)
+5:                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+5:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 258, in _env_rendezvous_handler
+5:     store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv)
+5:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 185, in _create_c10d_store
+5:     return TCPStore(
+5:            ^^^^^^^^^
+5: RuntimeError: The server socket has failed to listen on any local network address. useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+srun: error: worker1: task 6: Exited with exit code 1
+2: Traceback (most recent call last):
+2:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 67, in <module>
+2:     main()
+2:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 24, in main
+2:     dist.init_process_group(backend=backend, init_method="env://", rank=rank, world_size=world)
+2:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 79, in wrapper
+2:     return func(*args, **kwargs)
+2:            ^^^^^^^^^^^^^^^^^^^^^
+2:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 93, in wrapper
+2:     func_return = func(*args, **kwargs)
+2:                   ^^^^^^^^^^^^^^^^^^^^^
+2:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py", line 1361, in init_process_group
+2:     store, rank, world_size = next(rendezvous_iterator)
+2:                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+2:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 258, in _env_rendezvous_handler
+2:     store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv)
+2:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 185, in _create_c10d_store
+2:     return TCPStore(
+2:            ^^^^^^^^^
+2: RuntimeError: The server socket has failed to listen on any local network address. useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+0: Traceback (most recent call last):
+0:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 67, in <module>
+0:     main()
+0:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 24, in main
+0:     dist.init_process_group(backend=backend, init_method="env://", rank=rank, world_size=world)
+0:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 79, in wrapper
+0:     return func(*args, **kwargs)
+0:            ^^^^^^^^^^^^^^^^^^^^^
+0:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 93, in wrapper
+0:     func_return = func(*args, **kwargs)
+0:                   ^^^^^^^^^^^^^^^^^^^^^
+0:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py", line 1361, in init_process_group
+0:     store, rank, world_size = next(rendezvous_iterator)
+0:                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+0:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 258, in _env_rendezvous_handler
+0:     store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv)
+0:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+0:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 185, in _create_c10d_store
+0:     return TCPStore(
+0:            ^^^^^^^^^
+0: RuntimeError: The server socket has failed to listen on any local network address. useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+srun: error: worker1: tasks 4-5: Exited with exit code 1
+1: Traceback (most recent call last):
+1:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 67, in <module>
+1:     main()
+1:   File "/nfs-hpc/slurm-tests/./04_torch_gloo_allreduce.py", line 24, in main
+1:     dist.init_process_group(backend=backend, init_method="env://", rank=rank, world_size=world)
+1:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 79, in wrapper
+1:     return func(*args, **kwargs)
+1:            ^^^^^^^^^^^^^^^^^^^^^
+1:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/c10d_logger.py", line 93, in wrapper
+1:     func_return = func(*args, **kwargs)
+1:                   ^^^^^^^^^^^^^^^^^^^^^
+1:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/distributed_c10d.py", line 1361, in init_process_group
+1:     store, rank, world_size = next(rendezvous_iterator)
+1:                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+1:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 258, in _env_rendezvous_handler
+1:     store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv)
+1:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1:   File "/opt/micromamba/envs/llm/lib/python3.11/site-packages/torch/distributed/rendezvous.py", line 185, in _create_c10d_store
+1:     return TCPStore(
+1:            ^^^^^^^^^
+1: RuntimeError: The server socket has failed to listen on any local network address. useIpv6: 0, code: -98, name: EADDRINUSE, message: address already in use
+srun: error: master: task 2: Exited with exit code 1
+srun: error: master: task 0: Exited with exit code 1
+srun: error: master: task 1: Exited with exit code 1
+slurmstepd: error: *** JOB 373 ON master CANCELLED AT 2026-01-29T16:30:35 DUE TO TIME LIMIT ***
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+0: slurmstepd: error: *** STEP 373.0 ON master CANCELLED AT 2026-01-29T16:30:35 DUE TO TIME LIMIT ***

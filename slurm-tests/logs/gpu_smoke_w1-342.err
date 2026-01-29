@@ -1,0 +1,18 @@
+/usr/local/lib64/python3.9/site-packages/torch/cuda/__init__.py:283: UserWarning: 
+    Found GPU0 Quadro P1000 which is of cuda capability 6.1.
+    Minimum and Maximum cuda capability supported by this version of PyTorch is
+    (7.0) - (12.0)
+    
+  warnings.warn(
+/usr/local/lib64/python3.9/site-packages/torch/cuda/__init__.py:304: UserWarning: 
+    Please install PyTorch with a following CUDA
+    configurations:  12.6 following instructions at
+    https://pytorch.org/get-started/locally/
+    
+  warnings.warn(matched_cuda_warn.format(matched_arches))
+/usr/local/lib64/python3.9/site-packages/torch/cuda/__init__.py:326: UserWarning: 
+Quadro P1000 with CUDA capability sm_61 is not compatible with the current PyTorch installation.
+The current PyTorch install supports CUDA capabilities sm_70 sm_75 sm_80 sm_86 sm_90 sm_100 sm_120.
+If you want to use the Quadro P1000 GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/
+
+  warnings.warn(
