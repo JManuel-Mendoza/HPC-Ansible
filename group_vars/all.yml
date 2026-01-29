@@ -82,6 +82,11 @@ slurm_log_dir: /var/log/slurm
 # cgroup
 slurm_cgroup_conf: |
   CgroupPlugin=autodetect
+  CgroupAutomount=yes
+  ConstrainCores=yes
+  ConstrainRAMSpace=yes
+  ConstrainDevices=yes
+
 
 # control machine
 # Para construir slurm.conf a partir de facts
