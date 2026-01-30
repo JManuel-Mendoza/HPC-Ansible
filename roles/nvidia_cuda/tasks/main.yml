@@ -370,7 +370,7 @@
     _grub_cmdline_updated: >-
       {{
         (
-          (_grub_cmdline.stdout | default('') | regex_replace('^GRUB_CMDLINE_LINUX=\"(.*)\"$', '\\1'))
+          (_grub_cmdline.stdout | default('') | regex_replace('^GRUB_CMDLINE_LINUX=\"(.*)\"$', '\'))
           ~ ' rd.driver.blacklist=nouveau modprobe.blacklist=nouveau'
         )
         | regex_replace('\\s+', ' ')
