@@ -1,8 +1,0 @@
-cpu-bind=MASK - master, task  0  0 [140525]: mask 0x401 set
-cpu-bind=MASK - worker1, task  4  0 [610841]: mask 0x401 set
-cpu-bind=MASK - master, task  1  1 [140526]: mask 0x802 set
-cpu-bind=MASK - worker1, task  5  1 [610842]: mask 0x802 set
-cpu-bind=MASK - master, task  2  2 [140527]: mask 0x401 set
-cpu-bind=MASK - worker1, task  6  2 [610843]: mask 0x401 set
-cpu-bind=MASK - master, task  3  3 [140528]: mask 0x802 set
-cpu-bind=MASK - worker1, task  7  3 [610844]: mask 0x802 set

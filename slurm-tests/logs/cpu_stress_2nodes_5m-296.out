@@ -1,7 +1,0 @@
-=== CPU STRESS 2 NODES (stress-ng) ===
-Tue Jan 27 16:57:08 -05 2026
-JobID=296
-NodeList=worker[1-2]
-Tasks=  CpusPerTask=8
-DONE
-Tue Jan 27 16:57:08 -05 2026

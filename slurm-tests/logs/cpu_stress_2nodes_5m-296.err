@@ -1,6 +1,0 @@
-srun: error: _fwd_tree_get_addr: can't find address for host worker2, check slurm.conf
-srun: error: Task launch for StepId=296.0 failed on node worker2: Can't find an address, check slurm.conf
-srun: error: Application launch failed: Can't find an address, check slurm.conf
-srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
-srun: error: worker1: task 0: Killed
-srun: Force Terminated StepId=296.0

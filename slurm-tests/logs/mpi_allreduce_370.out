@@ -1,2 +1,0 @@
-JobID=370 NodeList=master,worker1 NNodes=2 NTasks=8
-Using srun --mpi=pmi2

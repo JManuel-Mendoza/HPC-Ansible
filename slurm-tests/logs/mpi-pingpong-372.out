@@ -1,7 +1,0 @@
-JobID=372 NodeList=master,worker1
-PingPong ranks 0<->1 msg=1048576 bytes iters=200
-RTT=18.449 ms  one-way=9.225 ms  approx_bw=0.114 GB/s
-PingPong ranks 0<->1 msg=65536 bytes iters=500
-RTT=1.241 ms  one-way=0.621 ms  approx_bw=0.106 GB/s
-PingPong ranks 0<->1 msg=1024 bytes iters=2000
-RTT=0.172 ms  one-way=0.086 ms  approx_bw=0.012 GB/s
