@@ -35,6 +35,13 @@ llm_conda_packages:
   - pytorch-cuda
   - numba
   - cudatoolkit
+  - transformers
+  - datasets
+  - accelerate
+  - peft
+  - safetensors
+  - sentencepiece
+
 
 llm_pip_packages:
   - transformers
