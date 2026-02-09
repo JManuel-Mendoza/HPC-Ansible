@@ -1,0 +1,104 @@
+---
+- name: LLM NFS | Configurar servidor NFS LLM
+  block:
+    - name: LLM NFS | Determinar familia de SO
+      ansible.builtin.set_fact:
+        llm_nfs_os_family: "{{ ansible_facts.os_family | default('RedHat') }}"
+      changed_when: false
+
+    - name: LLM NFS | Asegurar grupo de escritura
+      ansible.builtin.group:
+        name: "{{ llm_nfs_group }}"
+        state: present
+
+    - name: LLM NFS | Asegurar punto de montaje
+      ansible.builtin.file:
+        path: "{{ llm_nfs_fs_mountpoint }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: LLM NFS | Montar particion en {{ llm_nfs_fs_mountpoint }}
+      ansible.builtin.mount:
+        path: "{{ llm_nfs_fs_mountpoint }}"
+        src: "{{ llm_nfs_partition }}"
+        fstype: "{{ llm_nfs_fs_type }}"
+        state: mounted
+
+    - name: LLM NFS | Verificar mountpoint antes de limpiar
+      ansible.builtin.command: "mountpoint -q {{ llm_nfs_fs_mountpoint }}"
+      register: _llm_nfs_mountpoint
+      changed_when: false
+      failed_when: _llm_nfs_mountpoint.rc != 0
+      when: llm_nfs_wipe_mount | bool
+
+    - name: LLM NFS | Buscar contenido para limpieza
+      ansible.builtin.find:
+        paths: "{{ llm_nfs_fs_mountpoint }}"
+        hidden: true
+        file_type: any
+        recurse: false
+      register: _llm_nfs_wipe_find
+      when: llm_nfs_wipe_mount | bool
+
+    - name: LLM NFS | Borrar contenido del mountpoint
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ _llm_nfs_wipe_find.files | default([]) }}"
+      when: llm_nfs_wipe_mount | bool
+
+    - name: LLM NFS | Crear directorio exportado
+      ansible.builtin.file:
+        path: "{{ llm_nfs_export_dir }}"
+        state: directory
+        owner: root
+        group: "{{ llm_nfs_group }}"
+        mode: "{{ llm_nfs_mode }}"
+
+    - name: LLM NFS | Instalar paquetes del servidor
+      ansible.builtin.package:
+        name: "{{ llm_nfs_server_packages.get(llm_nfs_os_family, llm_nfs_server_packages['RedHat']) }}"
+        state: present
+
+    - name: LLM NFS | Habilitar y arrancar servicio NFS
+      ansible.builtin.service:
+        name: "{{ llm_nfs_server_service.get(llm_nfs_os_family, llm_nfs_server_service['RedHat']) }}"
+        state: started
+        enabled: true
+
+    - name: LLM NFS | Configurar exports
+      ansible.builtin.copy:
+        dest: "{{ llm_nfs_export_file }}"
+        content: "{{ llm_nfs_export_dir }} {{ llm_nfs_allowed_clients }}({{ llm_nfs_export_opts }})\n"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: LLM NFS | Recargar exports
+
+    - name: LLM NFS | Verificar firewalld activo
+      ansible.builtin.command: systemctl is-active firewalld
+      register: _llm_nfs_firewalld_active
+      changed_when: false
+      failed_when: false
+      when: llm_nfs_firewall_manage | bool
+
+    - name: LLM NFS | Consultar puerto 2049/tcp en firewalld
+      ansible.builtin.command: "firewall-cmd --permanent --query-port=2049/tcp"
+      register: _llm_nfs_firewalld_port
+      changed_when: false
+      failed_when: _llm_nfs_firewalld_port.rc not in [0, 1]
+      when:
+        - llm_nfs_firewall_manage | bool
+        - _llm_nfs_firewalld_active.rc == 0
+
+    - name: LLM NFS | Abrir puerto 2049/tcp en firewalld
+      ansible.builtin.command: "firewall-cmd --permanent --add-port=2049/tcp"
+      when:
+        - llm_nfs_firewall_manage | bool
+        - _llm_nfs_firewalld_active.rc == 0
+        - _llm_nfs_firewalld_port.rc == 1
+      notify: LLM NFS | Recargar firewalld
+  when: llm_nfs_enabled | bool
+  tags: [nfs, llm_nfs]

@@ -1,0 +1,30 @@
+---
+- name: LLM NFS | Configurar cliente NFS LLM
+  block:
+    - name: LLM NFS | Determinar familia de SO
+      ansible.builtin.set_fact:
+        llm_nfs_os_family: "{{ ansible_facts.os_family | default('RedHat') }}"
+      changed_when: false
+
+    - name: LLM NFS | Instalar paquetes del cliente
+      ansible.builtin.package:
+        name: "{{ llm_nfs_client_packages.get(llm_nfs_os_family, llm_nfs_client_packages['RedHat']) }}"
+        state: present
+
+    - name: LLM NFS | Asegurar punto de montaje en cliente
+      ansible.builtin.file:
+        path: "{{ llm_nfs_client_mountpoint }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: LLM NFS | Montar share en cliente
+      ansible.builtin.mount:
+        path: "{{ llm_nfs_client_mountpoint }}"
+        src: "{{ llm_nfs_server_host }}:{{ llm_nfs_server_export }}"
+        fstype: "{{ llm_nfs_client_fstype }}"
+        opts: "{{ llm_nfs_client_opts }}"
+        state: mounted
+  when: llm_nfs_client_enabled | bool
+  tags: [nfs, llm_nfs]

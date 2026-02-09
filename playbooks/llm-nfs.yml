@@ -1,0 +1,16 @@
+---
+- name: NFS LLM | Configurar servidor en master
+  hosts: hpc_master
+  become: true
+  gather_facts: true
+  roles:
+    - role: llm_nfs_server
+      tags: [nfs, llm_nfs]
+
+- name: NFS LLM | Configurar clientes en workers
+  hosts: workers
+  become: true
+  gather_facts: true
+  roles:
+    - role: llm_nfs_client
+      tags: [nfs, llm_nfs]

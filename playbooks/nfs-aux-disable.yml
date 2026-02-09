@@ -1,0 +1,40 @@
+---
+- name: NFS auxiliar | Desmontar share antiguo en workers
+  hosts: workers
+  become: true
+  gather_facts: true
+  vars_files:
+    - roles/nfs_hpc/defaults/main.yml
+  tags: [nfs_auxiliar]
+  tasks:
+    - name: NFS auxiliar | Desmontar share antiguo
+      ansible.builtin.mount:
+        path: "{{ nfs_hpc_mount_point }}"
+        state: absent
+
+- name: NFS auxiliar | Retirar export antiguo en master
+  hosts: hpc_master
+  become: true
+  gather_facts: true
+  vars_files:
+    - roles/nfs_hpc/defaults/main.yml
+  tags: [nfs_auxiliar]
+  tasks:
+    - name: NFS auxiliar | Determinar familia de SO
+      ansible.builtin.set_fact:
+        nfs_hpc_os_family: "{{ ansible_facts.os_family | default('RedHat') }}"
+      changed_when: false
+
+    - name: NFS auxiliar | Eliminar exports antiguo si existe
+      ansible.builtin.file:
+        path: "{{ nfs_hpc_export_file }}"
+        state: absent
+
+    - name: NFS auxiliar | Recargar exports
+      ansible.builtin.command: exportfs -ra
+
+    - name: NFS auxiliar | Asegurar servicio NFS activo
+      ansible.builtin.service:
+        name: "{{ nfs_hpc_server_service.get(nfs_hpc_os_family, nfs_hpc_server_service['RedHat']) }}"
+        state: started
+        enabled: true

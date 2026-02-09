@@ -1,0 +1,21 @@
+---
+llm_nfs_enabled: false
+llm_nfs_partition: /dev/sda2
+llm_nfs_fs_type: xfs
+llm_nfs_fs_mountpoint: /srv/nfs
+llm_nfs_export_dir: /srv/nfs/llm
+llm_nfs_allowed_clients: "*"
+llm_nfs_export_opts: "rw,sync,no_subtree_check"
+llm_nfs_export_file: /etc/exports.d/llm.exports
+llm_nfs_group: llmusers
+llm_nfs_mode: "2770"
+llm_nfs_wipe_mount: false
+llm_nfs_firewall_manage: true
+
+llm_nfs_server_packages:
+  RedHat: ["nfs-utils"]
+  Debian: ["nfs-kernel-server"]
+
+llm_nfs_server_service:
+  RedHat: "nfs-server"
+  Debian: "nfs-kernel-server"

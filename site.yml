@@ -9,7 +9,9 @@
     - { role: firewall, tags: ["firewall"] }
     - { role: network_internal, tags: ["network"] }
     - { role: cluster_routing, tags: ["routing"] }
-    - { role: nfs_hpc, tags: ["nfs"] }
+    - role: nfs_hpc
+      tags: ["nfs_auxiliar", "nfs_hpc"]
+      when: "'nfs_auxiliar' in (ansible_run_tags | default([]))"
     - { role: nvidia_cuda, tags: ["cuda"] }
     - { role: llm_env, tags: ["llm"] }
 

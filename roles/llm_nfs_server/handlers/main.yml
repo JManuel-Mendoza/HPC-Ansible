@@ -1,0 +1,6 @@
+---
+- name: LLM NFS | Recargar exports
+  ansible.builtin.command: exportfs -ra
+
+- name: LLM NFS | Recargar firewalld
+  ansible.builtin.command: firewall-cmd --reload

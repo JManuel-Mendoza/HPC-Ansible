@@ -1,0 +1,6 @@
+---
+llm_nfs_client_enabled: true
+llm_nfs_server_host: master
+llm_nfs_server_export: /srv/nfs/llm
+llm_nfs_client_mountpoint: /mnt/llm
+llm_nfs_client_opts: "rw,hard,intr,_netdev,vers=4.2"
