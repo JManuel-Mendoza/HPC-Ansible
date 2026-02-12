@@ -3,10 +3,12 @@
   ansible.builtin.command: uname -a
   register: uname_out
   changed_when: false
+  tags: [debug, debug_validate]
 
 - name: Validate | Print uname
   ansible.builtin.debug:
     var: uname_out.stdout
+  tags: [debug, debug_validate]
 
 - name: Validate | Check SSH password auth effective config (sshd -T)
   ansible.builtin.shell: |
@@ -16,10 +18,12 @@
     executable: /bin/bash
   register: sshd_t
   changed_when: false
+  tags: [debug, debug_validate]
 
 - name: Validate | Print sshd -T relevant lines
   ansible.builtin.debug:
     var: sshd_t.stdout_lines
+  tags: [debug, debug_validate]
 
 - name: Validate | Check nvidia-smi
   ansible.builtin.command: nvidia-smi -L
@@ -30,6 +34,7 @@
 - name: Validate | Print nvidia-smi
   ansible.builtin.debug:
     var: nvsmi.stdout_lines
+  tags: [debug, debug_validate]
 
 - name: Validate | Check Torch CUDA inside micromamba env
   ansible.builtin.command: >
@@ -52,6 +57,7 @@
 - name: Validate | Print Torch CUDA check
   ansible.builtin.debug:
     var: torch_cuda.stdout_lines
+  tags: [debug, debug_validate]
 
 # - name: Validate | Slurm checks
 #   ansible.builtin.include_tasks: slurm.yml

@@ -63,4 +63,4 @@
   when:
     - slurm_internal_cidr is defined
     - inventory_hostname in (groups.get('hpc_master', []) + groups.get('workers_r', []) + groups.get('workers', []))
-  tags: [firewall, slurm, slurm_firewall, slurm_validate]
+  tags: [firewall, slurm, slurm_firewall, slurm_validate, debug, debug_firewall]

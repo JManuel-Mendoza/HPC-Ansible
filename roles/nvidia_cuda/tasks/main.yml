@@ -42,6 +42,7 @@
   ansible.builtin.debug:
     msg: "No se detecta GPU NVIDIA (vendor 10de). Se omite el rol nvidia_cuda en este host."
   when: not _nvidia_gpu_present
+  tags: [debug, debug_cuda]
 
 - name: NVIDIA/CUDA | Saltar host sin GPU
   ansible.builtin.meta: end_host
@@ -676,6 +677,7 @@
   when:
     - nvidia_cuda_validate | bool
     - _nvidia_smi_full.rc != 0
+  tags: [debug, debug_cuda]
 
 - name: NVIDIA/CUDA | Capturar paquetes NVIDIA/CUDA cuando falla nvidia-smi
   ansible.builtin.shell: "rpm -qa | grep -Ei 'nvidia|cuda' || true"
@@ -685,6 +687,7 @@
     - ansible_facts['os_family'] == 'RedHat'
     - nvidia_cuda_validate | bool
     - _nvidia_smi_full.rc != 0
+  tags: [debug, debug_cuda]
 
 - name: NVIDIA/CUDA | Capturar paquetes NVIDIA/CUDA cuando falla nvidia-smi (Ubuntu)
   ansible.builtin.shell: "dpkg-query -W -f='${Package}\n' | grep -Ei 'nvidia|cuda' || true"
@@ -694,6 +697,7 @@
     - ansible_facts['os_family'] == 'Debian'
     - nvidia_cuda_validate | bool
     - _nvidia_smi_full.rc != 0
+  tags: [debug, debug_cuda]
 
 - name: NVIDIA/CUDA | Fallar si nvidia-smi no responde
   ansible.builtin.fail:
@@ -742,6 +746,7 @@
   when:
     - ansible_facts['os_family'] == 'RedHat'
     - nvidia_cuda_validate | bool
+  tags: [debug, debug_cuda]
 
 - name: NVIDIA/CUDA | Resumen final (Ubuntu)
   ansible.builtin.debug:
@@ -751,3 +756,4 @@
   when:
     - ansible_facts['os_family'] == 'Debian'
     - nvidia_cuda_validate | bool
+  tags: [debug, debug_cuda]

@@ -84,13 +84,13 @@ ansible-playbook -i inventario.ini site.yml --list-tasks --ask-vault-pass
 Dry-run sobre un solo nodo:
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1 --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1 --ask-vault-pass --skip-tags debug
 ```
 
 Ejecucion completa (recomendado por etapas):
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --ask-vault-pass --skip-tags debug
 ```
 
 ## Ejemplos por etapas (tags) y limites
@@ -123,7 +123,31 @@ ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_con
 Validación:
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --tags validate,slurm_validate --limit hpc_master --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags validate,slurm_validate --limit hpc_master --ask-vault-pass --skip-tags debug
+```
+
+## Diagnóstico (salida extra)
+
+Habilitar diagnóstico junto con una etapa (recomendado):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --tags validate,debug --limit worker1 --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags firewall,debug --limit worker1 --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags cuda,debug --limit worker1 --ask-vault-pass
+```
+
+Diagnóstico específico (sub-tags):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --tags firewall,debug_firewall --limit worker1 --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags validate,debug_validate --limit worker1 --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags cuda,debug_cuda --limit worker1 --ask-vault-pass
+```
+
+Omitir diagnóstico (recomendado en ejecución normal):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --skip-tags debug --ask-vault-pass
 ```
 
 ## Flujo recomendado (instalacion limpia -> HPC listo -> Slurm -> LLM)
