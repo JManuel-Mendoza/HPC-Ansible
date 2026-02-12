@@ -18,6 +18,7 @@
     executable: /bin/bash
   register: sshd_t
   changed_when: false
+  failed_when: false
   tags: [debug, debug_validate]
 
 - name: Validate | Print sshd -T relevant lines
@@ -25,11 +26,67 @@
     var: sshd_t.stdout_lines
   tags: [debug, debug_validate]
 
+- name: Validate | SSH | Recolectar service facts
+  ansible.builtin.service_facts:
+  changed_when: false
+  tags: [validate, validate_ssh]
+
+- name: Validate | SSH | Verificar servicio SSH activo
+  ansible.builtin.command: >-
+    systemctl is-active {{
+      ('sshd.service' in (ansible_facts.services | default({})))
+        | ternary('sshd', (('ssh.service' in (ansible_facts.services | default({}))) | ternary('ssh', 'sshd')))
+    }}
+  register: _validate_ssh_active
+  changed_when: false
+  failed_when: false
+  tags: [validate, validate_ssh]
+
+- name: Validate | SSH | Fallar si el servicio SSH no esta activo
+  ansible.builtin.assert:
+    that:
+      - (_validate_ssh_active.stdout | trim) == 'active'
+    fail_msg: >-
+      Servicio SSH no esta activo (stdout='{{ _validate_ssh_active.stdout | default('') | trim }}', rc={{ _validate_ssh_active.rc }}).
+      Accion: ejecutar `--tags ssh` (rol users_ssh) o verificar el servicio en el nodo:
+      `systemctl status sshd` (Rocky/RHEL) o `systemctl status ssh` (Ubuntu/Debian).
+  tags: [validate, validate_ssh]
+
+- name: Validate | SSH | Validar sintaxis de sshd (sshd -t)
+  ansible.builtin.command: sshd -t
+  register: _validate_sshd_syntax
+  changed_when: false
+  failed_when: false
+  tags: [validate, validate_ssh]
+
+- name: Validate | SSH | Fallar si la configuracion de sshd es invalida
+  ansible.builtin.assert:
+    that:
+      - _validate_sshd_syntax.rc == 0
+    fail_msg: >-
+      `sshd -t` fallo (rc={{ _validate_sshd_syntax.rc }}).
+      Accion: revisar `/etc/ssh/sshd_config` y `/etc/ssh/sshd_config.d/*.conf` (por ejemplo `roles/users_ssh`),
+      corregir el error y volver a ejecutar `--tags ssh`.
+  tags: [validate, validate_ssh]
+
 - name: Validate | Check nvidia-smi
   ansible.builtin.command: nvidia-smi -L
   register: nvsmi
   changed_when: false
-  failed_when: validate_cuda | bool and (nvsmi.rc != 0)
+  failed_when: false
+  when: validate_cuda | bool
+  tags: [validate, validate_cuda]
+
+- name: Validate | CUDA | Fallar si nvidia-smi no esta disponible o falla
+  ansible.builtin.assert:
+    that:
+      - nvsmi.rc == 0
+    fail_msg: >-
+      `nvidia-smi -L` fallo (rc={{ nvsmi.rc }}).
+      Accion: ejecutar `--tags cuda` (rol nvidia_cuda) y verificar driver NVIDIA. Si este nodo no deberia validar CUDA,
+      deshabilitar `validate_cuda` para este host/grupo.
+  when: validate_cuda | bool
+  tags: [validate, validate_cuda]
 
 - name: Validate | Print nvidia-smi
   ansible.builtin.debug:
@@ -41,18 +98,26 @@
     {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
     python -c "import torch; print(torch.__version__); print('cuda', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"
   environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+    MAMBA_ROOT_PREFIX: "{{ llm_micromamba_root }}"
   register: torch_cuda
   changed_when: false
   failed_when: false
+  when: validate_llm | bool
+  tags: [validate, validate_cuda]
 
-- name: Validate | Fail if LLM env missing or Torch CUDA unavailable
-  ansible.builtin.fail:
-    msg: >-
-      LLM env check failed (rc={{ torch_cuda.rc }}). Ensure micromamba env
-      '{{ llm_env_name }}' exists and torch has CUDA. stdout={{ torch_cuda.stdout | default('') }}
-      stderr={{ torch_cuda.stderr | default('') }}
-  when: validate_llm | bool and (torch_cuda.rc != 0 or 'cuda True' not in torch_cuda.stdout)
+- name: Validate | CUDA | Fallar si el entorno LLM no existe o Torch CUDA no esta disponible
+  ansible.builtin.assert:
+    that:
+      - torch_cuda.rc == 0
+      - "'cuda True' in (torch_cuda.stdout | default(''))"
+    fail_msg: >-
+      Check de Torch CUDA fallo (rc={{ torch_cuda.rc }}).
+      Accion:
+      1) confirmar que existe el env `{{ llm_env_name }}` (micromamba en `{{ llm_micromamba_bin }}`),
+      2) ejecutar `--tags llm,cuda` para provisionar entorno/driver,
+      3) revisar salida: stdout={{ (torch_cuda.stdout | default('') | trim)[:200] }}, stderr={{ (torch_cuda.stderr | default('') | trim)[:200] }}.
+  when: validate_llm | bool
+  tags: [validate, validate_cuda]
 
 - name: Validate | Print Torch CUDA check
   ansible.builtin.debug:
