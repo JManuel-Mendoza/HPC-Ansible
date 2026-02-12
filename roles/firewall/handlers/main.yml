@@ -1,0 +1,7 @@
+---
+- name: Firewall | Recargar firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: reloaded
+    enabled: true
+

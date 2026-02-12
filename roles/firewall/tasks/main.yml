@@ -16,6 +16,7 @@
     permanent: true
     state: enabled
     immediate: true
+  notify: Firewall | Recargar firewalld
 
 # -------------------------------------------------------------------
 # Slurm - allow controller <-> compute traffic only from internal CIDR
@@ -35,6 +36,7 @@
       source address="{{ slurm_internal_cidr }}"
       port port="{{ slurmctld_port }}" protocol="tcp"
       accept
+  notify: Firewall | Recargar firewalld
   when:
     - slurm_internal_cidr is defined
     - inventory_hostname in groups.get('hpc_master', [])
@@ -51,6 +53,7 @@
       source address="{{ slurm_internal_cidr }}"
       port port="{{ slurmd_port }}" protocol="tcp"
       accept
+  notify: Firewall | Recargar firewalld
   when:
     - slurm_internal_cidr is defined
     # Ajusta el grupo según tu inventario actual:
@@ -64,3 +67,7 @@
     - slurm_internal_cidr is defined
     - inventory_hostname in (groups.get('hpc_master', []) + groups.get('workers_r', []) + groups.get('workers', []))
   tags: [firewall, slurm, slurm_firewall, slurm_validate, debug, debug_firewall]
+
+- name: Firewall | Aplicar recargas pendientes antes de continuar
+  ansible.builtin.meta: flush_handlers
+  tags: [firewall]
