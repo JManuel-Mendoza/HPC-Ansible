@@ -5,6 +5,13 @@
 # - Conectividad TCP (master -> workers:6818 usando ansible_host de cada worker_r)
 # - (Opcional) presencia de rich rules esperadas
 
+- name: Validate | Firewall | Detectar firewall-cmd
+  ansible.builtin.stat:
+    path: /usr/bin/firewall-cmd
+  register: _validate_firewall_cmd
+  changed_when: false
+  tags: [validate, validate_firewall]
+
 - name: Validate | Master listens on Slurmctld (6817) and SlurmDBD (6819)
   ansible.builtin.shell: "ss -lntp | egrep ':(6817|6819)\\b' || true"
   args:
@@ -12,7 +19,9 @@
   register: _master_listen
   changed_when: false
   failed_when: false
-  when: inventory_hostname in groups.get('hpc_master', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
   tags: [validate, validate_slurm]
 
 - name: Validate | Slurm | Fallar si el master no escucha en 6817/6819
@@ -24,7 +33,9 @@
       El master no parece estar escuchando en los puertos esperados de Slurm (6817=slurmctld, 6819=slurmdbd).
       Accion: verificar servicios `slurmctld`/`slurmdbd` en el master y la configuracion de Slurm (`--tags slurm`).
       Evidencia: ss={{ _master_listen.stdout | default('') | trim }}
-  when: inventory_hostname in groups.get('hpc_master', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
   tags: [validate, validate_slurm]
 
 - name: Validate | Workers listen on slurmd port (6818)
@@ -34,7 +45,9 @@
   register: _worker_listen
   changed_when: false
   failed_when: false
-  when: inventory_hostname in groups.get('workers_r', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
   tags: [validate, validate_slurm]
 
 - name: Validate | Slurm | Fallar si el worker no escucha en 6818
@@ -45,7 +58,9 @@
       El worker no parece estar escuchando en 6818/tcp (slurmd).
       Accion: verificar servicio `slurmd` en el nodo y configuracion Slurm.
       Evidencia: ss={{ _worker_listen.stdout | default('') | trim }}
-  when: inventory_hostname in groups.get('workers_r', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
   tags: [validate, validate_slurm]
 
 # Clave: NO usar 192.168.34.1. Usar el host de control configurado en slurm.conf:
@@ -56,7 +71,9 @@
     port: 6817
     timeout: 2
   changed_when: false
-  when: inventory_hostname in groups.get('workers_r', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
   tags: [validate, validate_slurm]
 
 # Desde el master hacia cada worker real (workers_r), usando su ansible_host (192.168.34.2, 192.168.34.18, etc.)
@@ -67,7 +84,9 @@
     timeout: 2
   loop: "{{ groups.get('workers_r', []) }}"
   changed_when: false
-  when: inventory_hostname in groups.get('hpc_master', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
   tags: [validate, validate_slurm]
 
 # (Opcional) Validar firewall rich-rules mínimas, según tu patrón:
@@ -78,7 +97,10 @@
   register: _fw_master_rules
   changed_when: false
   failed_when: false
-  when: inventory_hostname in groups.get('hpc_master', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+    - _validate_firewall_cmd.stat.exists
   tags: [validate, validate_slurm, validate_firewall]
 
 - name: Validate | Firewall | Fallar si faltan rich rules en master (6817 y rango srun)
@@ -90,7 +112,10 @@
       Faltan rich rules esperadas en el master para Slurm (6817 y/o rango srun 60001-60100).
       Accion: ejecutar `--tags firewall,slurm_firewall` y verificar zona/puertos.
       Evidencia: rules={{ _fw_master_rules.stdout | default('') | trim }}
-  when: inventory_hostname in groups.get('hpc_master', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+    - _validate_firewall_cmd.stat.exists
   tags: [validate, validate_slurm, validate_firewall]
 
 - name: Validate | Workers firewalld rich rules present (6818)
@@ -98,7 +123,10 @@
   register: _fw_worker_rules
   changed_when: false
   failed_when: false
-  when: inventory_hostname in groups.get('workers_r', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
+    - _validate_firewall_cmd.stat.exists
   tags: [validate, validate_slurm, validate_firewall]
 
 - name: Validate | Firewall | Fallar si faltan rich rules en workers (6818)
@@ -109,5 +137,8 @@
       Faltan rich rules esperadas en workers para Slurm (6818).
       Accion: ejecutar `--tags firewall,slurm_firewall` y verificar zona/puertos.
       Evidencia: rules={{ _fw_worker_rules.stdout | default('') | trim }}
-  when: inventory_hostname in groups.get('workers_r', [])
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
+    - _validate_firewall_cmd.stat.exists
   tags: [validate, validate_slurm, validate_firewall]

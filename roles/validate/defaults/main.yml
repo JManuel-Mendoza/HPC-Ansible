@@ -1,6 +1,14 @@
 ---
+# Validaciones por defecto (para `--tags validate`).
+# Ajusta a nivel de host/grupo si tu clúster no cumple alguno de estos supuestos.
+validate_slurm: true
+
+# CUDA se autodetecta (nvidia-smi) para evitar falsos positivos en hosts sin GPU.
 validate_cuda: true
-validate_llm: true
+
+# Validacion del entorno LLM (micromamba + torch). Por defecto se deja deshabilitada
+# para que `--tags validate` no requiera que el entorno LLM haya sido aprovisionado.
+validate_llm: false
 
 llm_micromamba_root: "/opt/micromamba"
 llm_micromamba_bin: "/opt/micromamba/bin/micromamba"

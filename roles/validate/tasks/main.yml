@@ -26,10 +26,10 @@
     var: sshd_t.stdout_lines
   tags: [debug, debug_validate]
 
-- name: Validate | SSH | Recolectar service facts
+- name: Validate | Recolectar service facts
   ansible.builtin.service_facts:
   changed_when: false
-  tags: [validate, validate_ssh]
+  tags: [validate, validate_ssh, validate_slurm, validate_cuda]
 
 - name: Validate | SSH | Verificar servicio SSH activo
   ansible.builtin.command: >-
@@ -69,12 +69,27 @@
       corregir el error y volver a ejecutar `--tags ssh`.
   tags: [validate, validate_ssh]
 
+- name: Validate | CUDA | Detectar nvidia-smi
+  ansible.builtin.stat:
+    path: /usr/bin/nvidia-smi
+  register: _validate_nvidia_smi_bin
+  changed_when: false
+  tags: [validate, validate_cuda]
+
+- name: Validate | CUDA | Determinar si se espera GPU en este host
+  ansible.builtin.set_fact:
+    _validate_expect_gpu: "{{ inventory_hostname in groups.get('slurm_gpu', []) }}"
+  changed_when: false
+  tags: [validate, validate_cuda]
+
 - name: Validate | Check nvidia-smi
   ansible.builtin.command: nvidia-smi -L
   register: nvsmi
   changed_when: false
   failed_when: false
-  when: validate_cuda | bool
+  when:
+    - validate_cuda | bool
+    - _validate_nvidia_smi_bin.stat.exists
   tags: [validate, validate_cuda]
 
 - name: Validate | CUDA | Fallar si nvidia-smi no esta disponible o falla
@@ -85,13 +100,49 @@
       `nvidia-smi -L` fallo (rc={{ nvsmi.rc }}).
       Accion: ejecutar `--tags cuda` (rol nvidia_cuda) y verificar driver NVIDIA. Si este nodo no deberia validar CUDA,
       deshabilitar `validate_cuda` para este host/grupo.
-  when: validate_cuda | bool
+  when:
+    - validate_cuda | bool
+    - _validate_nvidia_smi_bin.stat.exists
+  tags: [validate, validate_cuda]
+
+- name: Validate | CUDA | Fallar si se espera GPU pero no existe nvidia-smi
+  ansible.builtin.assert:
+    that:
+      - _validate_nvidia_smi_bin.stat.exists
+    fail_msg: >-
+      Se esperaba GPU en este host (miembro de `slurm_gpu`), pero no existe `/usr/bin/nvidia-smi`.
+      Accion: ejecutar `--tags cuda` (rol nvidia_cuda) o corregir la instalacion del driver NVIDIA.
+  when:
+    - validate_cuda | bool
+    - _validate_expect_gpu | bool
   tags: [validate, validate_cuda]
 
 - name: Validate | Print nvidia-smi
   ansible.builtin.debug:
     var: nvsmi.stdout_lines
   tags: [debug, debug_validate]
+
+- name: Validate | CUDA | Detectar micromamba
+  ansible.builtin.stat:
+    path: "{{ llm_micromamba_bin }}"
+  register: _validate_micromamba_bin
+  changed_when: false
+  when:
+    - validate_llm | bool
+    - _validate_nvidia_smi_bin.stat.exists or (_validate_expect_gpu | default(false) | bool)
+  tags: [validate, validate_cuda]
+
+- name: Validate | CUDA | Fallar si se habilito validate_llm pero falta micromamba
+  ansible.builtin.assert:
+    that:
+      - _validate_micromamba_bin.stat.exists
+    fail_msg: >-
+      `validate_llm=true` pero no existe `{{ llm_micromamba_bin }}`.
+      Accion: ejecutar `--tags llm` (rol llm_env) o deshabilitar `validate_llm` en este host/grupo.
+  when:
+    - validate_llm | bool
+    - _validate_nvidia_smi_bin.stat.exists or (_validate_expect_gpu | default(false) | bool)
+  tags: [validate, validate_cuda]
 
 - name: Validate | Check Torch CUDA inside micromamba env
   ansible.builtin.command: >
@@ -102,7 +153,10 @@
   register: torch_cuda
   changed_when: false
   failed_when: false
-  when: validate_llm | bool
+  when:
+    - validate_llm | bool
+    - _validate_nvidia_smi_bin.stat.exists or (_validate_expect_gpu | default(false) | bool)
+    - _validate_micromamba_bin.stat.exists
   tags: [validate, validate_cuda]
 
 - name: Validate | CUDA | Fallar si el entorno LLM no existe o Torch CUDA no esta disponible
@@ -116,7 +170,9 @@
       1) confirmar que existe el env `{{ llm_env_name }}` (micromamba en `{{ llm_micromamba_bin }}`),
       2) ejecutar `--tags llm,cuda` para provisionar entorno/driver,
       3) revisar salida: stdout={{ (torch_cuda.stdout | default('') | trim)[:200] }}, stderr={{ (torch_cuda.stderr | default('') | trim)[:200] }}.
-  when: validate_llm | bool
+  when:
+    - validate_llm | bool
+    - _validate_nvidia_smi_bin.stat.exists or (_validate_expect_gpu | default(false) | bool)
   tags: [validate, validate_cuda]
 
 - name: Validate | Print Torch CUDA check
@@ -124,6 +180,19 @@
     var: torch_cuda.stdout_lines
   tags: [debug, debug_validate]
 
-# - name: Validate | Slurm checks
-#   ansible.builtin.include_tasks: slurm.yml
-#   tags: [validate, validate_slurm]
+- name: Validate | Slurm | Determinar si hay servicios de Slurm presentes
+  ansible.builtin.set_fact:
+    _validate_slurm_present: >-
+      {{
+        ('slurmctld.service' in (ansible_facts.services | default({}))) or
+        ('slurmd.service' in (ansible_facts.services | default({}))) or
+        ('slurmdbd.service' in (ansible_facts.services | default({})))
+      }}
+  changed_when: false
+  tags: [validate, validate_slurm]
+
+- name: Validate | Slurm checks
+  ansible.builtin.include_tasks: slurm.yml
+  when:
+    - validate_slurm | bool
+  tags: [validate, validate_slurm]
