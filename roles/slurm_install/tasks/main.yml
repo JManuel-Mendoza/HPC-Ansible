@@ -1,4 +1,8 @@
 ---
+- name: Slurm | Recolectar service facts
+  ansible.builtin.service_facts:
+  tags: [slurm, slurm_config, slurm_install]
+
 - name: Slurm | See locally built RPMs (Rocky/RHEL)
   ansible.builtin.shell: "ls -1 /root/rpmbuild/RPMS/x86_64/*.rpm | grep -v '/slurm-openlava-'"
   register: _slurm_rpms

@@ -24,8 +24,8 @@
     state: restarted
     no_block: true
   when:
-    - inventory_hostname in groups.get('slurm_compute', [])
-    - ("slurmd.service" in (ansible_facts.services | default({}))) or ("slurmd" in (ansible_facts.services | default({})))
+    - inventory_hostname in (groups.get('slurm_compute', []) + groups.get('hpc_master', []))
+    - "'slurmd.service' in (ansible_facts.services | default({}))"
 
 - name: Slurm | Recargar systemd daemon
   ansible.builtin.systemd:
