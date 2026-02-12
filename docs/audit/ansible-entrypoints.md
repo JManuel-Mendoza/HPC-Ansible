@@ -27,6 +27,11 @@ Documentos relacionados:
 9. `llm` -> tag `llm`
 10. `validate` -> tags `validate,slurm_validate`
 
+## Nota: reinicios de Slurm por handlers/notify
+
+Desde el paquete P8a, los reinicios de `slurmctld`, `slurmd` y `slurmdbd` se ejecutan via **handlers** y se disparan solo cuando cambia configuración (tareas `template`/`copy`/`lineinfile` que notifican).
+En los roles `slurm_controller` y `slurm_compute` se usa `meta: flush_handlers` antes de reconfigurar/validar para aplicar reinicios pendientes y evitar estados intermedios.
+
 ## Advertencias (HIGH-RISK)
 
 Zonas de alto riesgo: ejecutar siempre con `--limit` (un nodo primero) y ventana de mantenimiento si aplica.

@@ -45,11 +45,6 @@
     mode: "0644"
   tags: [slurm, slurm_config]
 
-- name: Slurm | Reload systemd units (compute)
-  ansible.builtin.systemd:
-    daemon_reload: true
-  tags: [slurm, slurmd]
-
 - name: Slurm | Enable and start slurmd (compute)
   ansible.builtin.systemd:
     name: slurmd
@@ -58,14 +53,18 @@
   when: slurm_manage_slurmd | bool
   tags: [slurm, slurmd]
 
-- name: Slurm | Restart slurmd si cambia config o NVML (compute)
-  ansible.builtin.systemd:
-    name: slurmd
-    state: restarted
-    no_block: true
+- name: Slurm | Marcar reinicio de slurmd por cambio de symlink NVML (compute)
+  ansible.builtin.command: /bin/true
+  changed_when: true
   when:
     - slurm_manage_slurmd | bool
-    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
+    - slurm_nvml_symlink_changed | default(false)
+  notify: Slurm | Reiniciar slurmd
+  tags: [slurm, slurmd]
+
+- name: Slurm | Aplicar reinicios pendientes antes de validar (compute)
+  ansible.builtin.meta: flush_handlers
+  when: slurm_manage_slurmd | bool
   tags: [slurm, slurmd]
 
 - name: Slurm | Verificar slurmd activo (compute)

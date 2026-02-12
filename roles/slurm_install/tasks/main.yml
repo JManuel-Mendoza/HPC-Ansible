@@ -159,6 +159,7 @@
     group: root
     mode: "0644"
     content: "{{ slurm_cgroup_conf }}"
+  notify: Slurm | Reiniciar slurmd
   tags: [slurm, slurm_config]
 
 - name: Slurm | Fallback per-host facts for templating
@@ -220,6 +221,9 @@
     owner: root
     group: root
     mode: "0644"
+  notify:
+    - Slurm | Reiniciar slurmctld
+    - Slurm | Reiniciar slurmd
   register: _slurm_conf_copy
   when: inventory_hostname in groups.get('hpc_master', [])
   tags: [slurm, slurm_config]
@@ -249,6 +253,9 @@
     owner: root
     group: root
     mode: "0644"
+  notify:
+    - Slurm | Reiniciar slurmctld
+    - Slurm | Reiniciar slurmd
   register: _slurm_conf_copy
   when:
     - inventory_hostname not in groups.get('hpc_master', [])
@@ -322,6 +329,7 @@
     owner: root
     group: root
     mode: "0644"
+  notify: Slurm | Reiniciar slurmd
   register: _slurm_gres_conf_copy
   tags: [slurm, slurm_config]
 

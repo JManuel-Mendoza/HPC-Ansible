@@ -38,6 +38,7 @@
     owner: slurm
     group: slurm
     mode: "0600"
+  notify: SlurmDBD | Reiniciar slurmdbd
   register: _slurmdbd_conf
   tags: [slurm, slurmdbd]
 
@@ -48,13 +49,6 @@
     state: started
   tags: [slurm, slurmdbd]
 
-- name: Slurm | Restart slurmdbd if config changed (master)
-  ansible.builtin.systemd:
-    name: slurmdbd
-    state: restarted
-  when: _slurmdbd_conf.changed
-  tags: [slurm, slurmdbd]
-
 - name: Slurm | Enable and start slurmctld (master)
   ansible.builtin.systemd:
     name: slurmctld
@@ -62,12 +56,9 @@
     state: started
   tags: [slurm, slurmctld]
 
-- name: Slurm | Restart slurmctld if slurm.conf changed (master)
-  ansible.builtin.systemd:
-    name: slurmctld
-    state: restarted
-  when: slurm_conf_changed | default(false)
-  tags: [slurm, slurmctld]
+- name: Slurm | Aplicar reinicios pendientes antes de reconfigurar (master)
+  ansible.builtin.meta: flush_handlers
+  tags: [slurm]
 
 - name: Slurm | Reconfigurar controlador al finalizar configuracion (master)
   ansible.builtin.command: scontrol reconfigure

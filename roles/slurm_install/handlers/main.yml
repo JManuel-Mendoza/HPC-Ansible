@@ -6,4 +6,27 @@
 - name: SlurmDBD | Reiniciar slurmdbd
   ansible.builtin.service:
     name: slurmdbd
+    enabled: true
     state: restarted
+  when: inventory_hostname in groups.get('hpc_master', [])
+
+- name: Slurm | Reiniciar slurmctld
+  ansible.builtin.systemd:
+    name: slurmctld
+    enabled: true
+    state: restarted
+  when: inventory_hostname in groups.get('hpc_master', [])
+
+- name: Slurm | Reiniciar slurmd
+  ansible.builtin.systemd:
+    name: slurmd
+    enabled: true
+    state: restarted
+    no_block: true
+  when:
+    - inventory_hostname in groups.get('slurm_compute', [])
+    - ("slurmd.service" in (ansible_facts.services | default({}))) or ("slurmd" in (ansible_facts.services | default({})))
+
+- name: Slurm | Recargar systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
