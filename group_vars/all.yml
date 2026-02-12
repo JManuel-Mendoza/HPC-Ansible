@@ -7,6 +7,9 @@ common_packages:
   - tar
   - unzip
   - htop
+  - iftop
+  - nload
+  - bmon
   - btop
   - tmux
   - jq

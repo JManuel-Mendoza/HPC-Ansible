@@ -4,8 +4,6 @@
 
 - `site.yml`
   - Orquestacion completa del cluster por capas.
-- `base.yml`
-  - Pre-flight simple para baseline minimo de paquetes.
 
 ## Orden real de plays en site.yml
 

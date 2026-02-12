@@ -54,7 +54,7 @@ def classify_type(rel: str) -> str:
         if "/files/" in rel:
             return "file"
         return "role"
-    if rel in {"site.yml", "base.yml"}:
+    if rel in {"site.yml"}:
         return "playbook"
     if rel.endswith((".yml", ".yaml")) and "playbook" in rel.lower():
         return "playbook"
@@ -82,7 +82,7 @@ def risk_for(rel: str, typ: str) -> str:
         "roles/nfs_hpc", "roles/munge", "inventario.ini", "group_vars/hpc_master.yml"
     ]
     med_markers = [
-        "roles/slurm_", "roles/llm_env", "roles/mariadb_server", "site.yml", "base.yml",
+        "roles/slurm_", "roles/llm_env", "roles/mariadb_server", "site.yml",
         "group_vars/all.yml", "host_vars/"
     ]
     if any(m in rel for m in high_markers):
@@ -131,7 +131,7 @@ def parse_site_roles() -> list[str]:
 
 
 def referenced_by(rel: str, site_roles: list[str]) -> str:
-    if rel in {"site.yml", "base.yml"}:
+    if rel in {"site.yml"}:
         return "CLI/operator"
     if rel == "ansible.cfg":
         return "ansible-playbook (autoload)"
@@ -179,7 +179,7 @@ def notes_for(rel: str) -> str:
         return "No se observa consumo activo en tasks; existe template slurm.conf.j2 administrado"
     if rel.startswith("archivo_no_en_uso/"):
         return "Fuera del flujo activo; conservar solo para trazabilidad historica"
-    if rel in {"site.yml", "base.yml"}:
+    if rel in {"site.yml"}:
         return "Entrypoint de ejecucion"
     if rel == "inventario.ini":
         return "Contiene datos sensibles y credenciales en texto plano"
@@ -367,17 +367,6 @@ def parse_task_blocks(path: Path, kind: str, inherited_become: str, min_name_ind
 def build_task_matrix(site_roles: list[str]):
     rows = []
 
-    # base.yml direct tasks
-    base_tasks = parse_task_blocks(
-        ROOT / "base.yml",
-        kind="task",
-        inherited_become="inherited(true)",
-        min_name_indent=4,
-    )
-    for t in base_tasks:
-        t["entrypoint"] = "base.yml"
-        rows.append(t)
-
     # site.yml roles + handlers
     for role in site_roles:
         for task_file in collect_role_task_files(role):
@@ -419,22 +408,12 @@ def write_file_ledger(files, site_roles):
 
 def write_entrypoints(site_roles):
     site_list = TMP_DIR / "site.list-tasks.txt"
-    base_list = TMP_DIR / "base.list-tasks.txt"
-
     site_plays = []
     site_task_count = 0
     if site_list.exists():
         txt = read_text(site_list)
         site_plays = re.findall(r"^\s+play #\d+ .*", txt, flags=re.M)
         site_task_count = len(re.findall(r"^\s{6,}[^\s].*\tTAGS:", txt, flags=re.M))
-
-    base_status = "No ejecutado"
-    if base_list.exists():
-        base_txt = read_text(base_list)
-        if "Unexpected Exception" in base_txt or "ERROR!" in base_txt:
-            base_status = "Fallo en entorno de auditoria (permisos sandbox/plugin load)"
-        elif "playbook:" in base_txt:
-            base_status = "OK"
 
     out = []
     out.append("# Ansible Entrypoints")
@@ -443,7 +422,6 @@ def write_entrypoints(site_roles):
     out.append("")
     out.append("| Playbook | Proposito | Estado list-tasks |")
     out.append("|---|---|---|")
-    out.append("| `base.yml` | Pre-flight baseline simple de SO/paquetes | " + base_status + " |")
     out.append("| `site.yml` | Orquestacion completa del cluster HPC/Slurm/LLM | OK (plays: " + str(len(site_plays)) + ", tasks listadas: " + str(site_task_count) + ") |")
     out.append("")
     out.append("## Entry points legacy/no activos")
@@ -453,7 +431,7 @@ def write_entrypoints(site_roles):
     out.append("## Orden recomendado de ejecucion (operativo)")
     out.append("")
     out.append("1. `clean OS` (si aplica fuera de este repo)")
-    out.append("2. `base` -> `base.yml`")
+    out.append("2. `baseline` -> tags `common,ssh`")
     out.append("3. `red` -> tags `network,routing`")
     out.append("4. `firewall` -> tag `firewall`")
     out.append("5. `gpu` -> tag `cuda`")
@@ -526,10 +504,10 @@ def write_findings(rows):
         ("HIGH", "Reinicios directos fuera de handlers", "`roles/slurm_controller/tasks/main.yml` y `roles/slurm_compute/tasks/main.yml` reinician servicios por task directa.", "Mover reinicios a handlers cuando sea viable."),
         ("MEDIUM", "Uso extensivo de `shell`", "Multiples archivos (`network_internal`, `nvidia_cuda`, `slurm_validate`, `validate`, `cluster_routing`).", "Reducir shell a casos con pipes reales; preferir modulos/command."),
         ("MEDIUM", "`ignore_errors: true` en kernel headers", "`roles/nvidia_cuda/tasks/main.yml` usa best effort para headers.", "Sustituir por `failed_when` controlado y fallback documentado."),
-        ("MEDIUM", "`base.yml` usa modulos no FQCN", "`base.yml` usa `dnf` sin `ansible.builtin.*`.", "Estandarizar FQCN en playbook base."),
+        ("MEDIUM", "Entrypoint unico con alto acoplamiento por tags", "`site.yml` concentra baseline, red, firewall, GPU, NFS, Slurm, LLM y validacion.", "Mantener orden operativo por tags y ejecutar por lotes con `--limit`."),
         ("MEDIUM", "Archivo legado de slurm.conf potencialmente obsoleto", "`roles/slurm_install/files/slurm.conf` convive con `templates/slurm.conf.j2` sin referencia activa clara.", "Archivar o documentar explicitamente su estado."),
         ("MEDIUM", "Debug operativo persistente", "Tareas de `debug` en varios roles (ej. firewall/network/slurm_validate).", "Mantener solo debug util en validacion; retirar ruido en provisioning."),
-        ("MEDIUM", "List-task de `base.yml` falla en entorno auditado", "`ansible-playbook --list-tasks base.yml` retorna excepcion de permisos/plugin.", "Corregir entorno de control o pin de colecciones para auditorias CI."),
+        ("MEDIUM", "Dependencia de validacion del flujo completo para pre-flight", "El pre-flight ahora vive en `roles/common` dentro de `site.yml`.", "Estandarizar check rapido con `--tags common,ssh` antes del despliegue completo."),
         ("MEDIUM", "Limpieza agresiva de conexiones NM", "`roles/network_internal/tasks/main.yml` borra conexiones no permitidas por filtros regex/interfaz.", "Añadir modo dry-run y evidencia previa antes de aplicar."),
         ("MEDIUM", "Dependencia de nombres de grupos inventario en firewall", "`roles/firewall/tasks/main.yml` usa combinacion `workers_r` + `workers`.", "Unificar criterio de grupos para evitar reglas duplicadas."),
         ("MEDIUM", "Riesgo de drift por tasks con `changed_when: true`", "Varias tasks marcan cambio forzado (reboot markers / update-grub / dracut).", "Documentar claramente cuando el cambio forzado es deseado."),
@@ -564,7 +542,7 @@ def write_findings(rows):
     out.append("## Metodologia")
     out.append("")
     out.append("- Analisis estatico de YAML y estructura de roles/playbooks.")
-    out.append("- Cruce con `site.yml --list-tasks` (base.yml con fallo de entorno auditado).")
+    out.append("- Cruce con `site.yml --list-tasks`.")
     out.append("- No se realizaron cambios de logica ni ejecuciones sobre infraestructura.")
 
     (AUDIT_DIR / "findings.md").write_text("\n".join(out) + "\n", encoding="utf-8")

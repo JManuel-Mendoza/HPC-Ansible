@@ -93,7 +93,6 @@ Auditoria archivo-por-archivo del repositorio (sin cambios de logica).
 | `archivo_no_en_uso/playbooks/storage_survey.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
 | `archivo_no_en_uso/slurm-test.sh` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
 | `archivo_no_en_uso/slurm-tests/slurm-tests.zip` | artifact | No referenciado por entrypoints activos | DELETE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `base.yml` | playbook | CLI/operator | KEEP | MEDIUM | Entrypoint de ejecucion |
 | `docs/00-indice.md` | doc | README.md / navegacion documental | KEEP | LOW |  |
 | `docs/01-guia-rapida-no-especialistas.md` | doc | README.md / navegacion documental | KEEP | LOW |  |
 | `docs/02-arquitectura-ejecucion.md` | doc | README.md / navegacion documental | KEEP | LOW |  |

@@ -6,9 +6,6 @@ Matriz task-por-task obtenida por combinacion de:
 
 | Entrypoint | Archivo | Linea | Tipo | Task | Modulo | Tags | When | Notify | Become | Variables usadas (aprox) | Recomendacion | Riesgo | Justificacion |
 |---|---:|---:|---|---|---|---|---|---|---|---|---|---|---|
-| `base.yml` | `base.yml` | 5 | task | Habilitar el repositorio EPEL | `dnf` |  |  |  | inherited(true) |  | KEEP | LOW | Sin riesgo evidente de refactor inmediato |
-| `base.yml` | `base.yml` | 10 | task | Actualizar todos los paquetes | `dnf` |  |  |  | inherited(true) |  | KEEP | LOW | Sin riesgo evidente de refactor inmediato |
-| `base.yml` | `base.yml` | 15 | task | Instalar herramientas de monitoreo base | `dnf` |  |  |  | inherited(true) |  | KEEP | LOW | Sin riesgo evidente de refactor inmediato |
 | `site.yml` | `roles/common/tasks/main.yml` | 2 | task | Actualizar caché de paquetes | `ansible.builtin.dnf` |  |  |  | inherited(true) |  | KEEP | LOW | Sin riesgo evidente de refactor inmediato |
 | `site.yml` | `roles/common/tasks/main.yml` | 6 | task | Instalar paquetes base | `ansible.builtin.dnf` |  |  |  | inherited(true) | common_packages | KEEP | LOW | Sin riesgo evidente de refactor inmediato |
 | `site.yml` | `roles/common/tasks/main.yml` | 11 | task | Instalar chrony si aplica | `ansible.builtin.dnf` |  | enable_chrony \| bool |  | inherited(true) |  | KEEP | LOW | Sin riesgo evidente de refactor inmediato |

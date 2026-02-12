@@ -4,8 +4,7 @@
 
 | Playbook | Proposito | Estado list-tasks |
 |---|---|---|
-| `base.yml` | Pre-flight baseline simple de SO/paquetes | Fallo en entorno de auditoria (permisos sandbox/plugin load) |
-| `site.yml` | Orquestacion completa del cluster HPC/Slurm/LLM | OK (plays: 10, tasks listadas: 353) |
+| `site.yml` | Orquestacion completa del cluster HPC/Slurm/LLM | OK (plays: 10, tasks listadas: 354) |
 
 ## Entry points legacy/no activos
 
@@ -14,7 +13,7 @@
 ## Orden recomendado de ejecucion (operativo)
 
 1. `clean OS` (si aplica fuera de este repo)
-2. `base` -> `base.yml`
+2. `baseline` -> tags `common,ssh`
 3. `red` -> tags `network,routing`
 4. `firewall` -> tag `firewall`
 5. `gpu` -> tag `cuda`

@@ -5,7 +5,6 @@ Esta referencia cubre todos los archivos de codigo activo del proyecto, excluyen
 ## Raiz
 
 - `site.yml`: playbook principal de orquestacion por capas.
-- `base.yml`: pre-flight baseline simple.
 - `ansible.cfg`: defaults de ejecucion (inventario, callbacks, become).
 - `inventario.ini`: grupos/hosts y vars globales de conexion.
 - `requirements.yml`: colecciones Ansible requeridas.

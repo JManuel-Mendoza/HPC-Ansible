@@ -13,7 +13,7 @@ Por defecto, el agente debe operar en modo **auditoría/verificación**:
 - **No hagas commits** salvo instrucción explícita del usuario.
 
 ## 1) Estructura del proyecto y organización
-- `site.yml` es el playbook principal (baseline, validación); `base.yml` es un pre-flight ligero.
+- `site.yml` es el playbook principal (baseline, validación).
 - `roles/` contiene roles en capas (`common`, `users_ssh`, `firewall`, `nvidia_cuda`, `llm_env`, `llm_project`, `validate`, etc.), cada uno con estructura estándar (`tasks/`, `defaults/`, `vars/`, `handlers/`, `templates/`, `files/` según aplique).
 - Variables:
 - `group_vars/all.yml` y `group_vars/hpc_master.yml` concentran defaults por alcance.

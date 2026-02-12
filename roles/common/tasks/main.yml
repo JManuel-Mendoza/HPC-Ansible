@@ -1,4 +1,9 @@
 ---
+- name: Habilitar el repositorio EPEL
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
 - name: Actualizar caché de paquetes
   ansible.builtin.dnf:
     update_cache: true

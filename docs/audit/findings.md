@@ -28,18 +28,18 @@ Top 20 hallazgos accionables identificados en auditoria estatica.
 8. [MEDIUM] `ignore_errors: true` en kernel headers
    Evidencia: `roles/nvidia_cuda/tasks/main.yml` usa best effort para headers.
    Accion: Sustituir por `failed_when` controlado y fallback documentado.
-9. [MEDIUM] `base.yml` usa modulos no FQCN
-   Evidencia: `base.yml` usa `dnf` sin `ansible.builtin.*`.
-   Accion: Estandarizar FQCN en playbook base.
+9. [MEDIUM] Entrypoint unico con alto acoplamiento por tags
+   Evidencia: `site.yml` concentra baseline, red, firewall, GPU, NFS, Slurm, LLM y validacion.
+   Accion: Mantener orden operativo por tags y ejecutar por lotes con `--limit`.
 10. [MEDIUM] Archivo legado de slurm.conf potencialmente obsoleto
    Evidencia: `roles/slurm_install/files/slurm.conf` convive con `templates/slurm.conf.j2` sin referencia activa clara.
    Accion: Archivar o documentar explicitamente su estado.
 11. [MEDIUM] Debug operativo persistente
    Evidencia: Tareas de `debug` en varios roles (ej. firewall/network/slurm_validate).
    Accion: Mantener solo debug util en validacion; retirar ruido en provisioning.
-12. [MEDIUM] List-task de `base.yml` falla en entorno auditado
-   Evidencia: `ansible-playbook --list-tasks base.yml` retorna excepcion de permisos/plugin.
-   Accion: Corregir entorno de control o pin de colecciones para auditorias CI.
+12. [MEDIUM] Dependencia de validacion del flujo completo para pre-flight
+   Evidencia: El pre-flight ahora vive en `roles/common` dentro de `site.yml`.
+   Accion: Estandarizar check rapido con `--tags common,ssh` antes del despliegue completo.
 13. [MEDIUM] Limpieza agresiva de conexiones NM
    Evidencia: `roles/network_internal/tasks/main.yml` borra conexiones no permitidas por filtros regex/interfaz.
    Accion: Añadir modo dry-run y evidencia previa antes de aplicar.
@@ -79,5 +79,5 @@ Top 20 hallazgos accionables identificados en auditoria estatica.
 ## Metodologia
 
 - Analisis estatico de YAML y estructura de roles/playbooks.
-- Cruce con `site.yml --list-tasks` (base.yml con fallo de entorno auditado).
+- Cruce con `site.yml --list-tasks`.
 - No se realizaron cambios de logica ni ejecuciones sobre infraestructura.
