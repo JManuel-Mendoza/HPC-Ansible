@@ -6,6 +6,10 @@
 |---|---|---|
 | `site.yml` | Orquestacion completa del cluster HPC/Slurm/LLM | OK (plays: 10, tasks listadas: 354) |
 
+Documentos relacionados:
+- Plan de cambios por paquetes: `docs/audit/plan.md`
+- Gestión de secretos: `docs/vault.md`
+
 ## Entry points legacy/no activos
 
 - `archivo_no_en_uso/playbooks/*.yml` y `archivo_no_en_uso/playbooks sueltos/**/*.yml`: historicos, no parte del flujo activo actual.
@@ -13,14 +17,33 @@
 ## Orden recomendado de ejecucion (operativo)
 
 1. `clean OS` (si aplica fuera de este repo)
-2. `baseline` -> tags `common,ssh`
-3. `red` -> tags `network,routing`
-4. `firewall` -> tag `firewall`
-5. `gpu` -> tag `cuda`
-6. `nfs` -> tag `nfs`
-7. `slurm` -> tags `slurm,munge,identities,slurm_install,slurm_config`
-8. `llm` -> tag `llm`
-9. `validate` -> tags `validate,slurm_validate`
+2. `bootstrap/base` -> tags `common,ssh`
+3. `network` -> tag `network`
+4. `routing` -> tag `routing`
+5. `firewall` -> tag `firewall`
+6. `cuda` -> tag `cuda`
+7. `nfs` -> tag `nfs`
+8. `slurm` -> tags `slurm,slurm_install,slurm_config,munge,identities,slurmdb`
+9. `llm` -> tag `llm`
+10. `validate` -> tags `validate,slurm_validate`
+
+## Advertencias (HIGH-RISK)
+
+Zonas de alto riesgo: ejecutar siempre con `--limit` (un nodo primero) y ventana de mantenimiento si aplica.
+
+- Red interna y ruteo: `roles/network_internal/*`, `roles/cluster_routing/*`
+- SSH y acceso: `roles/users_ssh/*`
+- Firewall: `roles/firewall/*`
+- Kernel/driver GPU: `roles/nvidia_cuda/*` (incluye reinicios/cambios de kernel)
+- NFS: `roles/nfs_hpc/*`
+- SlurmDB/MariaDB: `roles/mariadb_server/*`, `roles/slurm_db_prep/*`, `group_vars/hpc_master.yml`
+- Slurm control/compute: `roles/slurm_install/*`, `roles/slurm_controller/*`, `roles/slurm_compute/*`
+- Munge: `roles/munge/*`
+
+## Nota sobre warnings del entorno de auditoria
+
+En algunos entornos (sandbox) pueden aparecer warnings de carga de plugins (`Errno 13 Permission denied`).
+Estos warnings no invalidan `--syntax-check` ni el parseo de `--list-tasks` para fines de auditoria.
 
 ## Roles cargados por `site.yml`
 

@@ -43,6 +43,17 @@ Este indice organiza la documentacion para tres perfiles:
 - `docs/09-glosario.md`
   - Definiciones de terminos tecnicos usados en este repositorio.
 
+## Auditoria y operacion (entrypoint)
+
+- `docs/audit/ansible-entrypoints.md`
+  - Entrypoint unico (`site.yml`), orden recomendado por tags y advertencias HIGH-RISK.
+
+- `docs/audit/plan.md`
+  - Plan de cambios por paquetes (auditoria) y backlog priorizado.
+
+- `docs/vault.md`
+  - Como crear/editar Vault y ejecutar playbooks con `--ask-vault-pass` o `--vault-password-file`.
+
 ## Cobertura
 
 Cobertura incluida:

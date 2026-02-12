@@ -2,6 +2,9 @@
 
 Este repositorio automatiza la instalacion, configuracion y validacion de un cluster HPC con nodo `master` y nodos `workers`.
 
+Entrypoint unico:
+- `site.yml`
+
 Objetivo operativo:
 - Infraestructura declarativa (sin hotfixes manuales).
 - Cambios repetibles e idempotentes.
@@ -14,6 +17,36 @@ Alcance tecnico:
 - Driver NVIDIA/CUDA y entorno LLM con micromamba.
 - Slurm completo (identidades, munge, build, install, controller, compute).
 - Validaciones generales y smoke tests CPU/GPU.
+
+## Requisitos minimos (nodo de control)
+
+- Ansible instalado.
+- Colecciones instaladas: ver `requirements.yml`.
+- Acceso SSH a los nodos (idealmente con llave).
+- Vault configurado (ver `docs/vault.md`).
+
+## Configurar inventario (inventario.ini)
+
+- Edita `inventario.ini` para reflejar tus IPs/usuarios y grupos (`hpc_master`, `workers_*`, `slurm_*`).
+- Recomendado: ejecutar con `--limit` al inicio (un worker primero).
+
+## Vault (secretos)
+
+Este repo usa Ansible Vault.
+
+- Guía: `docs/vault.md`
+- Validación rápida:
+
+```bash
+ansible-inventory -i inventario.ini --graph --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
+```
+
+Alternativa reproducible sin prompt (archivo local fuera del repo):
+
+```bash
+ANSIBLE_VAULT_PASSWORD_FILE=~/.config/hpc-ansible/vault-pass.txt ansible-playbook -i inventario.ini site.yml --syntax-check
+```
 
 ## Documentacion completa
 
@@ -29,6 +62,8 @@ Toda la documentacion detallada esta en `docs/`.
 - `docs/07-runbooks-operativos.md`: runbooks de despliegue y operacion segura.
 - `docs/08-validacion-y-evidencia.md`: validacion, evidencia y criterios de salud.
 - `docs/09-glosario.md`: terminos HPC/Slurm explicados en lenguaje simple.
+- `docs/audit/ansible-entrypoints.md`: entrypoint, orden recomendado y advertencias de riesgo.
+- `docs/audit/plan.md`: plan de cambios por paquetes (auditoría).
 
 ## Inicio rapido
 
@@ -38,31 +73,66 @@ Instalar colecciones:
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Verificar inventario y sintaxis:
+Quickstart (sin tocar nodos, solo validaciones locales):
 
 ```bash
-ansible-inventory -i inventario.ini --graph
-ansible-playbook -i inventario.ini site.yml --syntax-check
+ansible-inventory -i inventario.ini --graph --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --list-tasks --ask-vault-pass
 ```
 
 Dry-run sobre un solo nodo:
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1
+ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1 --ask-vault-pass
 ```
 
-Ejecucion completa:
+Ejecucion completa (recomendado por etapas):
 
 ```bash
-ansible-playbook -i inventario.ini site.yml
+ansible-playbook -i inventario.ini site.yml --ask-vault-pass
 ```
 
-## Seguridad
+## Ejemplos por etapas (tags) y limites
 
-Este repositorio contiene valores sensibles en texto plano (por ejemplo, password de `become` en `inventario.ini` y password de SlurmDB en `group_vars/hpc_master.yml`).
+Baseline (paquetes base, EPEL, SSH):
 
-Recomendacion:
-- mover secretos a Ansible Vault antes de usar el repositorio fuera de un entorno controlado.
+```bash
+ansible-playbook -i inventario.ini site.yml --tags common,ssh --limit worker1 --ask-vault-pass
+```
+
+Red y ruteo (alto riesgo):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --tags network,routing --limit worker1 --ask-vault-pass
+```
+
+GPU/CUDA (alto riesgo, puede requerir reinicio):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --tags cuda --limit worker1 --ask-vault-pass
+```
+
+Slurm (master primero, luego compute):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --tags slurm,munge,identities,slurm_install,slurm_config,slurmdb --limit hpc_master --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit slurm_compute --ask-vault-pass
+```
+
+Validación:
+
+```bash
+ansible-playbook -i inventario.ini site.yml --tags validate,slurm_validate --limit hpc_master --ask-vault-pass
+```
+
+## Flujo recomendado (instalacion limpia -> HPC listo -> Slurm -> LLM)
+
+1. Instalación limpia del SO (fuera de este repo).
+2. Baseline HPC: `--tags common,ssh` (y luego `firewall/network/routing/nfs/cuda` según aplique).
+3. Slurm: DB (master) -> identidades + munge -> install/controller/compute.
+4. LLM: `--tags llm`.
+5. Validación: `--tags validate,slurm_validate`.
 
 ## Nota de alcance documental
 

@@ -1,5 +1,5 @@
 ---
-- name: Baseline para todos los nodos (SO + SSH + Firewall + GPU/CUDA + Entorno LLM)
+- name: Etapa 1 | Baseline HPC (common + ssh + red + firewall + cuda + nfs + llm)
   hosts: all
   become: true
   gather_facts: true
@@ -14,58 +14,59 @@
     - { role: llm_env, tags: ["llm"] }
 
 
-- name: MariaDB en master
+- name: Etapa 2 | MariaDB en master
   hosts: hpc_master
   become: true
   gather_facts: true
   roles:
     - { role: mariadb_server, tags: ["mariadb"] }
 
-- name: Preparar SlurmDB en MariaDB (master)
+- name: Etapa 3 | Preparar SlurmDB en MariaDB (master)
   hosts: hpc_master
   become: true
   gather_facts: true
   roles:
     - { role: slurm_db_prep, tags: ["mariadb", "slurmdb"] }
 
-- name: Validación de salud del clúster
+- name: Etapa 4 | Validación general de salud del clúster
   hosts: all
   become: true
   gather_facts: true
   roles:
     - { role: validate, tags: ["validate"] }
 
-- name: Configuración de identidades SLURM
+- name: Etapa 5 | Configuración de identidades SLURM
   hosts: all
   become: true
   roles:
     - role: slurm_identities
       tags: [slurm, munge, identities]
 
-- name: Configuración de munge en nodos SLURM
+- name: Etapa 6 | Configuración de Munge en nodos SLURM
   hosts: all
   become: true
   roles:
     - role: munge
       tags: [munge]
 
-- name: Recopilación de hechos SLURM en todos los nodos
+- name: Etapa 7 | Recopilación de hechos SLURM en todos los nodos
   hosts: all
   become: true
   roles:
     - role: slurm_facts
       tags: [slurm, slurm_facts, slurm_config]
 
-- name: Configuración de SLURM en nodo master
+- name: Etapa 8 | Configuración de SLURM en nodo master
   hosts: hpc_master
   become: true
   roles:
     - role: slurm_rpm_build
+      tags: [slurm, slurm_rpm_build]
     - role: slurm_install
       tags: [slurm, slurm_install]
     - { role: slurm_controller, tags: ["slurm", "slurm_config"] }
 
-- name: Configuración de SLURM en nodos workers
+- name: Etapa 9 | Configuración de SLURM en nodos workers
   hosts: slurm_compute
   become: true
   roles:
@@ -74,7 +75,7 @@
     - role: slurm_compute
       tags: [slurm, slurm_config]
 
-- name: Validacion Slurm (sin cambios de configuracion)
+- name: Etapa 10 | Validación Slurm (sin cambios de configuración)
   hosts: hpc_master
   become: true
   roles:
