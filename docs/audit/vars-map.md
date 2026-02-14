@@ -54,6 +54,8 @@ Tabla: variable | definida en | usada en (aprox) | categoría | notas
 | `llm_conda_packages` | `group_vars/all.yml` (override) | `roles/llm_env/tasks/main.yml` | llm | Paquetes micromamba/conda a instalar. |
 | `llm_pip_packages` | `group_vars/all.yml` | `roles/llm_env/tasks/main.yml` | llm | Si incluye `torch`, el rol advierte sobre override del torch conda. |
 | `llm_python_packages` | `group_vars/all.yml` | (referencia documental/uso futuro) | llm | Lista base para scripts/validación. |
+| `llm_micromamba_root` | `roles/llm_env/defaults/main.yml` | `roles/llm_env/tasks/main.yml` | llm | Ruta base de micromamba (antes había literales `/opt/micromamba` en tasks). |
+| `llm_micromamba_bin` | `roles/llm_env/defaults/main.yml` | `roles/llm_env/tasks/main.yml` | llm | Binario micromamba (deriva de `llm_micromamba_root`). |
 | `slurm_firewalld_zone` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Zona donde se aplican rich rules. |
 | `slurm_internal_cidr` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml`, `roles/nfs_hpc/defaults/main.yml` | firewall/network/nfs | CIDR de confianza para Slurm y clientes NFS. |
 | `slurmctld_port` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Puerto TCP del controller. |
@@ -76,21 +78,39 @@ Tabla: variable | definida en | usada en (aprox) | categoría | notas
 | `slurm_validate_torch` | `group_vars/all/vars.yml` (override) | `roles/slurm_validate/tasks/main.yml` | validate/llm | Controla prelude/exec para validar torch dentro de Slurm. Default también existe en `roles/slurm_validate/defaults/main.yml`. |
 | `hpc_internal_supernet` | `group_vars/all/vars.yml` | `roles/cluster_routing/tasks/main.yml` | routing/network | Superred usada para políticas/rutas. |
 | `hpc_internal_subnets` | `group_vars/all/vars.yml` | `roles/cluster_routing/tasks/main.yml` | routing/network | Lista de subredes internas permitidas/esperadas. |
+| `network_internal_keep_if` | `group_vars/all/vars.yml` | `roles/network_internal/tasks/main.yml` | network | Interfaz “principal” que no se debe tocar al limpiar conexiones NM. |
+| `network_internal_exclude_ifaces` | `group_vars/all/vars.yml` | `roles/network_internal/tasks/main.yml` | network | Interfaces a excluir (p. ej. tailscale). |
+| `network_internal_exclude_conn_regex` | `group_vars/all/vars.yml` | `roles/network_internal/tasks/main.yml` | network | Regex de nombres de conexión a excluir. |
+| `network_internal_links` | `group_vars/all/vars.yml` | `roles/network_internal/tasks/main.yml`, `roles/network_internal/tasks/master_link.yml` | network | Mapa worker->(NIC/IP) master y worker para enlaces punto-a-punto. |
 | `hpc_router_internal_ifaces` | `group_vars/hpc_master.yml` | `roles/cluster_routing/tasks/main.yml` | routing/network | Interfaces del master que enrutan entre subredes. |
 | `slurmdb_mysql_password` | `group_vars/hpc_master.yml` (vault-backed) | `roles/slurm_db_prep/*`, `roles/slurm_controller/*` | slurmdb | Referencia a `vault_slurmdb_mysql_password`. No está en claro. |
 
-## Hardcodes detectados (pendientes de parametrización)
+## Hardcodes resueltos en P11b
+
+IPs/NICs que antes estaban embebidos en defaults del rol y ahora son configurables:
+- `roles/network_internal/defaults/main.yml`
+  - Antes: incluía `eno1`, `enp3s0f*` y `192.168.34.*` como defaults del rol.
+  - Ahora: defaults quedan vacíos y el mapa se define en `group_vars/all/vars.yml` (`network_internal_*`).
+
+Rutas hardcodeadas que ahora consumen variables existentes:
+- `roles/slurm_controller/tasks/main.yml`, `roles/slurm_install/tasks/slurmdbd_hygiene.yml`
+  - Antes: `/etc/slurm/slurmdbd.conf`
+  - Ahora: `{{ slurm_etc_dir }}/slurmdbd.conf`
+- `roles/llm_env/tasks/main.yml`
+  - Antes: literales `/opt/micromamba` (path/creates/MAMBA_ROOT_PREFIX)
+  - Ahora: `{{ llm_micromamba_root }}` (y `{{ llm_micromamba_bin }}` ya se usaba en comandos)
+
+## Hardcodes restantes (a revisar)
 
 Estas ocurrencias son evidencia de valores embebidos en defaults/archivos. En P11a se documentan; no se refactorizan para no tocar roles.
 
 IPs hardcodeadas:
 - `inventario.ini`: `master ansible_host=10.195.34.17` y workers `192.168.34.*`
-- `group_vars/all/vars.yml`: `slurm_internal_cidr`, `hpc_internal_supernet`, `hpc_internal_subnets`
-- `roles/network_internal/defaults/main.yml`: `master_ip`/`worker_ip` por enlace (`192.168.34.x/28`)
+- `group_vars/all/vars.yml`: valores de topología del laboratorio (p. ej. `slurm_internal_cidr`, `hpc_internal_supernet`, `hpc_internal_subnets`, `network_internal_links`) que deben editarse al replicar.
 
 Interfaces hardcodeadas:
 - `group_vars/hpc_master.yml`: `hpc_router_internal_ifaces: [enp3s0f*]`
-- `roles/network_internal/defaults/main.yml`: `network_internal_keep_if: eno1` y mapa de `master_if`/`worker_if` (`enp3s0f*`)
+- `group_vars/all/vars.yml`: `network_internal_keep_if` y `network_internal_links` contienen NICs reales del laboratorio (deben editarse al replicar).
 
 Paths `/srv/nfs`, `/data`, `/scratch`:
 - Búsqueda rápida no encontró ocurrencias con ese patrón; los paths reales (si existen) deben confirmarse mirando defaults/templates del rol correspondiente.
@@ -100,5 +120,4 @@ Paths `/srv/nfs`, `/data`, `/scratch`:
 Cambios de red/ruteo/firewall son HIGH-RISK. Para replicar en otro sitio, normalmente se requiere adaptar como mínimo:
 - `inventario.ini` (IPs y grupos)
 - `group_vars/all/vars.yml` (CIDRs/subredes/puertos/particiones)
-- `group_vars/hpc_master.yml` + `roles/network_internal/defaults/main.yml` (interfaces y esquema de enlaces)
-
+- `group_vars/hpc_master.yml` + `group_vars/all/vars.yml` (interfaces y esquema de enlaces internos)

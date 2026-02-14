@@ -70,7 +70,7 @@ Edicion recomendada (en este orden):
 - `roles/firewall/tasks/main.yml`: firewalld + reglas Slurm.
 
 ### network_internal
-- `roles/network_internal/defaults/main.yml`: mapa de enlaces internos por host.
+- `roles/network_internal/defaults/main.yml`: defaults vacíos (P11b). La topología (NICs/IPs) vive en `group_vars/all/vars.yml` (`network_internal_*`).
 - `roles/network_internal/tasks/main.yml`: lifecycle de conexiones NM y `/etc/hosts`.
 - `roles/network_internal/tasks/master_link.yml`: subflujo de enlace master-<worker>.
 

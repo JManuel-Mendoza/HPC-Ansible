@@ -20,7 +20,7 @@
 
 - name: SlurmDBD | Asegurar PidFile en slurmdbd.conf
   ansible.builtin.lineinfile:
-    path: /etc/slurm/slurmdbd.conf
+    path: "{{ slurm_etc_dir }}/slurmdbd.conf"
     regexp: '^PidFile='
     line: 'PidFile=/run/slurm/slurmdbd.pid'
     insertafter: EOF
@@ -30,7 +30,7 @@
 
 - name: SlurmDBD | Asegurar SlurmUser en slurmdbd.conf
   ansible.builtin.lineinfile:
-    path: /etc/slurm/slurmdbd.conf
+    path: "{{ slurm_etc_dir }}/slurmdbd.conf"
     regexp: '^SlurmUser='
     line: 'SlurmUser=slurm'
     insertafter: EOF

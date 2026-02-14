@@ -63,8 +63,9 @@
     - inventory_hostname in groups.get('workers_r', [])
   tags: [validate, validate_slurm]
 
-# Clave: NO usar 192.168.34.1. Usar el host de control configurado en slurm.conf:
-# SlurmctldHost={{ slurm_control_machine }} (en tu all.yml es "master")
+# Clave: NO fijar IPs del enlace interno en el check.
+# Usar el host de control configurado en slurm.conf:
+# SlurmctldHost={{ slurm_control_machine }} (nombre de inventario del controller)
 - name: Validate | Workers can reach slurmctld on TCP/6817 (using slurm_control_machine hostname)
   ansible.builtin.wait_for:
     host: "{{ slurm_control_machine }}"
@@ -76,7 +77,7 @@
     - inventory_hostname in groups.get('workers_r', [])
   tags: [validate, validate_slurm]
 
-# Desde el master hacia cada worker real (workers_r), usando su ansible_host (192.168.34.2, 192.168.34.18, etc.)
+# Desde el master hacia cada worker real (workers_r), usando su `ansible_host` en inventario.
 - name: Validate | Master can reach slurmd on workers_r (TCP/6818)
   ansible.builtin.wait_for:
     host: "{{ hostvars[item].ansible_host | default(item) }}"

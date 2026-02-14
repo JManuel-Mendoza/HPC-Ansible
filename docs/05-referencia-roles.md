@@ -39,6 +39,7 @@ Este documento cubre todos los roles activos bajo `roles/`.
   - `roles/network_internal/tasks/main.yml`
   - `roles/network_internal/tasks/master_link.yml`
 - Entradas: `network_internal_keep_if`, `network_internal_links`, exclusiones.
+- Nota (P11b): los valores lab-specific (NICs/IPs) se definen en `group_vars/all/vars.yml` para facilitar replicación; el defaults del rol queda intencionalmente vacío.
 - Salidas:
   - conexiones `int-*` creadas/ajustadas,
   - conexiones no permitidas eliminadas,
@@ -251,4 +252,3 @@ Este documento cubre todos los roles activos bajo `roles/`.
   - ejecucion de `srun` CPU/GPU,
   - smoke `sbatch` CPU/GPU con verificacion `sacct` `COMPLETED|0:0`,
   - logs stdout/stderr recuperados para evidencia.
-

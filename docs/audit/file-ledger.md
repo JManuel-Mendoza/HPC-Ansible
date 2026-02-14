@@ -52,7 +52,8 @@ Auditoria archivo-por-archivo del repositorio (sin cambios de logica).
 | `docs/audit/findings.md` | doc | README.md / navegacion documental | KEEP | LOW |  |
 | `docs/audit/task-matrix.md` | doc | README.md / navegacion documental | KEEP | LOW |  |
 | `group_vars/all.yml` | file | Ansible inventory vars autoload | KEEP | MEDIUM |  |
-| `group_vars/hpc_master.yml` | file | Ansible inventory vars autoload | KEEP | HIGH | Contiene password de SlurmDB en texto plano |
+| `group_vars/all/vars.yml` | file | Ansible inventory vars autoload | KEEP | MEDIUM | Variables operacionales (topologia/red/firewall/slurm) para replicación |
+| `group_vars/hpc_master.yml` | file | Ansible inventory vars autoload | KEEP | HIGH | Variables del master (router/NFS/MariaDB). Passwords deben venir de Vault (vault-backed). |
 | `host_vars/master.yml` | file | Ansible inventory vars autoload | KEEP | MEDIUM |  |
 | `host_vars/worker1.yml` | file | Ansible inventory vars autoload | KEEP | MEDIUM |  |
 | `host_vars/worker2.yml` | file | Ansible inventory vars autoload | KEEP | MEDIUM |  |

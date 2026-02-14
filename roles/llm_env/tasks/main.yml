@@ -41,7 +41,7 @@
 
 - name: LLM Env | Create micromamba install dir
   ansible.builtin.file:
-    path: /opt/micromamba
+    path: "{{ llm_micromamba_root }}"
     state: directory
     owner: root
     group: root
@@ -85,9 +85,9 @@
     {% for c in llm_conda_channels %} -c {{ c }}{% endfor %}
     {% for p in llm_conda_packages %} {{ p }}{% endfor %}
   args:
-    creates: "/opt/micromamba/envs/{{ llm_env_name }}/conda-meta/history"
+    creates: "{{ llm_micromamba_root }}/envs/{{ llm_env_name }}/conda-meta/history"
   environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+    MAMBA_ROOT_PREFIX: "{{ llm_micromamba_root }}"
   when: not _env_stat.stat.exists
   register: _mamba_create
   changed_when: true
@@ -116,7 +116,7 @@
     {% for c in llm_conda_channels %} -c {{ c }}{% endfor %}
     {% for p in llm_conda_packages %} {{ p }}{% endfor %}
   environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+    MAMBA_ROOT_PREFIX: "{{ llm_micromamba_root }}"
   when: _env_stat.stat.exists
   register: conda_install
   changed_when: "'All requested packages already installed' not in conda_install.stdout"
@@ -127,7 +127,7 @@
     -c pytorch -c nvidia -c conda-forge
     python={{ llm_pytorch_python_version }} pytorch torchvision torchaudio pytorch-cuda=12.4
   environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+    MAMBA_ROOT_PREFIX: "{{ llm_micromamba_root }}"
   register: _pytorch_cuda_install
   changed_when: "'All requested packages already installed' not in _pytorch_cuda_install.stdout"
   when: _llm_env_exists | bool
@@ -154,7 +154,7 @@
     {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
     pip install -U {% for p in llm_pip_packages %} {{ p }}{% endfor %}
   environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+    MAMBA_ROOT_PREFIX: "{{ llm_micromamba_root }}"
   when: llm_pip_packages | length > 0 and not _pip_marker.stat.exists
   register: _pip_install
   changed_when: true
@@ -173,7 +173,7 @@
     installer = (dist.read_text('INSTALLER') or '').strip(); 
     print(installer if installer else 'unknown')\""
   environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+    MAMBA_ROOT_PREFIX: "{{ llm_micromamba_root }}"
   register: _torch_installer
   changed_when: false
   when: _llm_env_exists | bool
@@ -207,7 +207,7 @@
     {{ llm_micromamba_bin }} run -n {{ llm_env_name }}
     python -c "import torch; print(torch.__version__); print(torch.version.cuda); print(torch.backends.cuda.is_built()); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'no-gpu')"
   environment:
-    MAMBA_ROOT_PREFIX: "/opt/micromamba"
+    MAMBA_ROOT_PREFIX: "{{ llm_micromamba_root }}"
   register: _torch_cuda_check
   changed_when: false
   when: _llm_env_exists | bool

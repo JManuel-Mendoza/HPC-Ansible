@@ -1,27 +1,13 @@
 ---
-network_internal_keep_if: "eno1"
-network_internal_exclude_ifaces:
-  - "tailscale0"
-network_internal_exclude_conn_regex: ".*tailscale.*"
+# Defaults intencionalmente vacíos (P11b).
+#
+# Este rol necesita variables lab-specific (NICs/IPs por enlace). Para evitar hardcodes
+# dentro del rol y facilitar replicación, define estas variables en:
+# - group_vars/all/vars.yml
+#
+# Variables esperadas (ver `group_vars/all/vars.yml`):
+# - network_internal_keep_if
+# - network_internal_exclude_ifaces
+# - network_internal_exclude_conn_regex
+# - network_internal_links
 
-network_internal_links:
-  worker1:
-    master_if: "enp3s0f1"
-    master_ip: "192.168.34.1/28"
-    worker_if: "enp3s0f1"
-    worker_ip: "192.168.34.2/28"
-  worker2:
-    master_if: "enp3s0f2"
-    master_ip: "192.168.34.17/28"
-    worker_if: "enp3s0f2"
-    worker_ip: "192.168.34.18/28"
-  worker3:
-    master_if: "enp3s0f3"
-    master_ip: "192.168.34.33/28"
-    worker_if: "enp3s0f3"
-    worker_ip: "192.168.34.34/28"
-  worker4:
-    master_if: "enp3s0f0"
-    master_ip: "192.168.34.49/28"
-    worker_if: "enp3s0f0"
-    worker_ip: "192.168.34.50/28"
