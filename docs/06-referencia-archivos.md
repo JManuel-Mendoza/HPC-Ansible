@@ -28,8 +28,7 @@ Nota:
 
 ## Variables
 
-- `group_vars/all.yml`: defaults globales de baseline (paquetes, chrony, SSH, LLM).
-- `group_vars/all/vars.yml`: variables operacionales para replicabilidad (Slurm, red interna, firewall).
+- `group_vars/all/vars.yml`: defaults globales (baseline + variables operacionales: Slurm, red interna, firewall).
 - `group_vars/all/vault.yml`: secretos cifrados con Ansible Vault (no editar sin `ansible-vault`).
 - `group_vars/hpc_master.yml`: ajustes especificos del master (router, NFS server, MariaDB/SlurmDBD).
 - `host_vars/master.yml`: ejemplos de override de recursos Slurm.
@@ -50,10 +49,7 @@ Edicion recomendada (en este orden):
 3. `group_vars/hpc_master.yml`
 - Interfaces del master que enruta (`hpc_router_internal_ifaces`) y servicios del master (NFS/MariaDB/SlurmDBD).
 
-4. `group_vars/all.yml`
-- Paquetes base, SSH y entorno LLM (micromamba) segun el perfil de tu laboratorio.
-
-5. `group_vars/all/vault.yml`
+4. `group_vars/all/vault.yml`
 - Secretos (solo via Vault). Ver `docs/vault.md`.
 
 ## Roles

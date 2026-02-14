@@ -18,7 +18,7 @@ Nota operativa:
 
 ## Variables globales
 
-Archivo: `group_vars/all.yml`
+Archivo: `group_vars/all/vars.yml`
 
 Bloques clave:
 - Baseline:

@@ -1,9 +1,73 @@
-# Variables operacionales del cluster (topologia/red/firewall/slurm).
-# Objetivo: concentrar lo que normalmente se edita para replicar el HPC en otro entorno.
+# Variables globales del cluster (baseline + topologia/red/firewall/slurm).
+# Objetivo: tener un único lugar para defaults globales y replicabilidad.
 #
 # Nota de precedencia:
 # - host_vars/<host>.yml sobreescribe group_vars/*
 # - group_vars/<grupo>.yml sobreescribe group_vars/all/*
+
+# =====================
+# Baseline (paquetes/tiempo)
+# =====================
+
+common_packages:
+  - git
+  - curl
+  - wget
+  - vim
+  - rsync
+  - tar
+  - unzip
+  - htop
+  - iftop
+  - nload
+  - bmon
+  - btop
+  - tmux
+  - jq
+  - tree
+  - mpich
+  - mpich-devel
+
+enable_chrony: true
+
+# =====================
+# SSH (password habilitado)
+# =====================
+ssh_port: 22
+ssh_permit_root_login: "yes"
+ssh_password_authentication: "yes"
+
+# =====================
+# LLM env (micromamba)
+# =====================
+llm_conda_packages:
+  - python
+  - pip
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda
+  - numba
+  - cudatoolkit
+  - transformers
+  - datasets
+  - accelerate
+  - peft
+  - safetensors
+  - sentencepiece
+
+llm_pip_packages:
+  - transformers
+  - datasets
+  - accelerate
+  - peft
+  - safetensors
+  - sentencepiece
+
+llm_python_packages:
+  - numpy
+  - torch
+  - transformers
 
 # =====================
 # Firewall Rules

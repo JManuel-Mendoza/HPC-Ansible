@@ -79,7 +79,7 @@ def risk_for(rel: str, typ: str) -> str:
     ]
     med_markers = [
         "roles/slurm_", "roles/llm_env", "roles/mariadb_server", "site.yml",
-        "group_vars/all.yml", "host_vars/"
+        "group_vars/all/vars.yml", "host_vars/"
     ]
     if any(m in rel for m in high_markers):
         return "HIGH"

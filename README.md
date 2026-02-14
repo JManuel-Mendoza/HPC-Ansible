@@ -52,8 +52,7 @@ ANSIBLE_VAULT_PASSWORD_FILE=~/.config/hpc-ansible/vault-pass.txt ansible-playboo
 
 Archivos que normalmente debes editar para adaptar el clúster a tu laboratorio:
 - `inventario.ini` (hosts/grupos y `ansible_host`/usuarios)
-- `group_vars/all/vars.yml` (variables operacionales: red interna, Slurm, firewall, topología)
-- `group_vars/all.yml` (baseline: paquetes, SSH, LLM)
+- `group_vars/all/vars.yml` (defaults globales: baseline + variables operacionales de red/Slurm/firewall)
 - `group_vars/hpc_master.yml` (settings específicos del master: router/NFS/MariaDB/SlurmDBD)
 - `host_vars/*.yml` (overrides por nodo, si aplica)
 - `group_vars/all/vault.yml` (secretos cifrados; ver `docs/vault.md`)
@@ -112,15 +111,12 @@ Edita estos archivos (en este orden) para replicar el despliegue:
 - IPs/hostnames reales (`ansible_host`), usuarios (`ansible_user`) y pertenencia a grupos.
 
 2. `group_vars/all/vars.yml`
-- Topologia operacional: CIDRs/subredes internas, puertos, particiones Slurm, UID/GID, etc.
+- Defaults globales (baseline + topología operacional): paquetes, SSH, CIDRs/subredes internas, puertos, particiones Slurm, UID/GID, etc.
 
 3. `group_vars/hpc_master.yml`
 - Interfaces internas del master (`hpc_router_internal_ifaces`) y settings del master (NFS/MariaDB/SlurmDBD).
 
-4. `group_vars/all.yml`
-- Paquetes base, SSH y entorno LLM (micromamba) segun lo que quieras instalar por defecto.
-
-5. `group_vars/all/vault.yml` (cifrado) y `.secrets/` (local)
+4. `group_vars/all/vault.yml` (cifrado) y `.secrets/` (local)
 - Secretos via Vault. Ver `docs/vault.md`.
 - El “vault password file” es local (no se commitea).
 

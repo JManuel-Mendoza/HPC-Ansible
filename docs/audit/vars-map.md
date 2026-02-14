@@ -13,7 +13,7 @@ Alcance:
 Regla práctica (de mayor a menor):
 - `host_vars/<host>.yml`
 - `group_vars/<grupo>.yml`
-- `group_vars/all/*.yml` y `group_vars/all.yml`
+- `group_vars/all/*.yml` (por ejemplo `group_vars/all/vars.yml`)
 - `roles/<rol>/defaults/main.yml`
 
 Implicación: si un valor existe en `host_vars/`, no se debe “centralizar” a `all` porque eso cambia cómo se sobreescribe en el futuro (aunque el valor actual sea igual).
@@ -28,16 +28,13 @@ Implicación: si un valor existe en `host_vars/`, no se debe “centralizar” a
 2. `group_vars/all/vars.yml`
 - Topología del clúster y operación: red interna, puertos, particiones Slurm, UID/GID, etc.
 
-3. `group_vars/all.yml`
-- Baseline/“perfil de software”: paquetes base, toggles (p. ej. chrony), SSH, y paquetes LLM.
-
-4. `group_vars/hpc_master.yml`
+3. `group_vars/hpc_master.yml`
 - Ajustes específicos del master: interfaces router (`hpc_router_internal_ifaces`), SlurmDBD/MariaDB, NFS server.
 
-5. `host_vars/*.yml`
+4. `host_vars/*.yml`
 - Overrides por nodo (por ejemplo reservas/recursos Slurm en nodos concretos).
 
-6. `group_vars/all/vault.yml` (cifrado)
+5. `group_vars/all/vault.yml` (cifrado)
 - Secretos (`vault_*`). No se versiona ningún “vault password file”.
 
 ## Mapa de variables (operacionales y baseline)
@@ -46,14 +43,14 @@ Tabla: variable | definida en | usada en (aprox) | categoría | notas
 
 | Variable | Definida en | Usada en (aprox) | Categoría | Notas |
 |---|---|---|---|---|
-| `common_packages` | `group_vars/all.yml` | `roles/common/tasks/main.yml` | baseline | Lista de herramientas base (incluye “herramientas de monitoreo” integradas). |
-| `enable_chrony` | `group_vars/all.yml` | `roles/common/tasks/main.yml` | baseline | Habilita/instala chrony según rol `common`. |
-| `ssh_port` | `group_vars/all.yml` (override) | `roles/users_ssh/tasks/main.yml` | ssh | También existe default en `roles/users_ssh/defaults/main.yml`. |
-| `ssh_permit_root_login` | `group_vars/all.yml` (override) | `roles/users_ssh/tasks/main.yml` | ssh | Controla drop-in de `sshd_config`. |
-| `ssh_password_authentication` | `group_vars/all.yml` (override) | `roles/users_ssh/tasks/main.yml` | ssh | Controla drop-in de `sshd_config`. |
-| `llm_conda_packages` | `group_vars/all.yml` (override) | `roles/llm_env/tasks/main.yml` | llm | Paquetes micromamba/conda a instalar. |
-| `llm_pip_packages` | `group_vars/all.yml` | `roles/llm_env/tasks/main.yml` | llm | Si incluye `torch`, el rol advierte sobre override del torch conda. |
-| `llm_python_packages` | `group_vars/all.yml` | (referencia documental/uso futuro) | llm | Lista base para scripts/validación. |
+| `common_packages` | `group_vars/all/vars.yml` | `roles/common/tasks/main.yml` | baseline | Lista de herramientas base (incluye “herramientas de monitoreo” integradas). |
+| `enable_chrony` | `group_vars/all/vars.yml` | `roles/common/tasks/main.yml` | baseline | Habilita/instala chrony según rol `common`. |
+| `ssh_port` | `group_vars/all/vars.yml` (override) | `roles/users_ssh/tasks/main.yml` | ssh | También existe default en `roles/users_ssh/defaults/main.yml`. |
+| `ssh_permit_root_login` | `group_vars/all/vars.yml` (override) | `roles/users_ssh/tasks/main.yml` | ssh | Controla drop-in de `sshd_config`. |
+| `ssh_password_authentication` | `group_vars/all/vars.yml` (override) | `roles/users_ssh/tasks/main.yml` | ssh | Controla drop-in de `sshd_config`. |
+| `llm_conda_packages` | `group_vars/all/vars.yml` (override) | `roles/llm_env/tasks/main.yml` | llm | Paquetes micromamba/conda a instalar. |
+| `llm_pip_packages` | `group_vars/all/vars.yml` | `roles/llm_env/tasks/main.yml` | llm | Si incluye `torch`, el rol advierte sobre override del torch conda. |
+| `llm_python_packages` | `group_vars/all/vars.yml` | (referencia documental/uso futuro) | llm | Lista base para scripts/validación. |
 | `llm_micromamba_root` | `roles/llm_env/defaults/main.yml` | `roles/llm_env/tasks/main.yml` | llm | Ruta base de micromamba (antes había literales `/opt/micromamba` en tasks). |
 | `llm_micromamba_bin` | `roles/llm_env/defaults/main.yml` | `roles/llm_env/tasks/main.yml` | llm | Binario micromamba (deriva de `llm_micromamba_root`). |
 | `slurm_firewalld_zone` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Zona donde se aplican rich rules. |

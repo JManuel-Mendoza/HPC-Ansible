@@ -1,6 +1,6 @@
 ---
 nvidia_driver_stream: "580-dkms"
-nvidia_cuda_reboot: true
+nvidia_cuda_reboot: false
 nvidia_cuda_repo_enabled: true
 nvidia_cuda_validate: true
 
