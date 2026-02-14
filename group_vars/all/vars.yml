@@ -77,9 +77,18 @@ llm_python_packages:
 nfs_export_path: "/srv/nfs/llm"
 nfs_client_mountpoint: "/mnt/llm"
 
-# Preferir `ansible_host` del master (inventario). Fallback: IP por facts del master.
-# Nota: para forzar IP interna, define `ansible_host` del master con esa IP en `inventario.ini`.
-nfs_server_ip: "{{ hostvars[groups['hpc_master'][0]].ansible_host | default(hostvars[groups['hpc_master'][0]].ansible_default_ipv4.address) }}"
+# IP del server NFS (master) que usarán los clientes.
+# Este cluster tiene enlaces punto-a-punto master<->worker; por eso se prioriza la IP del master
+# correspondiente a CADA worker, definida en `network_internal_links[<worker>].master_ip`.
+# Fallback (si no hay mapa para el host): `ansible_host` del master (inventario) y luego facts.
+nfs_server_ip: >-
+  {{
+    (
+      (network_internal_links | default({}))[inventory_hostname].master_ip
+      | default(hostvars[groups['hpc_master'][0]].ansible_host | default(hostvars[groups['hpc_master'][0]].ansible_default_ipv4.address))
+    )
+    | regex_replace('/.*$', '')
+  }}
 
 # Variables consumidas por el rol `roles/nfs_hpc` (compatibilidad):
 nfs_hpc_share_dir: "{{ nfs_export_path }}"

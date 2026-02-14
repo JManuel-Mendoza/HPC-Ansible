@@ -5,7 +5,7 @@ Este repo configura NFS con el rol `roles/nfs_hpc`.
 Vars relevantes (ver `roles/nfs_hpc/defaults/main.yml`):
 - Export (server): `nfs_export_path` (este repo: `/srv/nfs/llm` en `group_vars/all/vars.yml`)
 - Mountpoint (clients): `nfs_client_mountpoint` (este repo: `/mnt/llm` en `group_vars/all/vars.yml`)
-- Server IP: `nfs_server_ip` (deriva de `ansible_host` del `hpc_master` en `inventario.ini`; fallback por facts)
+- Server IP: `nfs_server_ip` (por host: usa `network_internal_links[<worker>].master_ip`; fallback a `ansible_host` del `hpc_master` en `inventario.ini`)
 - Compat rol: `nfs_hpc_share_dir` (export), `nfs_hpc_mount_point` (mountpoint) y `nfs_hpc_server_host` (server addr)
 - Export file: `nfs_hpc_export_file` (default: `/etc/exports.d/hpc-nfs.exports`)
 - Clientes permitidos: `nfs_hpc_allowed_clients` (default: `{{ slurm_internal_cidr }}`)

@@ -57,7 +57,7 @@ Tabla: variable | definida en | usada en (aprox) | categoría | notas
 | `slurm_internal_cidr` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml`, `roles/nfs_hpc/defaults/main.yml` | firewall/network/nfs | CIDR de confianza para Slurm y clientes NFS. |
 | `nfs_export_path` | `group_vars/all/vars.yml` | `roles/nfs_hpc/tasks/main.yml`, `roles/nfs_hpc/templates/exports.j2` | nfs | Ruta exportada en el master (server). |
 | `nfs_client_mountpoint` | `group_vars/all/vars.yml` | `roles/nfs_hpc/tasks/main.yml` | nfs | Punto de montaje en clientes (workers). |
-| `nfs_server_ip` | `group_vars/all/vars.yml` | `roles/nfs_hpc/tasks/main.yml` | nfs | IP del server NFS (deriva de `ansible_host` del `hpc_master` en inventario; fallback por facts). |
+| `nfs_server_ip` | `group_vars/all/vars.yml` | `roles/nfs_hpc/tasks/main.yml` | nfs | IP del server NFS usada por cada host: prioriza `network_internal_links[<host>].master_ip` (enlaces punto-a-punto); fallback a `ansible_host` del `hpc_master`. |
 | `slurmctld_port` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Puerto TCP del controller. |
 | `slurmd_port` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Puerto TCP del daemon compute. |
 | `munge_uid` | `group_vars/all/vars.yml` | `roles/slurm_identities/tasks/main.yml` | slurm/munge | UID/GID declarados para consistencia entre nodos. |
