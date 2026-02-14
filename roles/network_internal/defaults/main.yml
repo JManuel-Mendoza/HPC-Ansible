@@ -1,13 +1,17 @@
 ---
-# Defaults intencionalmente vacíos (P11b).
+# Defaults neutros (P11c): este rol es HIGH-RISK y no debe operar sin topología explícita.
 #
-# Este rol necesita variables lab-specific (NICs/IPs por enlace). Para evitar hardcodes
-# dentro del rol y facilitar replicación, define estas variables en:
+# Define la topología real (NICs/IPs por enlace) en:
 # - group_vars/all/vars.yml
 #
-# Variables esperadas (ver `group_vars/all/vars.yml`):
-# - network_internal_keep_if
-# - network_internal_exclude_ifaces
-# - network_internal_exclude_conn_regex
-# - network_internal_links
+# El rol hace `assert` temprano para evitar ejecuciones peligrosas si faltan estas variables.
 
+# Interfaz "principal" que NO se debe tocar al limpiar conexiones NM.
+network_internal_keep_if: ""
+
+# Exclusiones (p. ej. tailscale).
+network_internal_exclude_ifaces: []
+network_internal_exclude_conn_regex: ""
+
+# Mapa worker->(master_if/master_ip/worker_if/worker_ip). Debe ser un dict no vacío.
+network_internal_links: {}

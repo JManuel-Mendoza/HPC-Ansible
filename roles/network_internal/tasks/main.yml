@@ -1,4 +1,18 @@
 ---
+- name: Red Interna | Assert variables definidas
+  ansible.builtin.assert:
+    that:
+      - network_internal_links is defined
+      - network_internal_links is mapping
+      - network_internal_links | length > 0
+      - network_internal_keep_if is defined
+      - network_internal_keep_if is string
+      - network_internal_keep_if | length > 0
+    fail_msg: >-
+      network_internal_links no está definido o está vacío, o network_internal_keep_if no está definido.
+      Define la topología de red interna en group_vars/all/vars.yml (ver docs/audit/vars-map.md).
+  tags: [network_internal, network]
+
 - name: Red Interna | Definir conexiones internas esperadas
   ansible.builtin.set_fact:
     network_internal_expected_conns: >-
