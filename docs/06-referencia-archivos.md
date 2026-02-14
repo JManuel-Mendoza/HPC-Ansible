@@ -1,6 +1,6 @@
 # Referencia de archivos
 
-Esta referencia cubre todos los archivos de codigo activo del proyecto, excluyendo `archivo_no_en_uso/`.
+Esta referencia cubre los archivos de codigo y operacion del proyecto. Documentación histórica se conserva en `docs/docs_old/` (ver `docs/docs_old/README.md`).
 
 ## Raiz
 

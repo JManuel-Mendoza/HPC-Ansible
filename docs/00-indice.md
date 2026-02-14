@@ -61,5 +61,7 @@ Cobertura incluida:
 - `group_vars/`, `host_vars/`.
 - Todos los roles en `roles/`.
 
-Cobertura excluida:
-- `archivo_no_en_uso/` (por requerimiento explicito).
+## Docs antiguas (histórico)
+
+- `docs/docs_old/README.md`
+  - Documentación histórica rescatada de iteraciones previas (no vigente).

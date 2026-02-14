@@ -31,68 +31,12 @@ Auditoria archivo-por-archivo del repositorio (sin cambios de logica).
 | `AGENTS.md` | doc | No determinado | KEEP | LOW |  |
 | `README.md` | doc | No determinado | KEEP | LOW |  |
 | `ansible.cfg` | file | ansible-playbook (autoload) | KEEP | MEDIUM |  |
-| `archivo_no_en_uso/docs/bitacora_codex.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/docs/codex-log.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/docs/contexto-actual-hpc-slurm.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/docs/runbooks/slurm-troubleshooting-log.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/docs/slurm-ansible-nvml.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/HPC-Status.txt` | log | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/STATUS.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/historial-comandos-master-26-01.txt` | log | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/hpc-repo-snapshot.zip` | artifact | No referenciado por entrypoints activos | DELETE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/mastersys-status.txt` | log | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/node-hw-short.txt` | log | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/node-hw.txt` | log | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/extras/worker1.txt` | log | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/inventario-glob.ini` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/README.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/artifacts/.gitkeep` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/configs/finetune_lora.yml` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/configs/pretrain_tiny.yml` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/data/processed/.gitkeep` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/data/raw/.gitkeep` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/00_env_check.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/00_smoke_gpu.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/01_prepare_dataset.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/02_train_tokenizer.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/03_pretrain_from_scratch.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/04_finetune_lora.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/05_infer.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/_config.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm-project/scripts/_data.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/code/compare_base_vs_ckpt.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/code/infer_gpt2.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/code/run_clm.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/code/train_clm_with_end.py` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/slurm tests/llm_clm_endings_3h.sbatch` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/slurm tests/llm_compare_gpt2.sbatch` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/slurm tests/llm_express_3h_gpt2.sbatch` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/slurm tests/llm_express_gpt2.sbatch` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/slurm tests/llm_infer_endings.sbatch` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm/slurm tests/llm_infer_gpt2.sbatch` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm_project/defaults/main.yml` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/llm_project/tasks/main.yml` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Acceso/bootstrap_sudo_nopasswd.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Acceso/workers_lock.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Acceso/workers_unlock.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/NFS/nfs_hpc.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Particiones/set_boot_mount_data_scratch.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Particiones/storage.bash` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Particiones/storage_data_scratch.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Red/limpiar_red.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Red/red_interna.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Red/redconf.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/Red/w1_w2_link.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/ansible0.cfg` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/inventarios/inventario.ini` | artifact | No referenciado por entrypoints activos | ARCHIVE | HIGH | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/inventarios/inventario_glob.ini` | artifact | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/python env/llm_env.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/python env/llm_env311.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks sueltos/python env/llm_env_reset.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks/ssh-password-toggle.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/playbooks/storage_survey.yml` | playbook | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/slurm-test.sh` | script | No referenciado por entrypoints activos | ARCHIVE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
-| `archivo_no_en_uso/slurm-tests/slurm-tests.zip` | artifact | No referenciado por entrypoints activos | DELETE | LOW | Fuera del flujo activo; conservar solo para trazabilidad historica |
+| `docs/docs_old/README.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Documentación histórica; no vigente |
+| `docs/docs_old/bitacora_codex.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Documentación histórica; no vigente |
+| `docs/docs_old/codex-log.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Documentación histórica; no vigente |
+| `docs/docs_old/contexto-actual-hpc-slurm.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Documentación histórica; no vigente |
+| `docs/docs_old/runbooks/slurm-troubleshooting-log.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Documentación histórica; no vigente |
+| `docs/docs_old/slurm-ansible-nvml.md` | doc | No referenciado por entrypoints activos | ARCHIVE | LOW | Documentación histórica; no vigente |
 | `docs/00-indice.md` | doc | README.md / navegacion documental | KEEP | LOW |  |
 | `docs/01-guia-rapida-no-especialistas.md` | doc | README.md / navegacion documental | KEEP | LOW |  |
 | `docs/02-arquitectura-ejecucion.md` | doc | README.md / navegacion documental | KEEP | LOW |  |

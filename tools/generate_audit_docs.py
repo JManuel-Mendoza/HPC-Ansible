@@ -68,10 +68,6 @@ def classify_type(rel: str) -> str:
         return "log"
     if name.endswith((".zip", ".tar", ".tar.gz", ".tgz", ".gz")):
         return "artifact"
-    if rel.startswith("archivo_no_en_uso/"):
-        if name.endswith((".txt", ".status", ".md")):
-            return "log"
-        return "artifact"
     return "file"
 
 
@@ -89,7 +85,7 @@ def risk_for(rel: str, typ: str) -> str:
         return "HIGH"
     if any(m in rel for m in med_markers):
         return "MEDIUM"
-    if rel.startswith("archivo_no_en_uso/"):
+    if rel.startswith("docs/docs_old/"):
         return "LOW"
     if typ in {"doc", "artifact", "log"}:
         return "LOW"
@@ -101,9 +97,7 @@ def recommendation_for(rel: str, typ: str) -> str:
         return "DELETE"
     if rel.startswith(".cache/"):
         return "DELETE"
-    if rel.startswith("archivo_no_en_uso/"):
-        if rel.endswith((".zip", ".tar", ".tar.gz", ".tgz")):
-            return "DELETE"
+    if rel.startswith("docs/docs_old/"):
         return "ARCHIVE"
     if rel == "roles/slurm_install/files/slurm.conf":
         return "ARCHIVE"
@@ -169,7 +163,7 @@ def referenced_by(rel: str, site_roles: list[str]) -> str:
         return "README.md / navegacion documental"
     if rel.startswith(".agents/"):
         return "AGENTS.md / runtime de agente"
-    if rel.startswith("archivo_no_en_uso/"):
+    if rel.startswith("docs/docs_old/"):
         return "No referenciado por entrypoints activos"
     return "No determinado"
 
@@ -177,8 +171,8 @@ def referenced_by(rel: str, site_roles: list[str]) -> str:
 def notes_for(rel: str) -> str:
     if rel == "roles/slurm_install/files/slurm.conf":
         return "No se observa consumo activo en tasks; existe template slurm.conf.j2 administrado"
-    if rel.startswith("archivo_no_en_uso/"):
-        return "Fuera del flujo activo; conservar solo para trazabilidad historica"
+    if rel.startswith("docs/docs_old/"):
+        return "Documentación histórica; no vigente"
     if rel in {"site.yml"}:
         return "Entrypoint de ejecucion"
     if rel == "inventario.ini":
@@ -426,7 +420,7 @@ def write_entrypoints(site_roles):
     out.append("")
     out.append("## Entry points legacy/no activos")
     out.append("")
-    out.append("- `archivo_no_en_uso/playbooks/*.yml` y `archivo_no_en_uso/playbooks sueltos/**/*.yml`: historicos, no parte del flujo activo actual.")
+    out.append("- Documentación histórica: `docs/docs_old/README.md` (bitácoras y notas de iteraciones previas; no parte del flujo activo).")
     out.append("")
     out.append("## Orden recomendado de ejecucion (operativo)")
     out.append("")
@@ -515,7 +509,7 @@ def write_findings(rows):
         ("MEDIUM", "`validate/tasks/slurm.yml` no se ejecuta por defecto", "Include en `roles/validate/tasks/main.yml` esta comentado.", "Decidir estrategia: habilitar por tag explicita o documentar como opcional."),
         ("LOW", "Host key checking deshabilitado", "`ansible.cfg`: `host_key_checking = False`.", "Revisar habilitacion en entornos sensibles."),
         ("LOW", "Artifacts locales en repo", "`.cache/slurm-rpms` y `.DS_Store`.", "Limpiar artifacts y reforzar `.gitignore`."),
-        ("LOW", "Legacy tree extensa", "`archivo_no_en_uso/` contiene playbooks/scripts/artifacts historicos.", "Conservar en archivo, no mezclar con flujo activo."),
+        ("LOW", "Documentación histórica separada", "Existe documentación histórica consolidada en `docs/docs_old/`.", "Mantenerla como referencia, sin mezclarla con el flujo activo."),
     ]
     for i, (sev, title, evidence, action) in enumerate(findings, 1):
         out.append(f"{i}. [{sev}] {title}")

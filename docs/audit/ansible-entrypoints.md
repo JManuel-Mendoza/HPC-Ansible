@@ -12,7 +12,7 @@ Documentos relacionados:
 
 ## Entry points legacy/no activos
 
-- `archivo_no_en_uso/playbooks/*.yml` y `archivo_no_en_uso/playbooks sueltos/**/*.yml`: historicos, no parte del flujo activo actual.
+- Documentación histórica: `docs/docs_old/README.md` (bitácoras y notas de iteraciones previas; no parte del flujo activo).
 
 ## Orden recomendado de ejecucion (operativo)
 

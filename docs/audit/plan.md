@@ -72,8 +72,8 @@ Resumen actual (desde `docs/audit/file-ledger.md:5`):
 Inventario completo verificable: `docs/audit/file-ledger.md:7` a `docs/audit/file-ledger.md:164`.
 
 Decisiones críticas:
-- `DELETE`: `.DS_Store`, `archivo_no_en_uso/extras/hpc-repo-snapshot.zip`, `archivo_no_en_uso/slurm-tests/slurm-tests.zip`
-- `ARCHIVE`: todo `archivo_no_en_uso/**` + `roles/slurm_install/files/slurm.conf`
+- `DELETE`: `.DS_Store` y artefactos binarios/históricos no necesarios para operación.
+- `ARCHIVE`: documentación histórica consolidada en `docs/docs_old/**` + `roles/slurm_install/files/slurm.conf`
 - `KEEP`: entrypoint (`site.yml`), roles activos bajo `roles/**`, vars de inventario, docs activas y herramientas de auditoría
 
 ## 5) Tasks marcadas REWORK (o equivalente), agrupadas por rol, con propuesta

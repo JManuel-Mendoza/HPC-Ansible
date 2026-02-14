@@ -52,18 +52,18 @@ Top 20 hallazgos accionables identificados en auditoria estatica.
 16. [MEDIUM] Validacion Slurm pesada en mismo role
    Evidencia: `roles/slurm_validate/tasks/main.yml` mezcla checks basicos y smoke largos.
    Accion: Separar tags/flows en validacion rapida vs profunda (sin cambiar logica ahora).
-17. [MEDIUM] `validate/tasks/slurm.yml` no se ejecuta por defecto
-   Evidencia: Include en `roles/validate/tasks/main.yml` esta comentado.
-   Accion: Decidir estrategia: habilitar por tag explicita o documentar como opcional.
+17. [MEDIUM] Validaciones Slurm en `roles/validate` requieren guardas por etapa
+   Evidencia: checks de puertos/conectividad pueden fallar antes de instalar Slurm si se ejecuta `validate` temprano.
+   Accion: Gate por presencia de servicios Slurm (service_facts) y/o ejecutar validación Slurm en etapa dedicada (`slurm_validate`).
 18. [LOW] Host key checking deshabilitado
    Evidencia: `ansible.cfg`: `host_key_checking = False`.
    Accion: Revisar habilitacion en entornos sensibles.
 19. [LOW] Artifacts locales en repo
    Evidencia: `.cache/slurm-rpms` y `.DS_Store`.
    Accion: Limpiar artifacts y reforzar `.gitignore`.
-20. [LOW] Legacy tree extensa
-   Evidencia: `archivo_no_en_uso/` contiene playbooks/scripts/artifacts historicos.
-   Accion: Conservar en archivo, no mezclar con flujo activo.
+20. [LOW] Documentación histórica separada del flujo activo
+   Evidencia: existe documentación histórica consolidada en `docs/docs_old/`.
+   Accion: Mantenerla como referencia, sin mezclarla con el flujo operativo actual.
 
 ## Zonas de alto riesgo (no tocar sin paquete dedicado)
 

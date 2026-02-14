@@ -160,4 +160,4 @@ ansible-playbook -i inventario.ini site.yml --skip-tags debug --ask-vault-pass
 
 ## Nota de alcance documental
 
-La documentacion cubre todo el proyecto activo y excluye explicitamente `archivo_no_en_uso/`.
+La documentacion cubre el proyecto activo. Notas/bitácoras históricas se preservan en `docs/docs_old/` (ver `docs/docs_old/README.md`).
