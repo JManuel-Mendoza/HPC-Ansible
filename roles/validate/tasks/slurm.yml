@@ -10,7 +10,7 @@
     path: /usr/bin/firewall-cmd
   register: _validate_firewall_cmd
   changed_when: false
-  tags: [validate, validate_firewall]
+  tags: [validate, validate_slurm, validate_firewall]
 
 - name: Validate | Master listens on Slurmctld (6817) and SlurmDBD (6819)
   ansible.builtin.shell: "ss -lntp | egrep ':(6817|6819)\\b' || true"
@@ -101,7 +101,7 @@
   when:
     - _validate_slurm_present | default(false) | bool
     - inventory_hostname in groups.get('hpc_master', [])
-    - _validate_firewall_cmd.stat.exists
+    - (_validate_firewall_cmd.stat.exists | default(false))
   tags: [validate, validate_slurm, validate_firewall]
 
 - name: Validate | Firewall | Fallar si faltan rich rules en master (6817 y rango srun)
@@ -116,7 +116,7 @@
   when:
     - _validate_slurm_present | default(false) | bool
     - inventory_hostname in groups.get('hpc_master', [])
-    - _validate_firewall_cmd.stat.exists
+    - (_validate_firewall_cmd.stat.exists | default(false))
   tags: [validate, validate_slurm, validate_firewall]
 
 - name: Validate | Workers firewalld rich rules present (6818)
@@ -127,7 +127,7 @@
   when:
     - _validate_slurm_present | default(false) | bool
     - inventory_hostname in groups.get('workers_r', [])
-    - _validate_firewall_cmd.stat.exists
+    - (_validate_firewall_cmd.stat.exists | default(false))
   tags: [validate, validate_slurm, validate_firewall]
 
 - name: Validate | Firewall | Fallar si faltan rich rules en workers (6818)
@@ -141,5 +141,5 @@
   when:
     - _validate_slurm_present | default(false) | bool
     - inventory_hostname in groups.get('workers_r', [])
-    - _validate_firewall_cmd.stat.exists
+    - (_validate_firewall_cmd.stat.exists | default(false))
   tags: [validate, validate_slurm, validate_firewall]
