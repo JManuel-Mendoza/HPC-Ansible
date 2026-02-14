@@ -30,6 +30,26 @@ Alcance tecnico:
 - Edita `inventario.ini` para reflejar tus IPs/usuarios y grupos (`hpc_master`, `workers_*`, `slurm_*`).
 - Recomendado: ejecutar con `--limit` al inicio (un worker primero).
 
+## Configuracion minima para adaptar a tu laboratorio
+
+Edita estos archivos (en este orden) para replicar el despliegue:
+
+1. `inventario.ini`
+- IPs/hostnames reales (`ansible_host`), usuarios (`ansible_user`) y pertenencia a grupos.
+
+2. `group_vars/all/vars.yml`
+- Topologia operacional: CIDRs/subredes internas, puertos, particiones Slurm, UID/GID, etc.
+
+3. `group_vars/hpc_master.yml`
+- Interfaces internas del master (`hpc_router_internal_ifaces`) y settings del master (NFS/MariaDB/SlurmDBD).
+
+4. `group_vars/all.yml`
+- Paquetes base, SSH y entorno LLM (micromamba) segun lo que quieras instalar por defecto.
+
+5. `group_vars/all/vault.yml` (cifrado) y `.secrets/` (local)
+- Secretos via Vault. Ver `docs/vault.md`.
+- El “vault password file” es local (no se commitea).
+
 ## Vault (secretos)
 
 Este repo usa Ansible Vault.
@@ -64,6 +84,7 @@ Toda la documentacion detallada esta en `docs/`.
 - `docs/09-glosario.md`: terminos HPC/Slurm explicados en lenguaje simple.
 - `docs/audit/ansible-entrypoints.md`: entrypoint, orden recomendado y advertencias de riesgo.
 - `docs/audit/plan.md`: plan de cambios por paquetes (auditoría).
+- `docs/audit/vars-map.md`: mapa de variables operacionales y hardcodes detectados (auditoría).
 
 ## Inicio rapido
 
