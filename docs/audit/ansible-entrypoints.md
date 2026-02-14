@@ -4,7 +4,7 @@
 
 | Playbook | Proposito | Estado list-tasks |
 |---|---|---|
-| `site.yml` | Orquestacion completa del cluster HPC/Slurm/LLM | OK (plays: 10, tasks listadas: 354) |
+| `site.yml` | Orquestacion completa del cluster HPC/Slurm/LLM | OK (plays: 15, tasks listadas: 404) |
 
 Documentos relacionados:
 - Plan de cambios por paquetes: `docs/audit/plan.md`
@@ -56,13 +56,18 @@ Estos warnings no invalidan `--syntax-check` ni el parseo de `--list-tasks` para
 
 ## Plays detectadas en `site.yml --list-tasks`
 
-- play #1 (all): Baseline para todos los nodos (SO + SSH + Firewall + GPU/CUDA + Entorno LLM)	TAGS: []
-- play #2 (hpc_master): MariaDB en master	TAGS: []
-- play #3 (hpc_master): Preparar SlurmDB en MariaDB (master)	TAGS: []
-- play #4 (all): Validación de salud del clúster	TAGS: []
-- play #5 (all): Configuración de identidades SLURM	TAGS: []
-- play #6 (all): Configuración de munge en nodos SLURM	TAGS: []
-- play #7 (all): Recopilación de hechos SLURM en todos los nodos	TAGS: []
-- play #8 (hpc_master): Configuración de SLURM en nodo master	TAGS: []
-- play #9 (slurm_compute): Configuración de SLURM en nodos workers	TAGS: []
-- play #10 (hpc_master): Validacion Slurm (sin cambios de configuracion)	TAGS: []
+- play #1 (all): Baseline HPC (common + ssh)	TAGS: []
+- play #2 (all): Red interna + ruteo + firewall	TAGS: []
+- play #3 (all): CUDA/Driver NVIDIA (solo nodos con GPU)	TAGS: []
+- play #4 (hpc_master): NFS HPC (server export)	TAGS: []
+- play #5 (all:!hpc_master): NFS HPC (clientes mount)	TAGS: []
+- play #6 (hpc_master): MariaDB en master	TAGS: []
+- play #7 (hpc_master): Preparar SlurmDB en MariaDB (master)	TAGS: []
+- play #8 (slurm_all): Configuración de identidades SLURM	TAGS: []
+- play #9 (slurm_all): Configuración de Munge en nodos SLURM	TAGS: []
+- play #10 (slurm_all): Recopilación de hechos SLURM en nodos SLURM	TAGS: []
+- play #11 (hpc_master): Configuración de SLURM en nodo master	TAGS: []
+- play #12 (slurm_compute): Configuración de SLURM en nodos compute	TAGS: []
+- play #13 (all): Entorno LLM (micromamba + torch)	TAGS: []
+- play #14 (all): Validación general de salud del clúster	TAGS: []
+- play #15 (hpc_master): Validación Slurm (sin cambios de configuracion)	TAGS: []

@@ -11,7 +11,7 @@ Modo: **solo auditoría y planificación** (sin cambios en archivos)
 - Hallazgos accionables: `docs/audit/findings.md:1`
 - `ansible-inventory -i inventario.ini --graph`: grupos detectados (`hpc_master`, `workers`, `slurm_compute`, etc.)
 - `ansible-playbook -i inventario.ini site.yml --syntax-check`: válido con warnings de permisos del entorno sandbox
-- `ansible-playbook -i inventario.ini site.yml --list-tasks`: OK (10 plays)
+- `ansible-playbook -i inventario.ini site.yml --list-tasks`: OK (15 plays)
 
 ## 2) Plan de paquetes (máximo 10)
 

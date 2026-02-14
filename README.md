@@ -257,7 +257,7 @@ ansible-playbook -i inventario.ini site.yml --skip-tags debug --ask-vault-pass
 ## Flujo recomendado (instalacion limpia -> HPC listo -> Slurm -> LLM)
 
 1. Instalación limpia del SO (fuera de este repo).
-2. Baseline HPC: `--tags common,ssh` (y luego `firewall/network/routing/nfs/cuda` según aplique).
+2. Baseline HPC: `--tags common,ssh` (y luego `network,routing,firewall,cuda,nfs` según aplique).
 3. Slurm: DB (master) -> identidades + munge -> install/controller/compute.
 4. LLM: `--tags llm`.
 5. Validación: `--tags validate,slurm_validate`.
