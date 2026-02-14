@@ -43,6 +43,21 @@ Este indice organiza la documentacion para tres perfiles:
 - `docs/09-glosario.md`
   - Definiciones de terminos tecnicos usados en este repositorio.
 
+## Runbooks operativos
+
+Runbooks mínimos, orientados a comandos y evidencia:
+
+- `docs/runbooks/slurm.md`
+  - Operación/diagnóstico de `slurmctld`, `slurmd`, `slurmdbd` y accounting.
+- `docs/runbooks/munge.md`
+  - Permisos de key, pruebas `munge -n | unmunge` y fallas comunes.
+- `docs/runbooks/gpu-cuda.md`
+  - Diagnóstico NVIDIA/CUDA (`nvidia-smi`, módulos, dmesg) + PyTorch (micromamba).
+- `docs/runbooks/nfs.md`
+  - Server exports + client mounts + troubleshooting (firewall/permisos).
+- `docs/runbooks/network-firewall.md`
+  - Interfaces/rutas + `firewalld` + verificación de reglas Slurm.
+
 ## Auditoria y operacion (entrypoint)
 
 - `docs/audit/ansible-entrypoints.md`
