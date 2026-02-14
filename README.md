@@ -20,10 +20,84 @@ Alcance tecnico:
 
 ## Requisitos minimos (nodo de control)
 
-- Ansible instalado.
+- Ansible instalado (recomendado: `>= 2.14`).
 - Colecciones instaladas: ver `requirements.yml` y ejecutar `ansible-galaxy collection install -r requirements.yml`.
 - Acceso SSH a los nodos (idealmente con llave).
 - Vault configurado (ver `docs/vault.md`).
+
+## Desde cero: instalación limpia -> clúster listo
+
+Esta guía asume que ya tienes un SO limpio instalado en `master` y `workers` (paso fuera de este repo).
+El entrypoint único del repositorio es `site.yml`.
+
+### Prerrequisitos (control node)
+
+1) Colecciones Ansible (obligatorio):
+```bash
+ansible-galaxy collection install -r requirements.yml
+```
+
+2) Vault (obligatorio):
+- Guía: `docs/vault.md`
+- Ejecución interactiva:
+```bash
+ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
+```
+- Ejecución reproducible sin prompt (archivo local, no se commitea):
+```bash
+ANSIBLE_VAULT_PASSWORD_FILE=~/.config/hpc-ansible/vault-pass.txt ansible-playbook -i inventario.ini site.yml --syntax-check
+```
+
+### Configuración mínima para replicar
+
+Archivos que normalmente debes editar para adaptar el clúster a tu laboratorio:
+- `inventario.ini` (hosts/grupos y `ansible_host`/usuarios)
+- `group_vars/all/vars.yml` (variables operacionales: red interna, Slurm, firewall, topología)
+- `group_vars/all.yml` (baseline: paquetes, SSH, LLM)
+- `group_vars/hpc_master.yml` (settings específicos del master: router/NFS/MariaDB/SlurmDBD)
+- `host_vars/*.yml` (overrides por nodo, si aplica)
+- `group_vars/all/vault.yml` (secretos cifrados; ver `docs/vault.md`)
+
+Referencias:
+- `docs/06-referencia-archivos.md`
+- `docs/audit/vars-map.md`
+
+### Preflight seguro (no cambia nodos)
+
+```bash
+ansible-inventory -i inventario.ini --graph --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --list-tasks --ask-vault-pass
+```
+
+### Orden recomendado de ejecución (por etapas/tags)
+
+La fuente de verdad es `docs/audit/ansible-entrypoints.md`. Resumen:
+- Baseline: `--tags common,ssh`
+- Red/ruteo: `--tags network,routing` (HIGH-RISK)
+- Firewall: `--tags firewall` (HIGH-RISK)
+- CUDA: `--tags cuda` (HIGH-RISK; puede requerir reboot)
+- NFS: `--tags nfs` (HIGH-RISK)
+- Slurm: `--tags slurm,slurm_install,slurm_config,munge,identities,slurmdb` (HIGH-RISK)
+- LLM: `--tags llm`
+- Validación: `--tags validate,slurm_validate`
+
+### Ejemplos seguros (recomendado con `--limit`)
+
+Dry-run (preflight de idempotencia) sobre un solo nodo:
+```bash
+ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1 --ask-vault-pass --skip-tags debug
+```
+
+Baseline en un solo nodo:
+```bash
+ansible-playbook -i inventario.ini site.yml --tags common,ssh --limit worker1 --ask-vault-pass --skip-tags debug
+```
+
+Ejecución completa (cuando ya probaste por etapas):
+```bash
+ansible-playbook -i inventario.ini site.yml --ask-vault-pass --skip-tags debug
+```
 
 ## Configurar inventario (inventario.ini)
 
@@ -85,6 +159,19 @@ Toda la documentacion detallada esta en `docs/`.
 - `docs/audit/ansible-entrypoints.md`: entrypoint, orden recomendado y advertencias de riesgo.
 - `docs/audit/plan.md`: plan de cambios por paquetes (auditoría).
 - `docs/audit/vars-map.md`: mapa de variables operacionales y hardcodes detectados (auditoría).
+- `docs/runbooks/`: runbooks operativos mínimos (Slurm/GPU/NFS/Munge/Network).
+
+## Mapa del repositorio
+
+- `site.yml`: entrypoint único (orquesta roles por etapas).
+- `inventario.ini`: inventario por defecto (hosts, grupos y conexión).
+- `group_vars/`: variables por alcance (`all`, `hpc_master`, etc.) y Vault (`group_vars/all/vault.yml`).
+- `host_vars/`: overrides por nodo (cuando aplica).
+- `roles/`: roles Ansible (state + validación), organizados por dominio (`common`, `firewall`, `nvidia_cuda`, `slurm_*`, `validate`, etc.).
+- `docs/`: documentación principal (índice, arquitectura, referencia).
+- `docs/runbooks/`: operación/diagnóstico por dominio (comandos y evidencia).
+- `docs/audit/`: auditoría (entrypoints, ledger, matriz de tasks, plan).
+- `tools/`: herramientas auxiliares de análisis (no tocan infraestructura).
 
 ## Inicio rapido
 
@@ -178,6 +265,27 @@ ansible-playbook -i inventario.ini site.yml --skip-tags debug --ask-vault-pass
 3. Slurm: DB (master) -> identidades + munge -> install/controller/compute.
 4. LLM: `--tags llm`.
 5. Validación: `--tags validate,slurm_validate`.
+
+## Validación y troubleshooting
+
+Validaciones (rol `validate`) se pueden ejecutar por dominio:
+```bash
+ansible-playbook -i inventario.ini site.yml --tags validate --limit worker1 --ask-vault-pass --skip-tags debug
+ansible-playbook -i inventario.ini site.yml --tags validate_slurm --limit slurm_all --ask-vault-pass --skip-tags debug
+ansible-playbook -i inventario.ini site.yml --tags validate_cuda --limit worker1 --ask-vault-pass --skip-tags debug
+```
+
+Smoke tests de Slurm (rol `slurm_validate`, desde el master):
+```bash
+ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_master --ask-vault-pass --skip-tags debug
+```
+
+Runbooks operativos (diagnóstico y evidencia):
+- Slurm: `docs/runbooks/slurm.md`
+- GPU/CUDA: `docs/runbooks/gpu-cuda.md`
+- NFS: `docs/runbooks/nfs.md`
+- Munge: `docs/runbooks/munge.md`
+- Network/Firewall: `docs/runbooks/network-firewall.md`
 
 ## Nota de alcance documental
 
