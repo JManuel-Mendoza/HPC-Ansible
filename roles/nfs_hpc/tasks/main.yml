@@ -41,6 +41,35 @@
   when: nfs_hpc_server_enabled | bool
   tags: [nfs, nfs_server, nfs_permissions]
 
+- name: NFS | Server | Buscar archivos de exports (posibles duplicados)
+  ansible.builtin.find:
+    paths:
+      - /etc/exports.d
+    file_type: file
+  register: _nfs_exportsd_files
+  changed_when: false
+  when: nfs_hpc_server_enabled | bool
+  tags: [nfs, nfs_server]
+
+- name: NFS | Server | Quitar entradas duplicadas del export (preflight)
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    # Match: "<share_dir> <allowed_clients>(...)" o "<share_dir> <allowed_clients>"
+    regexp: "^\\s*{{ nfs_hpc_share_dir | regex_escape }}\\s+{{ nfs_hpc_allowed_clients | regex_escape }}(\\s*\\(|\\s*$)"
+    state: absent
+  loop: >-
+    {{
+      (
+        ['/etc/exports']
+        + (_nfs_exportsd_files.files | default([]) | map(attribute='path') | list)
+      )
+      | unique
+      | reject('equalto', nfs_hpc_export_file)
+      | list
+    }}
+  when: nfs_hpc_server_enabled | bool
+  tags: [nfs, nfs_server]
+
 - name: NFS | Configurar exports
   ansible.builtin.template:
     src: exports.j2
