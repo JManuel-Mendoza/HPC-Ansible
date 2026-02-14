@@ -1,3 +1,4 @@
 ---
 collections:
+  # Usado por tasks con `ansible.posix.*` (ej.: firewalld, sysctl).
   - name: ansible.posix

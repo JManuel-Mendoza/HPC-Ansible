@@ -17,6 +17,12 @@ Alternativa (pip):
 python3 -m pip install --user ansible-lint
 ```
 
+Antes de correr `ansible-lint` (o `ansible-playbook`), instala las colecciones declaradas por el repo:
+
+```bash
+ansible-galaxy collection install -r requirements.yml
+```
+
 ## Cómo ejecutar
 
 Lint general del repo:

@@ -21,7 +21,7 @@ Alcance tecnico:
 ## Requisitos minimos (nodo de control)
 
 - Ansible instalado.
-- Colecciones instaladas: ver `requirements.yml`.
+- Colecciones instaladas: ver `requirements.yml` y ejecutar `ansible-galaxy collection install -r requirements.yml`.
 - Acceso SSH a los nodos (idealmente con llave).
 - Vault configurado (ver `docs/vault.md`).
 
