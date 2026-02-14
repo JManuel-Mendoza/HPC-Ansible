@@ -3,7 +3,7 @@
 Este repo configura NFS con el rol `roles/nfs_hpc`.
 
 Vars relevantes (ver `roles/nfs_hpc/defaults/main.yml`):
-- Share: `nfs_hpc_share_dir` (default: `/nfs-hpc`)
+- Share: `nfs_hpc_share_dir` (default del rol: `/nfs-hpc`; este repo lo sobreescribe a `/srv/nfs/llm` en `group_vars/all/vars.yml`)
 - Export file: `nfs_hpc_export_file` (default: `/etc/exports.d/hpc-nfs.exports`)
 - Server host: `nfs_hpc_server_host` (default: `{{ slurm_control_machine }}` / `master`)
 - Clientes permitidos: `nfs_hpc_allowed_clients` (default: `{{ slurm_internal_cidr }}`)
@@ -40,13 +40,13 @@ firewall-cmd --list-ports || true
 1) ¿Está montado?
 ```bash
 mount | grep -E ' nfs' || true
-df -hT | grep -E ' nfs|/nfs-hpc' || true
-mountpoint -q /nfs-hpc; echo $?
+df -hT | grep -E ' nfs|/srv/nfs/llm' || true
+mountpoint -q /srv/nfs/llm; echo $?
 ```
 
 2) ¿Se puede leer/escribir? (según permisos del share)
 ```bash
-ls -la /nfs-hpc | head
+ls -la /srv/nfs/llm | head
 ```
 
 ## Problemas comunes
@@ -82,5 +82,5 @@ cat /etc/exports.d/hpc-nfs.exports
 2. Verifica que el cliente esté dentro del rango permitido (`nfs_hpc_allowed_clients`, típicamente `slurm_internal_cidr`).
 3. Verifica permisos del directorio del share:
 ```bash
-ls -ld /nfs-hpc
+ls -ld /srv/nfs/llm
 ```

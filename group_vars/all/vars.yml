@@ -70,6 +70,13 @@ llm_python_packages:
   - transformers
 
 # =====================
+# NFS (share HPC)
+# =====================
+# Override del default del rol `roles/nfs_hpc` (que usa `/nfs-hpc`).
+# En este cluster el share se monta en:
+nfs_hpc_share_dir: "/srv/nfs/llm"
+
+# =====================
 # Firewall Rules
 # =====================
 
