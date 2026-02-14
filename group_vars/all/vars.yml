@@ -72,9 +72,19 @@ llm_python_packages:
 # =====================
 # NFS (share HPC)
 # =====================
-# Override del default del rol `roles/nfs_hpc` (que usa `/nfs-hpc`).
-# En este cluster el share se monta en:
-nfs_hpc_share_dir: "/srv/nfs/llm"
+# Export en el master (server) y punto de montaje en workers (clients).
+# Importante: el montaje en clientes debe usar IP del master (no el hostname literal "master").
+nfs_export_path: "/srv/nfs/llm"
+nfs_client_mountpoint: "/mnt/llm"
+
+# Preferir `ansible_host` del master (inventario). Fallback: IP por facts del master.
+# Nota: para forzar IP interna, define `ansible_host` del master con esa IP en `inventario.ini`.
+nfs_server_ip: "{{ hostvars[groups['hpc_master'][0]].ansible_host | default(hostvars[groups['hpc_master'][0]].ansible_default_ipv4.address) }}"
+
+# Variables consumidas por el rol `roles/nfs_hpc` (compatibilidad):
+nfs_hpc_share_dir: "{{ nfs_export_path }}"
+nfs_hpc_mount_point: "{{ nfs_client_mountpoint }}"
+nfs_hpc_server_host: "{{ nfs_server_ip }}"
 
 # =====================
 # Firewall Rules

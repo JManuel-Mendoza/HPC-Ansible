@@ -55,6 +55,9 @@ Tabla: variable | definida en | usada en (aprox) | categoría | notas
 | `llm_micromamba_bin` | `roles/llm_env/defaults/main.yml` | `roles/llm_env/tasks/main.yml` | llm | Binario micromamba (deriva de `llm_micromamba_root`). |
 | `slurm_firewalld_zone` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Zona donde se aplican rich rules. |
 | `slurm_internal_cidr` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml`, `roles/nfs_hpc/defaults/main.yml` | firewall/network/nfs | CIDR de confianza para Slurm y clientes NFS. |
+| `nfs_export_path` | `group_vars/all/vars.yml` | `roles/nfs_hpc/tasks/main.yml`, `roles/nfs_hpc/templates/exports.j2` | nfs | Ruta exportada en el master (server). |
+| `nfs_client_mountpoint` | `group_vars/all/vars.yml` | `roles/nfs_hpc/tasks/main.yml` | nfs | Punto de montaje en clientes (workers). |
+| `nfs_server_ip` | `group_vars/all/vars.yml` | `roles/nfs_hpc/tasks/main.yml` | nfs | IP del server NFS (deriva de `ansible_host` del `hpc_master` en inventario; fallback por facts). |
 | `slurmctld_port` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Puerto TCP del controller. |
 | `slurmd_port` | `group_vars/all/vars.yml` | `roles/firewall/tasks/main.yml` | firewall/slurm | Puerto TCP del daemon compute. |
 | `munge_uid` | `group_vars/all/vars.yml` | `roles/slurm_identities/tasks/main.yml` | slurm/munge | UID/GID declarados para consistencia entre nodos. |

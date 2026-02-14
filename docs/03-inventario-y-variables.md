@@ -28,6 +28,10 @@ Bloques clave:
   - `ssh_port`, `ssh_permit_root_login`, `ssh_password_authentication`
 - LLM:
   - `llm_conda_packages`, `llm_pip_packages`, `llm_python_packages`
+- NFS:
+  - `nfs_export_path` (export en master)
+  - `nfs_client_mountpoint` (mountpoint en workers)
+  - `nfs_server_ip` (IP del master tomada de `ansible_host` en inventario)
 - Firewall Slurm:
   - `slurm_firewalld_zone`, `slurm_internal_cidr`, `slurmctld_port`, `slurmd_port`
 - Identidades:

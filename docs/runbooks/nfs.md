@@ -3,9 +3,11 @@
 Este repo configura NFS con el rol `roles/nfs_hpc`.
 
 Vars relevantes (ver `roles/nfs_hpc/defaults/main.yml`):
-- Share: `nfs_hpc_share_dir` (default del rol: `/nfs-hpc`; este repo lo sobreescribe a `/srv/nfs/llm` en `group_vars/all/vars.yml`)
+- Export (server): `nfs_export_path` (este repo: `/srv/nfs/llm` en `group_vars/all/vars.yml`)
+- Mountpoint (clients): `nfs_client_mountpoint` (este repo: `/mnt/llm` en `group_vars/all/vars.yml`)
+- Server IP: `nfs_server_ip` (deriva de `ansible_host` del `hpc_master` en `inventario.ini`; fallback por facts)
+- Compat rol: `nfs_hpc_share_dir` (export), `nfs_hpc_mount_point` (mountpoint) y `nfs_hpc_server_host` (server addr)
 - Export file: `nfs_hpc_export_file` (default: `/etc/exports.d/hpc-nfs.exports`)
-- Server host: `nfs_hpc_server_host` (default: `{{ slurm_control_machine }}` / `master`)
 - Clientes permitidos: `nfs_hpc_allowed_clients` (default: `{{ slurm_internal_cidr }}`)
 - Servicio server:
   - RHEL/Rocky: `nfs-server`
@@ -40,13 +42,13 @@ firewall-cmd --list-ports || true
 1) ¿Está montado?
 ```bash
 mount | grep -E ' nfs' || true
-df -hT | grep -E ' nfs|/srv/nfs/llm' || true
-mountpoint -q /srv/nfs/llm; echo $?
+df -hT | grep -E ' nfs|/mnt/llm' || true
+mountpoint -q /mnt/llm; echo $?
 ```
 
 2) ¿Se puede leer/escribir? (según permisos del share)
 ```bash
-ls -la /srv/nfs/llm | head
+ls -la /mnt/llm | head
 ```
 
 ## Problemas comunes
@@ -83,4 +85,19 @@ cat /etc/exports.d/hpc-nfs.exports
 3. Verifica permisos del directorio del share:
 ```bash
 ls -ld /srv/nfs/llm
+```
+
+## Remoción segura (tag `del_nfs`)
+
+El rol `roles/nfs_hpc` incluye tareas de remoción bajo el tag `del_nfs`:
+- En server (master): quita el archivo de exports del repo y cierra 2049/tcp si `firewalld` está activo.
+- En clientes: desmonta `/mnt/llm`, limpia fstab y (si están vacíos) intenta borrar directorios de montaje legacy.
+
+Ejemplos:
+```bash
+# Remover NFS solo en workers (recomendado primero)
+ansible-playbook -i inventario.ini site.yml --tags del_nfs --limit workers
+
+# Remover export NFS del master (no borra /srv/nfs/llm ni su contenido)
+ansible-playbook -i inventario.ini site.yml --tags del_nfs --limit hpc_master
 ```

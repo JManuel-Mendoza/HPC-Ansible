@@ -670,7 +670,7 @@ master | CHANGED | rc=0 >>
 **Key findings (from SUMMARY + reports):**
 - All nodes: NVMe disk `nvme0n1` ~238.5G; SATA disk `sda` ~3.6T; `/data` is on `sda1` (xfs).
 - Master: `llm_nfs_export_dir` exists at `/export/llm-project` and lives on root (`/dev/nvme0n1p3`); `exportfs -v` output is empty (no active exports reported).
-- Workers: `findmnt /mnt/llm-project` empty; NFS mount appears **not mounted** even though fstab includes `master:/export/llm-project /mnt/llm-project nfs _netdev,nofail,...`.
+- Workers: `findmnt /mnt/llm-project` empty; NFS mount appears **not mounted** even though fstab includes `master-host:/export/llm-project /mnt/llm-project nfs _netdev,nofail,...`.
 **Next-step recommendation:**
 - Use `/data` (SATA 3.6T) for persistent datasets/checkpoints.
 - Use NVMe (e.g., `/opt` or a dedicated `/scratch` on nvme) for scratch/cache.
