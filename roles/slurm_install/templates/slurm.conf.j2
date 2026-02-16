@@ -1,3 +1,9 @@
+{# Proposito: Renderizar plantilla del rol 'slurm_install' para instalar binarios, unidades y archivos base de Slurm. #}
+{# Supuestos/prerrequisitos: El archivo destino debe existir con permisos definidos por la task de template en el rol. #}
+{# Variables clave consumidas: slurm_control_machine, slurm_srun_port_range, slurm_host_list, slurm_partitions y hostvars slurm_* por nodo. #}
+{# Estructura de salida y ramas condicionales: El render respeta condicionales y bucles Jinja para adaptar configuracion por host/grupo. #}
+{# Tags relevantes: Heredadas del task que invoca template dentro del rol. #}
+
 # slurm.config_1
 # Example slurm.conf file. Please run configurator.html
 # (in doc/html) to build a configuration file customized

@@ -1,3 +1,12 @@
+# Proposito:
+# - Implementar tareas del rol 'network_internal' para configurar enlaces y direccionamiento de red interna.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/network_internal/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
 ---
 - name: Red Interna | Verificar conexion int-{{ link_item.key }}
   ansible.builtin.set_fact:

@@ -1,3 +1,12 @@
+# Proposito:
+# - Implementar tareas del rol 'slurm_identities' para asegurar usuarios y grupos de servicio Slurm/Munge.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/slurm_identities/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
 - name: Choose nologin shell (varies by distro)
   ansible.builtin.set_fact:
     nologin_shell: "{{ '/usr/sbin/nologin' if (ansible_facts['distribution'] in ['Ubuntu', 'Debian']) else '/sbin/nologin' }}"

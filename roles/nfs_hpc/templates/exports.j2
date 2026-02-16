@@ -1,1 +1,7 @@
+{# Proposito: Renderizar plantilla del rol 'nfs_hpc' para provisionar export y montaje NFS para datos compartidos. #}
+{# Supuestos/prerrequisitos: El archivo destino debe existir con permisos definidos por la task de template en el rol. #}
+{# Variables clave consumidas: nfs_hpc_share_dir, nfs_hpc_allowed_clients, nfs_hpc_export_opts. #}
+{# Estructura de salida y ramas condicionales: El render respeta condicionales y bucles Jinja para adaptar configuracion por host/grupo. #}
+{# Tags relevantes: Heredadas del task que invoca template dentro del rol. #}
+
 {{ nfs_hpc_share_dir }} {{ nfs_hpc_allowed_clients }}({{ nfs_hpc_export_opts }})

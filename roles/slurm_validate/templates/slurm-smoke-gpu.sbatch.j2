@@ -1,3 +1,9 @@
+{# Proposito: Renderizar plantilla del rol 'slurm_validate' para ejecutar validaciones read-only de Slurm y smoke jobs. #}
+{# Supuestos/prerrequisitos: El archivo destino debe existir con permisos definidos por la task de template en el rol. #}
+{# Variables clave consumidas: slurm_validate_partitions #}
+{# Estructura de salida y ramas condicionales: El render respeta condicionales y bucles Jinja para adaptar configuracion por host/grupo. #}
+{# Tags relevantes: Heredadas del task que invoca template dentro del rol. #}
+
 #!/bin/bash
 #SBATCH -J smoke-gpu
 #SBATCH -p {{ slurm_validate_partitions.gpu }}

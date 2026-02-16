@@ -1,3 +1,12 @@
+# Proposito:
+# - Implementar tareas del rol 'slurm_controller' para configurar servicios Slurm de control y accounting.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/slurm_controller/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
 ---
 - name: Slurm | Ensure log dir exists (master)
   ansible.builtin.file:

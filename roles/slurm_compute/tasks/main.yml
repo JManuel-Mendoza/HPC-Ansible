@@ -1,3 +1,12 @@
+# Proposito:
+# - Implementar tareas del rol 'slurm_compute' para configurar servicios Slurm en nodos de computo.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/slurm_compute/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
 ---
 - name: Slurm | Gather service facts (compute)
   ansible.builtin.service_facts:

@@ -1,3 +1,12 @@
+# Proposito:
+# - Definir ajustes especificos del host 'worker2' para sobreescribir variables comunes cuando es necesario.
+# Supuestos/prerrequisitos:
+# - El hostname debe coincidir con inventario.ini para que los overrides apliquen correctamente.
+# Variables clave consumidas:
+# - Overrides por nodo para red, Slurm, GPU o parametros operativos sensibles al hardware.
+# Tags relevantes:
+# - N/A directo en este archivo; las tags se evalúan en playbooks/tasks consumidoras.
+
 # # Reservas para administracion sin causar INVALID_REG.
 # # Slurm mantiene los totales reales, pero no asigna estos recursos.
 # slurm_core_spec_count: 3

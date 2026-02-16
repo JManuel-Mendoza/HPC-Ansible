@@ -1,3 +1,12 @@
+# Proposito:
+# - Implementar tareas del rol 'llm_env' para provisionar entorno LLM (micromamba, python y torch).
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/llm_env/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
 ---
 - name: LLM Env | Ensure base packages
   ansible.builtin.dnf:

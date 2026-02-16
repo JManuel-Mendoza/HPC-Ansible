@@ -1,3 +1,12 @@
+# Proposito:
+# - Definir handlers del rol 'slurm_install' para aplicar cambios diferidos solo cuando hay notify.
+# Supuestos/prerrequisitos:
+# - Los handlers se ejecutan al final del play o tras flush_handlers; requieren servicios instalados previamente.
+# Variables clave consumidas:
+# - Parametros definidos en defaults/vars del rol y estados calculados por tasks que notifican.
+# Tags relevantes:
+# - No aplican tags directas; se activan por notify desde tasks etiquetadas.
+
 ---
 - name: SlurmDBD | Aplicar tmpfiles
   ansible.builtin.command: systemd-tmpfiles --create

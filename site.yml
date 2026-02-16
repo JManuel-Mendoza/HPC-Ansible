@@ -1,3 +1,12 @@
+# Proposito:
+# - Orquestar el despliegue del cluster en 15 etapas, separando capas de red, storage, Slurm, LLM y validacion.
+# Supuestos/prerrequisitos:
+# - Inventario y variables deben estar definidos; cada play recolecta facts en pre_tasks para mantener consistencia entre etapas.
+# Variables clave consumidas:
+# - group_vars/all/vars.yml, group_vars/hpc_master.yml, host_vars/* y defaults de cada rol incluido.
+# Tags relevantes:
+# - common, ssh, network, routing, firewall, nfs, cuda, slurm, llm, validate, slurm_validate.
+
 ---
 - name: Etapa 1 | Baseline HPC (common + ssh)
   hosts: all

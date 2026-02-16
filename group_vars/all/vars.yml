@@ -1,3 +1,12 @@
+# Proposito:
+# - Definir variables de inventario para el alcance 'all' con impacto transversal en roles/playbooks.
+# Supuestos/prerrequisitos:
+# - Las claves aqui declaradas deben ser compatibles con defaults de roles y grupos existentes en inventario.
+# Variables clave consumidas:
+# - Variables globales de cluster (red, Slurm, NFS, CUDA, validaciones) y sus overrides por host.
+# Tags relevantes:
+# - N/A directo en este archivo; las tags se evalúan en playbooks/tasks consumidoras.
+
 # Variables globales del cluster (baseline + topologia/red/firewall/slurm).
 # Objetivo: tener un único lugar para defaults globales y replicabilidad.
 #
