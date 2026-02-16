@@ -6,7 +6,7 @@
 \chapter{Automatización del clúster con Ansible}
 \label{chap:ansible}
 
-Este capítulo presenta Ansible como herramienta de automatización para administración de infraestructura. Primero se explica qué es, cómo funciona y cómo se organiza un proyecto típico. Después se muestran ejemplos independientes (no ligados todavía a la implementación del clúster). En la siguiente sección del capítulo se documenta la implementación realizada en la práctica para este proyecto.
+Este capítulo presenta Ansible como herramienta de automatización para administración de infraestructura. La organización del contenido sigue este flujo: introducción, teoría completa, paso a paso único, práctica con ejemplos mínimos e implementación práctica en el clúster.
 
 % \begin{figure}[h]
 %   \centering
@@ -90,338 +90,9 @@ Los nodos gestionados no requieren Ansible instalado, pero normalmente requieren
   \item Python para ejecutar el código que Ansible envía temporalmente al nodo (salvo excepciones como algunos módulos de red). \cite{ansible_installation_guide}
 \end{itemize}
 
+Como requisito operativo mínimo, se considera suficiente disponer de Python 3 accesible en el nodo gestionado para permitir la ejecución remota de módulos estándar.
+
 Por defecto, Ansible asume el uso de llaves SSH (recomendado). Si se usa contraseña, Ansible puede solicitarla con opciones específicas. \cite{ansible_connection_details}
-
-\section{Ejemplos independientes de uso}
-\label{sec:ansible_ejemplos}
-
-Los ejemplos de esta sección sirven para entender el uso básico. En la implementación del proyecto se ajustan rutas, nombres de hosts, usuarios y llaves según el clúster.
-
-\subsection{Ejemplo 1: inventario mínimo (INI)}
-\label{subsec:ansible_ej1_inventario}
-
-Un inventario INI mínimo define hosts y grupos:
-
-\begin{verbatim}
-# inventory.ini (ejemplo)
-[master]
-master ansible_host=10.195.34.17
-
-[workers]
-worker1 ansible_host=10.195.34.21
-worker2 ansible_host=10.195.34.22
-
-[all:vars]
-ansible_user=sistemas
-\end{verbatim}
-
-Este formato permite apuntar a los hosts por nombre (\texttt{worker1}) y conservar la IP como variable (\texttt{ansible\_host}). \cite{ansible_inventory_intro}
-
-% \begin{figure}[h]
-%   \centering
-%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/a10_inventory_ini.png}
-%   \caption{Ejemplo de inventario INI y su ubicación en el proyecto.}
-%   \label{fig:ansible_inventory_ini}
-% \end{figure}
-
-\subsection{Ejemplo 2: comando ad hoc para probar conectividad (ping)}
-\label{subsec:ansible_ej2_ping}
-
-Los \textbf{ad hoc commands} son comandos de una sola tarea que se ejecutan sin escribir playbooks. Son útiles para pruebas rápidas. \cite{ansible_adhoc_intro}
-
-\begin{verbatim}
-ansible -i inventory.ini all -m ping
-\end{verbatim}
-
-Si la conectividad y credenciales son correctas, cada host responde con \texttt{pong}.
-
-% \begin{figure}[h]
-%   \centering
-%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/a11_ansible_ping.png}
-%   \caption{Ejecución de \texttt{ansible -m ping} y salida esperada.}
-%   \label{fig:ansible_ping}
-% \end{figure}
-
-\subsection{Ejemplo 3: ejecutar un comando simple en varios hosts}
-\label{subsec:ansible_ej3_command}
-
-\begin{verbatim}
-ansible -i inventory.ini workers -m command -a "hostname"
-\end{verbatim}
-
-Este ejemplo consulta el hostname en todos los \textit{workers}. Para comandos que requieren shell (pipes, redirecciones), se usa el módulo \texttt{shell} con cuidado.
-
-\subsection{Ejemplo 4: playbook mínimo (instalar un paquete)}
-\label{subsec:ansible_ej4_playbook}
-
-Un playbook describe tareas repetibles. Este ejemplo asegura que un paquete esté presente:
-
-\begin{verbatim}
-# install-tools.yml (ejemplo)
-- name: Instalar herramientas básicas
-  hosts: workers
-  become: yes
-  tasks:
-    - name: Asegurar que htop esté instalado
-      ansible.builtin.dnf:
-        name: htop
-        state: present
-\end{verbatim}
-
-La idempotencia implica que, si \texttt{htop} ya está instalado, la tarea no vuelve a instalarlo. \cite{ansible_playbooks_intro,ansible_modules_intro}
-
-Para ejecutarlo:
-
-\begin{verbatim}
-ansible-playbook -i inventory.ini install-tools.yml
-\end{verbatim}
-
-% \begin{figure}[h]
-%   \centering
-%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/a12_ansible_playbook_run.png}
-%   \caption{Ejecución de un playbook con \texttt{ansible-playbook}.}
-%   \label{fig:ansible_playbook_run}
-% \end{figure}
-
-\subsection{Ejemplo 5: copiar un archivo de configuración}
-\label{subsec:ansible_ej5_copy}
-
-\begin{verbatim}
-# copy-example.yml (ejemplo)
-- name: Copiar archivo a /etc
-  hosts: master
-  become: yes
-  tasks:
-    - name: Copiar un archivo de ejemplo
-      ansible.builtin.copy:
-        src: files/ejemplo.conf
-        dest: /etc/ejemplo.conf
-        owner: root
-        group: root
-        mode: "0644"
-\end{verbatim}
-
-Este tipo de automatización es útil para estandarizar configuraciones entre nodos.
-
-\section{Implementación práctica en el clúster: instalación de Ansible y primera prueba}
-\label{sec:ansible_practica_instalacion_ping}
-
-Esta sección documenta la preparación del nodo de control y la primera prueba de conectividad con Ansible. En este proyecto, el nodo \textit{master} se usa como \textbf{nodo de control} para ejecutar automatizaciones sobre los \textit{workers}. Ansible se ejecuta desde el \textit{master} y se conecta a los demás nodos por SSH, lo que permite operar el clúster sin acceder manualmente nodo por nodo. \cite{ansible_installation_distros,ansible_connection_details}
-
-\subsection{Instalación de Ansible en el nodo master (nodo de control)}
-\label{subsec:ansible_install_master}
-
-En sistemas tipo RHEL/Rocky, Ansible puede instalarse desde repositorios del sistema (por ejemplo, AppStream en RHEL 9) o desde repositorios comunitarios (como EPEL) dependiendo de la distribución y del paquete deseado. En entornos de servidores es común usar el gestor de paquetes del sistema para mantener actualizaciones y dependencias controladas. \cite{redhat_rhel9_ansible_core,ansible_installation_distros}
-
-\subsubsection*{Procedimiento realizado}
-\begin{enumerate}
-  \item Se actualizó el sistema para aplicar parches antes de instalar herramientas:
-\end{enumerate}
-
-\begin{verbatim}
-sudo dnf -y update
-\end{verbatim}
-
-% \begin{figure}[h]
-%   \centering
-%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/p01_dnf_update_master.png}
-%   \caption{Actualización del sistema en el master antes de instalar Ansible.}
-%   \label{fig:p01_dnf_update_master}
-% \end{figure}
-
-\begin{enumerate}
-  \setcounter{enumi}{1}
-  \item Se instaló Ansible en el \textit{master} usando \texttt{dnf}:
-\end{enumerate}
-
-\begin{verbatim}
-sudo dnf install ansible-core -y
-\end{verbatim}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.6\textwidth]{images/ansible/ansible-core install.png}
-  \caption{Instalación de Ansible (paquete \texttt{ansible-core}) en el master.}
-  \label{fig:install_ansible_core}
-\end{figure}
-
-\begin{enumerate}
-  \setcounter{enumi}{2}
-  \item Se verificó la instalación y versión:
-\end{enumerate}
-
-\begin{verbatim}
-ansible --version
-\end{verbatim}
-
-La salida mostró la versión de \texttt{ansible-core}, la versión de Python y la ruta del archivo de configuración de Ansible cuando aplica. Esto confirmó que Ansible quedó disponible desde la terminal del \textit{master}. \cite{ansible_installation_guide}
-
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=0.92\textwidth]{images/ansible/ansible version.png}
-  \caption{Verificación de instalación de Ansible con \texttt{ansible --version}.}
-  \label{fig:p03_ansible_version}
-\end{figure}
-
-\subsection{Estructura mínima del proyecto de automatización}
-\label{subsec:ansible_project_structure}
-
-En este proyecto se organiza la automatización como un directorio de trabajo que contiene:
-\begin{itemize}
-  \item Un inventario (lista de hosts del clúster).
-  \item Una configuración local del proyecto (\texttt{ansible.cfg}) para evitar depender de configuraciones globales.
-  \item Playbooks y roles (cuando la automatización crece).
-\end{itemize}
-
-Mantener un \texttt{ansible.cfg} local ayuda a que el proyecto sea replicable: quien copie el repositorio obtiene la misma configuración por defecto. Ansible incluye herramientas para inspeccionar configuración y sus fuentes, como \texttt{ansible-config}. \cite{ansible_config_reference}
-
-\subsubsection*{Procedimiento realizado}
-\begin{enumerate}
-  \item Se creó un directorio de trabajo para la automatización (ejemplo: \texttt{\textasciitilde/hpc-ansible}) y se ingresó a él:
-\end{enumerate}
-
-\begin{verbatim}
-mkdir -p ~/hpc-ansible
-cd ~/hpc-ansible
-\end{verbatim}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.92\textwidth]{images/ansible/dir ansible.png}
-  \caption{Creación del directorio exclusivo para usar Ansible}
-  \label{fig:p04_project_structure}
-\end{figure}
-
-\subsection{Creación del inventario del clúster (\texttt{inventario.ini})}
-\label{subsec:ansible_inventory_ini_real}
-
-El inventario define qué equipos administra Ansible y cómo conectarse a ellos. En este proyecto se organizó el inventario en dos grupos: \texttt{master} y \texttt{workers}. Además, se definió el usuario remoto común (\texttt{sistemas}) como variable global. \cite{ansible_inventory_intro,ansible_connection_details}
-
-\subsubsection*{Procedimiento realizado}
-\begin{enumerate}
-  \item Se creó el archivo \texttt{inventario.ini} usando \texttt{nano}:
-\end{enumerate}
-
-\begin{verbatim}
-nano inventario.ini
-\end{verbatim}
-
-En el editor se escribió el siguiente contenido y se guardó el archivo.
-
-\begin{verbatim}
-[hpc_master]
-master ansible_host=10.195.34.17 ansible_user=sistemas
-
-[workers]
-worker1 ansible_host=10.195.20.52 ansible_user=sistemas
-worker2 ansible_host=10.195.34.19 ansible_user=sistemas
-
-[all:vars]
-ansible_python_interpreter=/usr/bin/python3
-ansible_ssh_private_key_file=~/.ssh/id_ed25519
-\end{verbatim}
-
-Para guardar en \texttt{nano} se usó \texttt{Ctrl+O}, luego \texttt{Enter}, y para salir \texttt{Ctrl+X}.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.92\textwidth]{images/ansible/inventario.png}
-  \caption{Edición de \texttt{inventario.ini} con \texttt{nano}.}
-  \label{fig:p05_inventory_ini_nano}
-\end{figure}
-
-En este punto, \texttt{worker1} y \texttt{worker2} pueden resolverse por nombre si existe DNS o si posteriormente se agregan entradas en \texttt{/etc/hosts}. Si aún no hay resolución de nombres, el inventario se completa asignando \texttt{ansible\_host=<IP>} a cada worker.
-
-\subsection{Configuración local del proyecto (\texttt{ansible.cfg})}
-\label{subsec:ansible_cfg_local_minimo}
-
-Ansible permite definir parámetros por defecto en \texttt{ansible.cfg}. En esta fase se utiliza un archivo local para fijar el inventario por defecto y evitar escribir \texttt{-i inventory.ini} en cada comando. La referencia oficial documenta este comportamiento y las opciones disponibles. \cite{ansible_config_reference}
-
-\subsubsection*{Procedimiento realizado}
-\begin{enumerate}
-  \item Se creó el archivo \texttt{ansible.cfg} usando \texttt{nano}:
-\end{enumerate}
-
-\begin{verbatim}
-nano ansible.cfg
-\end{verbatim}
-
-En el editor se escribió el siguiente contenido y se guardó el archivo:
-
-\begin{verbatim}
-[defaults]
-inventory = inventario.ini
-timeout = 30
-
-[ssh_connection]
-pipelining = True
-\end{verbatim}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.92\textwidth]{images/ansible/ansible cfg.png}
-  \caption{Edición de \texttt{ansible.cfg} con \texttt{nano}.}
-  \label{fig:p06_ansible_cfg_nano}
-\end{figure}
-
-\begin{enumerate}
-  \setcounter{enumi}{1}
-  \item Se verificó que Ansible estuviera usando el archivo de configuración local:
-\end{enumerate}
-
-\begin{verbatim}
-ansible --version
-\end{verbatim}
-
-En la salida se observó la línea \texttt{config file = .../hpc-ansible/ansible.cfg}, lo cual confirmó que la ejecución estaba tomando la configuración del proyecto.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.92\textwidth]{images/ansible/ansible ver cfg.png}
-  \caption{Verificación de \texttt{config file} en \texttt{ansible --version}.}
-  \label{fig:p07_ansible_version_config_file}
-\end{figure}
-
-\subsection{Primera prueba de conectividad con Ansible}
-\label{subsec:ansible_first_ping_minimo}
-
-El módulo \texttt{ping} de Ansible se usa como prueba inicial porque confirma que el nodo de control puede conectarse al host remoto y ejecutar un módulo básico. Esta prueba depende de que exista conectividad SSH y credenciales correctas (preferiblemente llaves). \cite{ansible_adhoc_intro,ansible_connection_details}
-
-\subsubsection*{Procedimiento realizado}
-\begin{enumerate}
-  \item Se probó conectividad contra todos los hosts del inventario:
-\end{enumerate}
-
-\begin{verbatim}
-ansible all -m ping
-\end{verbatim}
-
-En la salida se observó \texttt{pong} en los hosts accesibles, lo cual confirmó que Ansible podía ejecutar módulos de forma remota.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.75\textwidth]{images/ansible/all ping.png}
-  \caption{Primera prueba con \texttt{ansible all -m ping} y respuesta \texttt{pong}.}
-  \label{fig:p08_ansible_ping_all}
-\end{figure}
-
-\begin{enumerate}
-  \setcounter{enumi}{1}
-  \item Se verificó la identificación de los workers ejecutando \texttt{hostname}:
-\end{enumerate}
-
-\begin{verbatim}
-ansible workers -m command -a "hostname"
-\end{verbatim}
-
-La salida mostró \texttt{worker1} y \texttt{worker2}, lo cual evidenció que las conexiones estaban llegando a los nodos correctos.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.92\textwidth]{images/ansible/ansible hostname workers.png}
-  \caption{Ejecución del comando \texttt{hostname} en los workers con Ansible.}
-  \label{fig:p09_ansible_hostname_workers}
-\end{figure}
 
 \section{YAML: el formato base de Ansible}
 \label{sec:ansible_yaml}
@@ -430,27 +101,27 @@ Antes de describir playbooks, es útil entender \textbf{YAML}, el formato de tex
 
 Conceptos mínimos de YAML:
 \begin{itemize}
-  \item \textbf{Indentación:} define jerarquías. Se recomienda usar dos espacios. No se mezclan tabs.
-  \item \textbf{Listas:} comienzan con guion. Cada elemento es un ítem.
-  \item \textbf{Mapas (pares clave-valor):} se escriben como \texttt{clave: valor}.
+  \item \inlineconcept{Indentación:} define jerarquías. Se recomienda usar dos espacios. No se mezclan tabs.
+  \item \inlineconcept{Listas:} comienzan con guion. Cada elemento es un ítem.
+  \item \inlineconcept{Mapas (pares clave-valor):} se escriben como \texttt{clave: valor}.
 \end{itemize}
 
 Ejemplo simple de YAML (lista de paquetes):
-\begin{verbatim}
+\begin{codeblock}
 packages:
   - vim
   - git
   - htop
-\end{verbatim}
+\end{codeblock}
 
 Y ejemplo con mapas y listas combinadas:
-\begin{verbatim}
+\begin{codeblock}
 server:
   name: nodo01
   services:
     - ssh
     - firewalld
-\end{verbatim}
+\end{codeblock}
 
 En Ansible, un playbook es una \textbf{lista} de \textit{plays}; por eso suele comenzar con un guion. La indentación y los guiones indican la estructura del documento. \cite{ansible_playbooks_intro}
 
@@ -485,8 +156,8 @@ Esta estructura permite separar responsabilidades: un \textit{play} puede dedica
 
 El siguiente ejemplo muestra un playbook con dos \textit{plays}: uno para tareas base en todos los nodos y otro específico para un grupo \texttt{web}.
 
-\begin{verbatim}
-# multi-play.yml (ejemplo)
+\begin{codeblock}
+multi-play.yml (ejemplo)
 - name: Preparar sistema base
   hosts: all
   become: yes
@@ -514,7 +185,7 @@ El siguiente ejemplo muestra un playbook con dos \textit{plays}: uno para tareas
         name: nginx
         enabled: true
         state: started
-\end{verbatim}
+\end{codeblock}
 
 Aquí se observa que el primer \textit{play} es general (\texttt{all}) y el segundo se limita a un grupo específico (\texttt{web}). Cada \textit{play} puede tener sus propias tareas y variables.
 
@@ -526,8 +197,8 @@ Un \textbf{\textit{handler}} es una tarea especial que \textbf{solo se ejecuta s
 
 Este ejemplo ilustra cómo una tarea puede disparar un \textit{handler} para reiniciar un servicio únicamente si hubo cambios en un archivo:
 
-\begin{verbatim}
-# config-app.yml (ejemplo)
+\begin{codeblock}
+config-app.yml (ejemplo)
 - name: Desplegar configuración de una app
   hosts: app
   become: yes
@@ -545,7 +216,7 @@ Este ejemplo ilustra cómo una tarea puede disparar un \textit{handler} para rei
       ansible.builtin.systemd:
         name: app
         state: restarted
-\end{verbatim}
+\end{codeblock}
 
 La relación entre tareas y \textit{handlers} es clave para mantener idempotencia y evitar reinicios innecesarios.
 
@@ -562,12 +233,12 @@ Componentes básicos de una tarea con módulo:
 \end{itemize}
 
 Ejemplo de tarea usando un módulo:
-\begin{verbatim}
+\begin{codeblock}
 - name: Asegurar que htop esté instalado
   ansible.builtin.dnf:
     name: htop
     state: present
-\end{verbatim}
+\end{codeblock}
 
 Otros módulos comunes:
 \begin{itemize}
@@ -583,15 +254,15 @@ Comprender los módulos es clave porque cada uno tiene parámetros propios y res
 
 El archivo \texttt{site.yml} es el punto de entrada del proyecto de automatización. En esta etapa se presenta una \textbf{estructura base simplificada} que se irá completando a medida que avanzan los capítulos. Esta versión inicial permite entender la organización general sin entrar aún en todo el detalle.
 
-\begin{verbatim}
-# site.yml (estructura base inicial)
+\begin{codeblock}
+site.yml (estructura base inicial)
 - name: Baseline para todos los nodos
   hosts: all
   become: true
   roles:
     - common
     # (se agregan más roles de base en capítulos posteriores)
-\end{verbatim}
+\end{codeblock}
 
 En los siguientes apartados se muestra cómo esta estructura se va enriqueciendo con roles adicionales hasta llegar a la versión actual del proyecto.
 
@@ -625,24 +296,24 @@ La ventaja principal es la \textbf{reutilización}: un rol bien definido puede u
 
 El siguiente ejemplo muestra un rol sencillo llamado \texttt{mi\_servicio}, con una estructura mínima típica. Se incluye un diagrama ASCII para visualizar las carpetas y dos archivos clave: uno de tareas y otro de \textit{handlers}.
 
-\begin{verbatim}
+\begin{codeblock}
 roles/
-└── mi_servicio/
-    ├── tasks/
-    │   └── main.yml
-    ├── handlers/
-    │   └── main.yml
-    ├── defaults/
-    │   └── main.yml
-    ├── templates/
-    │   └── mi_servicio.conf.j2
-    └── files/
-        └── banner.txt
-\end{verbatim}
+`-- mi_servicio/
+    |-- tasks/
+    |   `-- main.yml
+    |-- handlers/
+    |   `-- main.yml
+    |-- defaults/
+    |   `-- main.yml
+    |-- templates/
+    |   `-- mi_servicio.conf.j2
+    `-- files/
+        `-- banner.txt
+\end{codeblock}
 
 Ejemplo de \texttt{tasks/main.yml}:
-\begin{verbatim}
-# roles/mi_servicio/tasks/main.yml
+\begin{codeblock}
+roles/mi_servicio/tasks/main.yml
 - name: Instalar paquete del servicio
   ansible.builtin.dnf:
     name: mi-servicio
@@ -653,16 +324,16 @@ Ejemplo de \texttt{tasks/main.yml}:
     src: mi_servicio.conf.j2
     dest: /etc/mi_servicio/mi_servicio.conf
   notify: Reiniciar mi servicio
-\end{verbatim}
+\end{codeblock}
 
 Ejemplo de \texttt{handlers/main.yml}:
-\begin{verbatim}
-# roles/mi_servicio/handlers/main.yml
+\begin{codeblock}
+roles/mi_servicio/handlers/main.yml
 - name: Reiniciar mi servicio
   ansible.builtin.systemd:
     name: mi-servicio
     state: restarted
-\end{verbatim}
+\end{codeblock}
 
 Cómo funciona todo en conjunto:
 \begin{itemize}
@@ -683,7 +354,7 @@ Esta sección explica tres conceptos esenciales para hacer playbooks y roles fle
 Una \textbf{variable} es un valor que puede cambiar sin modificar el playbook. Sirve para parametrizar nombres de paquetes, rutas, puertos o usuarios. En Ansible, las variables se definen en diferentes lugares (por ejemplo, dentro del playbook, en \texttt{group\_vars/}, \texttt{host\_vars/} o en \texttt{defaults/} de un rol) y luego se usan con la sintaxis \texttt{\{\{ variable \}\}}. \cite{ansible_variables}
 
 Ejemplo simple de variables en un playbook:
-\begin{verbatim}
+\begin{codeblock}
 - name: Configurar un servicio con variables
   hosts: all
   become: yes
@@ -695,7 +366,7 @@ Ejemplo simple de variables en un playbook:
       ansible.builtin.dnf:
         name: "{{ servicio }}"
         state: present
-\end{verbatim}
+\end{codeblock}
 
 En este ejemplo, cambiar \texttt{servicio} o \texttt{puerto} modifica el comportamiento del playbook sin reescribir tareas.
 
@@ -707,19 +378,19 @@ Una \textbf{plantilla} es un archivo de texto que incluye variables y lógica b�
 Las variables que aparecen en una plantilla provienen de las mismas fuentes que en un playbook: pueden estar definidas en \texttt{vars:} dentro del playbook, en archivos de grupo (\texttt{group\_vars/}), en archivos por host (\texttt{host\_vars/}) o en los \texttt{defaults/} de un rol. Al ejecutar el playbook, Ansible construye un conjunto de variables disponible para la plantilla y reemplaza cada \texttt{\{\{ variable \}\}} con su valor correspondiente. \cite{ansible_variables}
 
 Ejemplo de plantilla (\texttt{templates/app.conf.j2}):
-\begin{verbatim}
-# app.conf.j2 (ejemplo)
+\begin{codeblock}
+app.conf.j2 (ejemplo)
 port={{ puerto }}
 log_path={{ log_dir }}/app.log
-\end{verbatim}
+\end{codeblock}
 
 Ejemplo de tarea que renderiza la plantilla:
-\begin{verbatim}
+\begin{codeblock}
 - name: Generar configuración desde plantilla
   ansible.builtin.template:
     src: templates/app.conf.j2
     dest: /etc/mi_app/app.conf
-\end{verbatim}
+\end{codeblock}
 
 Si cambian las variables \texttt{puerto} o \texttt{log\_dir}, el archivo generado será diferente. Esto permite mantener una sola plantilla para múltiples nodos con configuraciones específicas.
 
@@ -729,7 +400,7 @@ Si cambian las variables \texttt{puerto} o \texttt{log\_dir}, el archivo generad
 Un \textbf{archivo estático} es un archivo que se copia exactamente igual al host remoto, sin reemplazo de variables. Se usa para binarios, scripts, certificados, o archivos de texto que no requieren personalización. El módulo típico es \texttt{ansible.builtin.copy}, y los archivos suelen vivir en la carpeta \texttt{files/} del rol.
 
 Ejemplo de tarea con archivo estático:
-\begin{verbatim}
+\begin{codeblock}
 - name: Copiar banner estático
   ansible.builtin.copy:
     src: banner.txt
@@ -737,7 +408,7 @@ Ejemplo de tarea con archivo estático:
     owner: root
     group: root
     mode: "0644"
-\end{verbatim}
+\end{codeblock}
 
 Es importante que la ruta de destino exista en los nodos de destino (por ejemplo, \texttt{/etc/} o \texttt{/opt/mi\_app/}). Si el directorio no existe, la tarea fallará, por lo que normalmente se crea antes con un módulo como \texttt{ansible.builtin.file}.
 
@@ -747,9 +418,9 @@ Es importante que la ruta de destino exista en los nodos de destino (por ejemplo
 Una vez escrito un playbook, se ejecuta con el comando \texttt{ansible-playbook}. El objetivo es que Ansible lea el archivo, se conecte a los hosts definidos en el inventario, ejecute las tareas en orden y reporte el resultado de cada una.
 
 Comando general de ejecución:
-\begin{verbatim}
+\begin{terminalblock}
 ansible-playbook -i inventory.ini mi-playbook.yml
-\end{verbatim}
+\end{terminalblock}
 
 Componentes del comando:
 \begin{itemize}
@@ -778,9 +449,410 @@ Al final, Ansible muestra un resumen (\textit{play recap}) por cada host, indica
 
 En una ejecución exitosa, se espera:
 \begin{itemize}
-  \item Conectividad estable con todos los hosts del inventario.
-  \item Cero fallos (\texttt{failed=0}) en el resumen final.
-  \item Cambios solo cuando son necesarios (idempotencia).
+  \item \inlineok Conectividad estable con todos los hosts del inventario.
+  \item \inlineok[OK: failed=0] En el resumen final no se observan fallos.
+  \item \inlineok Cambios solo cuando son necesarios (idempotencia).
+  \item \inlinefail Cuando aparece \texttt{failed>0} o no hay respuesta de los hosts objetivo.
 \end{itemize}
 
 Si se ejecuta el mismo playbook por segunda vez sin modificar nada, la mayoría de tareas deberían aparecer como \texttt{ok} y no \texttt{changed}, lo cual indica que el sistema ya está en el estado deseado.
+
+\section{Paso a paso único}
+\label{subsec:ansible_paso_a_paso_unico}
+
+Como guía operativa breve para enmarcar los ejemplos del capítulo, se sigue esta secuencia:
+\begin{enumerate}
+  \item \textbf{Confirmar conectividad y acceso SSH:} se valida primero el acceso remoto descrito en la Sección~\ref{sec:ssh_master} y en los requisitos de la Sección~\ref{sec:ansible_requisitos}.
+  \item \textbf{Verificar inventario y grupos:} se revisa el formato y la agrupación de hosts con base en la Subsección~\ref{subsec:ansible_ej1_inventario} y su adaptación al clúster en la Subsección~\ref{subsec:ansible_inventory_ini_real}.
+  \item \textbf{Probar conectividad con Ansible ping:} se ejecuta la validación mínima indicada en las Subsecciones~\ref{subsec:ansible_ej2_ping} y~\ref{subsec:ansible_first_ping_minimo}.
+  \item \textbf{Ejecutar un playbook mínimo:} se usa el flujo de ejemplo documentado en la Subsección~\ref{subsec:ansible_ej4_playbook}.
+  \item \textbf{Verificar resultados y salida:} se interpreta la ejecución con los criterios de las Subsecciones~\ref{subsec:ansible_output} y~\ref{subsec:ansible_expected_results}; la evidencia queda en la salida de consola del comando ejecutado.
+\end{enumerate}
+
+\section{Práctica (ejemplos mínimos)}
+\label{sec:ansible_ejemplos}
+
+Los ejemplos de esta sección sirven para entender el uso básico. En la implementación del proyecto se ajustan rutas, nombres de hosts, usuarios y llaves según el clúster.
+
+\subsection{Ejemplo 1: inventario mínimo (INI)}
+\label{subsec:ansible_ej1_inventario}
+
+Un inventario INI mínimo define hosts y grupos:
+
+\begin{codeblock}
+inventory.ini (ejemplo)
+[master]
+master ansible_host=10.195.34.17
+
+[workers]
+worker1 ansible_host=10.195.34.21
+worker2 ansible_host=10.195.34.22
+
+[all:vars]
+ansible_user=sistemas
+\end{codeblock}
+
+Este formato permite apuntar a los hosts por nombre (\texttt{worker1}) y conservar la IP como variable (\texttt{ansible\_host}). \cite{ansible_inventory_intro}
+
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/a10_inventory_ini.png}
+%   \caption{Ejemplo de inventario INI y su ubicación en el proyecto.}
+%   \label{fig:ansible_inventory_ini}
+% \end{figure}
+
+\subsection{Ejemplo 2: comando ad hoc para probar conectividad (ping)}
+\label{subsec:ansible_ej2_ping}
+
+Los \textbf{ad hoc commands} son comandos de una sola tarea que se ejecutan sin escribir playbooks. Son útiles para pruebas rápidas. \cite{ansible_adhoc_intro}
+
+\begin{terminalblock}
+ansible -i inventory.ini all -m ping
+\end{terminalblock}
+
+Si la conectividad y credenciales son correctas, cada host responde con \texttt{pong}.
+
+\begin{outputblock}
+worker1 | SUCCESS => {"ping": "pong"}
+worker2 | SUCCESS => {"ping": "pong"}
+\end{outputblock}
+
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/a11_ansible_ping.png}
+%   \caption{Ejecución de \texttt{ansible -m ping} y salida esperada.}
+%   \label{fig:ansible_ping}
+% \end{figure}
+
+\subsection{Ejemplo 3: ejecutar un comando simple en varios hosts}
+\label{subsec:ansible_ej3_command}
+
+\begin{terminalblock}
+ansible -i inventory.ini workers -m command -a "hostname"
+\end{terminalblock}
+
+Este ejemplo consulta el hostname en todos los \textit{workers}. Para comandos que requieren shell (pipes, redirecciones), se usa el módulo \texttt{shell} con cuidado.
+
+\subsection{Ejemplo 4: playbook mínimo (instalar un paquete)}
+\label{subsec:ansible_ej4_playbook}
+
+Un playbook describe tareas repetibles. Este ejemplo asegura que un paquete esté presente:
+
+\begin{codeblock}
+install-tools.yml (ejemplo)
+- name: Instalar herramientas básicas
+  hosts: workers
+  become: yes
+  tasks:
+    - name: Asegurar que htop esté instalado
+      ansible.builtin.dnf:
+        name: htop
+        state: present
+\end{codeblock}
+
+La idempotencia implica que, si \texttt{htop} ya está instalado, la tarea no vuelve a instalarlo. \cite{ansible_playbooks_intro,ansible_modules_intro}
+
+Para ejecutarlo:
+
+\begin{terminalblock}
+ansible-playbook -i inventory.ini install-tools.yml
+\end{terminalblock}
+
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/a12_ansible_playbook_run.png}
+%   \caption{Ejecución de un playbook con \texttt{ansible-playbook}.}
+%   \label{fig:ansible_playbook_run}
+% \end{figure}
+
+\subsection{Ejemplo 5: copiar un archivo de configuración}
+\label{subsec:ansible_ej5_copy}
+
+\begin{codeblock}
+copy-example.yml (ejemplo)
+- name: Copiar archivo a /etc
+  hosts: master
+  become: yes
+  tasks:
+    - name: Copiar un archivo de ejemplo
+      ansible.builtin.copy:
+        src: files/ejemplo.conf
+        dest: /etc/ejemplo.conf
+        owner: root
+        group: root
+        mode: "0644"
+\end{codeblock}
+
+Este tipo de automatización es útil para estandarizar configuraciones entre nodos.
+
+\section{Implementación práctica en el clúster: instalación de Ansible y primera prueba}
+\label{sec:ansible_practica_instalacion_ping}
+
+Esta sección documenta la preparación del nodo de control y la primera prueba de conectividad con Ansible. En este proyecto, el nodo \textit{master} se usa como \textbf{nodo de control} para ejecutar automatizaciones sobre los \textit{workers}. Ansible se ejecuta desde el \textit{master} y se conecta a los demás nodos por SSH, lo que permite operar el clúster sin acceder manualmente nodo por nodo. \cite{ansible_installation_distros,ansible_connection_details}
+
+\subsection{Antes de iniciar}
+\label{subsec:ansible_antes_de_iniciar}
+
+Antes de ejecutar los procedimientos, conviene fijar algunas definiciones breves:
+\begin{description}
+  \item[\inlineconcept{Terminal}] interfaz de texto donde se ejecutan comandos del sistema operativo.
+  \item[\inlineconcept{SSH}] protocolo de conexión remota segura usado para que el nodo de control opere sobre otros nodos.
+  \item[\inlineconcept{YAML}] formato de texto basado en indentación, utilizado por Ansible para playbooks y variables.
+  \item[\inlineconcept{Paquete/servicio}] un paquete es software instalable con el gestor del sistema; un servicio es un proceso administrado por \texttt{systemd}.
+  \item[\inlineconcept{Privilegios (\texttt{become})}] mecanismo de elevación de privilegios equivalente en función a ejecutar tareas con \texttt{sudo}.
+\end{description}
+
+\subsection{Dónde se ejecutan los comandos}
+\label{subsec:ansible_donde_se_ejecutan}
+
+Salvo indicación explícita, los comandos \cmd{ansible} y \cmd{ansible-playbook} se ejecutan en el nodo \textit{master}, que cumple el rol de nodo de control. La ejecución se origina en el \textit{master} y los cambios se aplican por SSH en los nodos gestionados definidos en el inventario.
+
+\begin{criticalnote}
+Se considera \inlinefail cuando un comando de Ansible se intenta ejecutar directamente en un \textit{worker} sin justificación del procedimiento. Se considera \inlineok cuando la ejecución se realiza en el nodo de control y el inventario delimita correctamente los hosts objetivo.
+\end{criticalnote}
+
+\subsection{Convenciones usadas en el manual}
+\label{subsec:ansible_convenciones_manual}
+
+Para mantener consistencia en la lectura, se aplican las siguientes convenciones:
+\begin{itemize}
+  \item \textit{master} se usa como nodo de control de Ansible.
+  \item \textit{workers} se usa para nodos gestionados de cómputo.
+  \item El inventario define hosts y grupos (por ejemplo, \texttt{master} y \texttt{workers}) y determina dónde se aplica cada tarea.
+  \item Los comandos de terminal se muestran en \texttt{terminalblock}; los fragmentos de configuración y playbooks se muestran en \texttt{codeblock}.
+\end{itemize}
+
+
+\subsection{Verificación del entorno en nodo de control}
+\label{subsec:ansible_verificacion_control_node}
+
+Rocky Linux 9.6 incluye Python 3.9.25 por defecto, y es suficiente para trabajar con Ansible en este proyecto.
+
+Estas verificaciones se ejecutan en el nodo de control (\textit{master}):
+
+\begin{terminalblock}
+python3 --version
+ansible --version
+\end{terminalblock}
+
+\begin{outputblock}
+Python 3.9.25
+ansible [core <version>]
+\end{outputblock}
+
+La verificación de \texttt{python3 --version} confirma el runtime base del sistema. La verificación de \texttt{ansible --version} se valida una vez instalado \texttt{ansible-core} en este mismo nodo de control.
+
+\subsection{Instalación de Ansible en el nodo master (nodo de control)}
+\label{subsec:ansible_install_master}
+
+En sistemas tipo RHEL/Rocky, Ansible puede instalarse desde repositorios del sistema (por ejemplo, AppStream en RHEL 9) o desde repositorios comunitarios (como EPEL) dependiendo de la distribución y del paquete deseado. En entornos de servidores es común usar el gestor de paquetes del sistema para mantener actualizaciones y dependencias controladas. \cite{redhat_rhel9_ansible_core,ansible_installation_distros}
+
+\subsubsection*{Procedimiento realizado}
+\begin{enumerate}
+  \item Se actualizó el sistema para aplicar parches antes de instalar herramientas:
+\end{enumerate}
+
+\begin{terminalblock}
+sudo dnf -y update
+\end{terminalblock}
+
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=0.92\textwidth]{images/cap_ansible/p01_dnf_update_master.png}
+%   \caption{Actualización del sistema en el master antes de instalar Ansible.}
+%   \label{fig:p01_dnf_update_master}
+% \end{figure}
+
+\begin{enumerate}
+  \setcounter{enumi}{1}
+  \item Se instaló Ansible en el \textit{master} usando \texttt{dnf}:
+\end{enumerate}
+
+\begin{terminalblock}
+sudo dnf install ansible-core -y
+\end{terminalblock}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{images/ansible/ansible-core install.png}
+  \caption{Instalación de Ansible (paquete \texttt{ansible-core}) en el master.}
+  \label{fig:install_ansible_core}
+\end{figure}
+
+\begin{enumerate}
+  \setcounter{enumi}{2}
+  \item Se verificó la instalación y versión:
+\end{enumerate}
+
+\begin{terminalblock}
+ansible --version
+\end{terminalblock}
+
+La salida mostró la versión de \texttt{ansible-core}, la versión de Python y la ruta del archivo de configuración de Ansible cuando aplica. Esto confirmó que Ansible quedó disponible desde la terminal del \textit{master}. \cite{ansible_installation_guide}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/ansible/ansible version.png}
+  \caption{Verificación de instalación de Ansible con \texttt{ansible --version}.}
+  \label{fig:p03_ansible_version}
+\end{figure}
+
+\subsection{Estructura mínima del proyecto de automatización}
+\label{subsec:ansible_project_structure}
+
+En este proyecto se organiza la automatización como un directorio de trabajo que contiene:
+\begin{itemize}
+  \item Un inventario (lista de hosts del clúster).
+  \item Una configuración local del proyecto (\texttt{ansible.cfg}) para evitar depender de configuraciones globales.
+  \item Playbooks y roles (cuando la automatización crece).
+\end{itemize}
+
+Mantener un \texttt{ansible.cfg} local ayuda a que el proyecto sea replicable: quien copie el repositorio obtiene la misma configuración por defecto. Ansible incluye herramientas para inspeccionar configuración y sus fuentes, como \texttt{ansible-config}. \cite{ansible_config_reference}
+
+\subsubsection*{Procedimiento realizado}
+\begin{enumerate}
+  \item Se creó un directorio de trabajo para la automatización (ejemplo: \texttt{\textasciitilde/hpc-ansible}) y se ingresó a él:
+\end{enumerate}
+
+\begin{terminalblock}
+mkdir -p ~/hpc-ansible
+cd ~/hpc-ansible
+\end{terminalblock}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/ansible/dir ansible.png}
+  \caption{Creación del directorio exclusivo para usar Ansible}
+  \label{fig:p04_project_structure}
+\end{figure}
+
+\subsection{Creación del inventario del clúster (\texttt{inventario.ini})}
+\label{subsec:ansible_inventory_ini_real}
+
+El inventario define qué equipos administra Ansible y cómo conectarse a ellos. En este proyecto se organizó el inventario en dos grupos: \texttt{master} y \texttt{workers}. Además, se definió el usuario remoto común (\texttt{sistemas}) como variable global. \cite{ansible_inventory_intro,ansible_connection_details}
+
+\subsubsection*{Procedimiento realizado}
+\begin{enumerate}
+  \item Se creó el archivo \texttt{inventario.ini} usando \texttt{nano}:
+\end{enumerate}
+
+\begin{terminalblock}
+nano inventario.ini
+\end{terminalblock}
+
+En el editor se escribió el siguiente contenido y se guardó el archivo.
+
+\begin{codeblock}
+[hpc_master]
+master ansible_host=10.195.34.17 ansible_user=sistemas
+
+[workers]
+worker1 ansible_host=10.195.20.52 ansible_user=sistemas
+worker2 ansible_host=10.195.34.19 ansible_user=sistemas
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_ssh_private_key_file=~/.ssh/id_ed25519
+\end{codeblock}
+
+Para guardar en \texttt{nano} se usó \texttt{Ctrl+O}, luego \texttt{Enter}, y para salir \texttt{Ctrl+X}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/ansible/inventario.png}
+  \caption{Edición de \texttt{inventario.ini} con \texttt{nano}.}
+  \label{fig:p05_inventory_ini_nano}
+\end{figure}
+
+En este punto, \texttt{worker1} y \texttt{worker2} pueden resolverse por nombre si existe DNS o si posteriormente se agregan entradas en \texttt{/etc/hosts}. Si aún no hay resolución de nombres, el inventario se completa asignando \texttt{ansible\_host=<IP>} a cada worker.
+
+\subsection{Configuración local del proyecto (\texttt{ansible.cfg})}
+\label{subsec:ansible_cfg_local_minimo}
+
+Ansible permite definir parámetros por defecto en \texttt{ansible.cfg}. En esta fase se utiliza un archivo local para fijar el inventario por defecto y evitar escribir \texttt{-i inventory.ini} en cada comando. La referencia oficial documenta este comportamiento y las opciones disponibles. \cite{ansible_config_reference}
+
+\subsubsection*{Procedimiento realizado}
+\begin{enumerate}
+  \item Se creó el archivo \texttt{ansible.cfg} usando \texttt{nano}:
+\end{enumerate}
+
+\begin{terminalblock}
+nano ansible.cfg
+\end{terminalblock}
+
+En el editor se escribió el siguiente contenido y se guardó el archivo:
+
+\begin{codeblock}
+[defaults]
+inventory = inventario.ini
+timeout = 30
+
+[ssh_connection]
+pipelining = True
+\end{codeblock}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/ansible/ansible cfg.png}
+  \caption{Edición de \texttt{ansible.cfg} con \texttt{nano}.}
+  \label{fig:p06_ansible_cfg_nano}
+\end{figure}
+
+\begin{enumerate}
+  \setcounter{enumi}{1}
+  \item Se verificó que Ansible estuviera usando el archivo de configuración local:
+\end{enumerate}
+
+\begin{terminalblock}
+ansible --version
+\end{terminalblock}
+
+En la salida se observó la línea \texttt{config file = .../hpc-ansible/ansible.cfg}, lo cual confirmó que la ejecución estaba tomando la configuración del proyecto.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/ansible/ansible ver cfg.png}
+  \caption{Verificación de \texttt{config file} en \texttt{ansible --version}.}
+  \label{fig:p07_ansible_version_config_file}
+\end{figure}
+
+\subsection{Primera prueba de conectividad con Ansible}
+\label{subsec:ansible_first_ping_minimo}
+
+El módulo \texttt{ping} de Ansible se usa como prueba inicial porque confirma que el nodo de control puede conectarse al host remoto y ejecutar un módulo básico. Esta prueba depende de que exista conectividad SSH y credenciales correctas (preferiblemente llaves). \cite{ansible_adhoc_intro,ansible_connection_details}
+
+\subsubsection*{Procedimiento realizado}
+\begin{enumerate}
+  \item Se probó conectividad contra todos los hosts del inventario:
+\end{enumerate}
+
+\begin{terminalblock}
+ansible all -m ping
+\end{terminalblock}
+
+En la salida se observó \texttt{pong} en los hosts accesibles, lo cual confirmó que Ansible podía ejecutar módulos de forma remota.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{images/ansible/all ping.png}
+  \caption{Primera prueba con \texttt{ansible all -m ping} y respuesta \texttt{pong}.}
+  \label{fig:p08_ansible_ping_all}
+\end{figure}
+
+\begin{enumerate}
+  \setcounter{enumi}{1}
+  \item Se verificó la identificación de los workers ejecutando \texttt{hostname}:
+\end{enumerate}
+
+\begin{terminalblock}
+ansible workers -m command -a "hostname"
+\end{terminalblock}
+
+La salida mostró \texttt{worker1} y \texttt{worker2}, lo cual evidenció que las conexiones estaban llegando a los nodos correctos.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{images/ansible/ansible hostname workers.png}
+  \caption{Ejecución del comando \texttt{hostname} en los workers con Ansible.}
+  \label{fig:p09_ansible_hostname_workers}
+\end{figure}

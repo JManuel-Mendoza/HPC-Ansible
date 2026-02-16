@@ -333,10 +333,10 @@ En el primer arranque se confirma que el sistema inicia desde el disco y que las
   \item Se ejecutaron los siguientes comandos para verificar discos, puntos de montaje y espacio disponible:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 lsblk
 df -h
-\end{verbatim}
+\end{terminalblock}
 
 \begin{figure}[H]
   \centering
@@ -356,25 +356,25 @@ Aunque el nodo \textit{master} se instaló inicialmente como \textit{Minimal Ins
   \item Se actualizaron los repositorios y paquetes del sistema:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 sudo dnf -y update
-\end{verbatim}
+\end{terminalblock}
 
 \begin{enumerate}
   \setcounter{enumi}{1}
   \item Se instaló el grupo \textit{Server with GUI}:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 sudo dnf groupinstall "Server with GUI"
-\end{verbatim}
+\end{terminalblock}
 
 Tras completarse la instalación, se configuró el arranque por defecto en modo gráfico para que el entorno iniciara automáticamente.
 
-\begin{verbatim}
+\begin{terminalblock}
 sudo systemctl set-default graphical.target
 sudo reboot
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[H]
 %   \centering
@@ -396,7 +396,7 @@ Después del reinicio, el sistema inició con pantalla gráfica, lo cual confirm
   \centering
   \includegraphics[width=0.75\textwidth] {images/HPC/Rocky/rocky_welcome.jpg}
   \caption{Pantalla de bienvenida del entorno gráfico en Rocky Linux.}
-  \label{fig:gui_login}
+  \label{fig:gui_welcome}
 \end{figure}
 
 Se recomienda seguir el tour si se no se está familiarizado con el entorno GNOME en Linux.
@@ -454,9 +454,9 @@ Después del primer inicio de sesión en cada \textit{worker}, se realizaron ver
 
 \begin{enumerate}
   \item Se confirmó el nombre del host configurado:
-\begin{verbatim}
+\begin{terminalblock}
 hostnamectl
-\end{verbatim}
+\end{terminalblock}
 La salida mostró el hostname esperado (por ejemplo, \texttt{worker1} o \texttt{worker2}), lo cual confirmó que el identificador del nodo quedó aplicado correctamente.
 
 \begin{figure}[H]
@@ -468,9 +468,9 @@ La salida mostró el hostname esperado (por ejemplo, \texttt{worker1} o \texttt{
 
 
   \item Se confirmó la versión del sistema operativo instalada:
-\begin{verbatim}
+\begin{terminalblock}
 cat /etc/os-release
-\end{verbatim}
+\end{terminalblock}
 La salida mostró Rocky Linux 9.x, consistente con la versión usada en el \textit{master}.
 
 \begin{figure}[H]
@@ -481,10 +481,10 @@ La salida mostró Rocky Linux 9.x, consistente con la versión usada en el \text
 \end{figure}
 
   \item Se verificaron discos, particiones y montajes:
-\begin{verbatim}
+\begin{terminalblock}
 lsblk
 df -h
-\end{verbatim}
+\end{terminalblock}
 Estas salidas permitieron confirmar que el disco del sistema tenía particiones montadas correctamente y que el nodo contaba con espacio disponible para operación. En caso de haberse definido puntos de montaje adicionales en el \textit{worker}, estos también se observaron reflejados en \texttt{df -h}.
 
 \begin{figure}[H]
@@ -511,9 +511,9 @@ Los nodos del clúster tienen varias interfaces de red (varios puertos físicos)
   \item Se listaron las interfaces y direcciones IP:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ip a
-\end{verbatim}
+\end{terminalblock}
 
 \begin{figure}[H]
   \centering
@@ -532,9 +532,9 @@ Una \textit{ruta por defecto} indica a qué puerta de enlace (\textit{gateway}) 
   \item Se consultó la tabla de rutas:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ip route
-\end{verbatim}
+\end{terminalblock}
 
 \begin{figure}
   \centering
@@ -575,9 +575,9 @@ Si se requiere documentar el método de configuración desde el gestor de red (N
   \item Se listan las conexiones activas y el dispositivo asociado:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 nmcli -t -f NAME,DEVICE,STATE connection show --active
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -591,9 +591,9 @@ nmcli -t -f NAME,DEVICE,STATE connection show --active
   \item Se consulta el método IPv4 del perfil activo (reemplazando \texttt{<CONEXION>} por el nombre real mostrado en el paso anterior):
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 nmcli -f ipv4.method,ipv4.addresses,ipv4.gateway connection show "<CONEXION>"
-\end{verbatim}
+\end{terminalblock}
 
 En la salida se espera observar \texttt{ipv4.method: auto} cuando el nodo está configurado por DHCP, además de la dirección asignada y el gateway del perfil. Esto permite respaldar documentalmente el método de direccionamiento sin depender solo de la tabla de rutas. \cite{nm_settings_nmcli}
 
@@ -609,9 +609,9 @@ En Rocky Linux el servicio que acepta conexiones SSH es \texttt{sshd}. Para que 
   \item Se verificó si el servidor OpenSSH estaba instalado y, si era necesario, se instaló:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 sudo dnf -y install openssh-server
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -622,10 +622,10 @@ sudo dnf -y install openssh-server
 
 Después de la instalación, se dejó el servicio habilitado para iniciar automáticamente y se inició de inmediato. La salida de \texttt{systemctl status} mostró el servicio en estado \texttt{active (running)}, lo cual evidenció que el master estaba listo para aceptar conexiones. \cite{rhel_openssh_secure}
 
-\begin{verbatim}
+\begin{terminalblock}
 sudo systemctl enable --now sshd
 sudo systemctl status sshd --no-pager
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -639,11 +639,11 @@ sudo systemctl status sshd --no-pager
   \item Se habilitó el servicio SSH en el firewall del sistema y se recargó la configuración:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 sudo firewall-cmd --permanent --add-service=ssh
 sudo firewall-cmd --reload
 sudo firewall-cmd --list-services
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -661,9 +661,9 @@ Para conectarse al master se requiere conocer (1) la IP del master en la red de 
   \item Desde el computador del usuario, se realizó la conexión SSH hacia el master:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ssh sistemas@10.195.34.17
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -676,9 +676,9 @@ En la primera conexión es normal que el cliente SSH solicite confirmar la ident
 
 Al ingresar la contraseña del usuario \texttt{sistemas} (que en este caso también es \texttt{sistemas}), se obtuvo acceso a una sesión remota. Como verificación simple, se ejecutó \texttt{hostname} y se observó \texttt{master}, lo cual confirmó que la sesión correspondía al nodo correcto.
 
-\begin{verbatim}
+\begin{terminalblock}
 hostname
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -687,7 +687,7 @@ hostname
 %   \label{fig:c05_hostname_master_remote}
 % \end{figure}
 
-\subsection{Autenticación por llaves SSH (usuario $\rightarrow$ master y master $\rightarrow$ workers)}
+\subsection{Autenticación por llaves SSH (\texorpdfstring{usuario $\rightarrow$ master y master $\rightarrow$ workers}{usuario -> master y master -> workers})}
 \label{subsec:ssh_keys}
 
 En esta etapa se configura autenticación por llaves SSH para reducir dependencia de contraseñas y habilitar administración automatizada. En SSH, la autenticación por llaves funciona con un par criptográfico: una llave privada que permanece protegida en el equipo que inicia la conexión y una llave pública que se instala en el servidor dentro de \texttt{\textasciitilde/.ssh/authorized\_keys}. \cite{man_ssh_keygen,redhat_key_based_auth_blog,rhel_key_pairs_ssh}
@@ -697,9 +697,9 @@ En esta etapa se configura autenticación por llaves SSH para reducir dependenci
   \item En el computador del usuario se generó un par de llaves Ed25519 para el acceso al \textit{master}:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ssh-keygen -t ed25519
-\end{verbatim}
+\end{terminalblock}
 
 Este comando creó (por defecto) dos archivos en \texttt{\textasciitilde/.ssh/}: la llave privada \texttt{id\_ed25519} y la llave pública \texttt{id\_ed25519.pub}. \cite{man_ssh_keygen}
 
@@ -715,9 +715,9 @@ Este comando creó (por defecto) dos archivos en \texttt{\textasciitilde/.ssh/}:
   \item Se verificó que los archivos quedaron creados y con permisos restrictivos (la llave privada no debe ser legible por otros usuarios):
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ls -l ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub
-\end{verbatim}
+\end{terminalblock}
 
 En la salida se observó que la llave privada tenía permisos restrictivos (típicamente \texttt{-rw-------}). Esto es importante porque OpenSSH puede rechazar llaves privadas con permisos inseguros. \cite{redhat_key_based_auth_blog}
 
@@ -735,9 +735,9 @@ Para instalar la llave pública de forma segura y controlada se utilizó \texttt
   \item Desde el computador del usuario se copió la llave pública al usuario \texttt{sistemas} del master:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ssh-copy-id -i ~/.ssh/id_ed25519.pub sistemas@10.195.34.17
-\end{verbatim}
+\end{terminalblock}
 
 Durante este paso, el sistema solicitó la contraseña del usuario remoto para permitir la instalación inicial de la llave (esto es esperado con \texttt{ssh-copy-id}). \cite{man_ssh_copy_id}
 
@@ -753,9 +753,9 @@ Durante este paso, el sistema solicitó la contraseña del usuario remoto para p
   \item Se probó el acceso por llave (sin contraseña) ejecutando un comando remoto:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ssh sistemas@10.195.34.17 "hostname"
-\end{verbatim}
+\end{terminalblock}
 
 En la salida se observó \texttt{master}. La ausencia de solicitud de contraseña evidenció que la autenticación por llave quedó funcionando.
 
@@ -773,9 +773,9 @@ En el clúster, el nodo \textit{master} se usa como punto central de administrac
   \item En el \textit{master}, iniciando sesión como \texttt{sistemas}, se generó una llave Ed25519 destinada a conexiones hacia los \textit{workers}:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ssh-keygen -t ed25519
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -789,10 +789,10 @@ ssh-keygen -t ed25519
   \item Se instaló la llave pública del master en cada \textit{worker}. Se usó la dirección alcanzable de cada worker en la red de administración (por DHCP) o su hostname si ya resolvía:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ssh-copy-id -i ~/.ssh/id_ed25519.pub sistemas@worker1
 ssh-copy-id -i ~/.ssh/id_ed25519.pub sistemas@worker2
-\end{verbatim}
+\end{terminalblock}
 
 % \begin{figure}[h]
 %   \centering
@@ -806,10 +806,10 @@ ssh-copy-id -i ~/.ssh/id_ed25519.pub sistemas@worker2
   \item Se verificó la conexión por llave desde el master hacia cada worker ejecutando un comando remoto:
 \end{enumerate}
 
-\begin{verbatim}
+\begin{terminalblock}
 ssh sistemas@worker1 "hostname"
 ssh sistemas@worker2 "hostname"
-\end{verbatim}
+\end{terminalblock}
 
 En la salida se observó el hostname correspondiente (\texttt{worker1} y \texttt{worker2}). Esto evidenció que (1) existía conectividad por SSH y (2) la autenticación por llaves quedó operativa.
 

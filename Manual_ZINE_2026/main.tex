@@ -26,6 +26,134 @@
 \usepackage{float}
 \usepackage{eso-pic}   % para colocar imagen de fondo en portada
 \usepackage{xcolor}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+
+% =========================
+% Esquema visual (Overleaf, sin shell-escape)
+% =========================
+\definecolor{zineBlueDark}{HTML}{0F2A3B}
+\definecolor{zineBlueMid}{HTML}{1C4E69}
+\definecolor{zineBlueSoft}{HTML}{EAF3F8}
+\definecolor{zineCodeBg}{HTML}{F7FAFC}
+\definecolor{zineCodeFrame}{HTML}{C8D9E6}
+\definecolor{zineTermBg}{HTML}{EEF4F7}
+\definecolor{zineTermFrame}{HTML}{99B7CA}
+\definecolor{zineOutBg}{HTML}{F3F7F2}
+\definecolor{zineOutFrame}{HTML}{9EB99A}
+\definecolor{zineOkBg}{HTML}{E6F5E9}
+\definecolor{zineOkFrame}{HTML}{2E7D32}
+\definecolor{zineFailBg}{HTML}{FDECEC}
+\definecolor{zineFailFrame}{HTML}{B3261E}
+
+\lstdefinestyle{zineListing}{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=false,
+  frame=none,
+  extendedchars=true,
+  literate=
+    {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+    {ñ}{{\~n}}1 {Ñ}{{\~N}}1 {ü}{{\"u}}1 {Ü}{{\"U}}1
+    {└}{{+}}1 {┌}{{+}}1 {┐}{{+}}1 {┘}{{+}}1 {├}{{+}}1 {┤}{{+}}1
+    {│}{{|}}1 {─}{{-}}1
+}
+
+\newcommand{\inlineconcept}[1]{%
+  \tcbox[
+    on line,
+    boxrule=0pt,
+    arc=2pt,
+    left=4pt,right=4pt,top=1pt,bottom=1pt,
+    colback=zineBlueSoft,
+    colframe=zineBlueSoft
+  ]{\textbf{#1}}%
+}
+
+\newcommand{\inlinecommand}[1]{%
+  \tcbox[
+    on line,
+    boxrule=0.4pt,
+    arc=2pt,
+    left=4pt,right=4pt,top=1pt,bottom=1pt,
+    colback=zineCodeBg,
+    colframe=zineCodeFrame
+  ]{\texttt{#1}}%
+}
+
+\newcommand{\cmd}[1]{\inlinecommand{#1}}
+
+\newcommand{\inlineok}[1][OK]{%
+  \tcbox[
+    on line,
+    boxrule=0.5pt,
+    arc=2pt,
+    left=4pt,right=4pt,top=1pt,bottom=1pt,
+    colback=zineOkBg,
+    colframe=zineOkFrame
+  ]{\textbf{#1}}%
+}
+
+\newcommand{\inlinefail}[1][FAIL]{%
+  \tcbox[
+    on line,
+    boxrule=0.5pt,
+    arc=2pt,
+    left=4pt,right=4pt,top=1pt,bottom=1pt,
+    colback=zineFailBg,
+    colframe=zineFailFrame
+  ]{\textbf{#1}}%
+}
+
+\tcbset{
+  zineblock/.style={
+    breakable,
+    listing only,
+    boxrule=0.5pt,
+    arc=2pt,
+    left=6pt,right=6pt,top=6pt,bottom=6pt,
+    listing options={style=zineListing},
+    fonttitle=\bfseries\small,
+    coltitle=zineBlueDark
+  }
+}
+
+\newtcblisting{terminalblock}{
+  zineblock,
+  title={Terminal},
+  colback=zineTermBg,
+  colframe=zineTermFrame
+}
+
+\newtcblisting{codeblock}{
+  zineblock,
+  title={Código},
+  colback=zineCodeBg,
+  colframe=zineCodeFrame
+}
+
+\newtcblisting{outputblock}{
+  zineblock,
+  title={Salida},
+  colback=zineOutBg,
+  colframe=zineOutFrame
+}
+
+\newtcolorbox{criticalnote}[1][]{
+  breakable,
+  boxrule=0.6pt,
+  arc=2pt,
+  left=6pt,right=6pt,top=6pt,bottom=6pt,
+  colback=zineFailBg,
+  colframe=zineFailFrame,
+  title={Nota crítica},
+  fonttitle=\bfseries\small,
+  #1
+}
 
 % =========================
 % Enlaces
