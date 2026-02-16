@@ -1,274 +1,111 @@
 # Automatizacion de cluster HPC con Ansible
 
-Este repositorio automatiza la instalacion, configuracion y validacion de un cluster HPC con nodo `master` y nodos `workers`.
+Este repositorio automatiza el aprovisionamiento y la operacion de un cluster HPC con Ansible.
+La orquestacion principal vive en `site.yml` e integra red interna, firewall, NFS, CUDA/NVIDIA, Slurm, entorno LLM y validaciones.
+El diseno separa fases de configuracion y fases de verificacion para reducir riesgo operativo.
+La guia resume como configurar inventario y variables, ejecutar por etapas/tags y validar con smoke/canary.
 
-Entrypoint unico:
-- `site.yml`
+## Caracteristicas principales
 
-Objetivo operativo:
-- Infraestructura declarativa (sin hotfixes manuales).
-- Cambios repetibles e idempotentes.
-- Operacion segura de servicios criticos (red, firewall, Slurm, GPU, NFS).
+- Orquestacion declarativa por etapas en un entrypoint unico: `site.yml`.
+- Ejecucion parcial por tags para despliegues controlados (`common`, `network`, `slurm`, `validate`, entre otros).
+- Soporte de nodos de control y nodos de computo con grupos de inventario dedicados.
+- Integracion de servicios base HPC: `firewalld`, rutas internas, NFS compartido, Slurm y Munge.
+- Pipeline de validacion con checks generales (`validate`) y smoke jobs Slurm CPU/GPU (`slurm_validate_smoke`).
+- Manejo de secretos con Ansible Vault (`group_vars/all/vault.yml`).
 
-Alcance tecnico:
-- Baseline de sistema, SSH y firewall.
-- Red interna entre subredes y ruteo entre nodos.
-- NFS compartido para trabajo HPC.
-- Driver NVIDIA/CUDA y entorno LLM con micromamba.
-- Slurm completo (identidades, munge, build, install, controller, compute).
-- Validaciones generales y smoke tests CPU/GPU.
+## Arquitectura resumida
 
-## Requisitos minimos (nodo de control)
+### Nodos y grupos
 
-- Ansible instalado (recomendado: `>= 2.14`).
-- Colecciones instaladas: ver `requirements.yml` y ejecutar `ansible-galaxy collection install -r requirements.yml`.
-  - Nota: `requirements.yml` fija `ansible.posix` en `1.5.4` por compatibilidad con `ansible-core 2.14`.
-- Acceso SSH a los nodos (idealmente con llave).
-- Vault configurado (ver `docs/vault.md`).
+- `hpc_master`: nodo de control principal (`master`).
+- `workers`: conjunto de nodos de trabajo habilitados en inventario.
+- `slurm_all`: nodos con componentes Slurm.
+- `slurm_compute`: nodos objetivo para `slurmd` y configuracion de compute.
+- `slurm_gpu`: nodos con capacidad GPU para validaciones y jobs acelerados.
 
-## Desde cero: instalación limpia -> clúster listo
+Referencia: `inventario.ini`.
 
-Esta guía asume que ya tienes un SO limpio instalado en `master` y `workers` (paso fuera de este repo).
-El entrypoint único del repositorio es `site.yml`.
+### Componentes operativos
 
-### Prerrequisitos (control node)
+- Baseline: hardening basico y acceso SSH (`common`, `users_ssh`).
+- Red interna y ruteo: `network_internal`, `cluster_routing`.
+- Firewall: reglas de `firewalld` para trafico de cluster.
+- Storage compartido: `nfs_hpc` (export en master y mounts en clientes).
+- GPU/CUDA: `nvidia_cuda`.
+- Slurm: identidades, munge, facts, instalacion/controller/compute, validacion.
+- Entorno LLM: `llm_env`.
+- Verificacion: `validate` y `slurm_validate`.
 
-1) Colecciones Ansible (obligatorio):
-```bash
-ansible-galaxy collection install -r requirements.yml
+## Prerrequisitos
+
+- Nodo de control Linux con Ansible disponible.
+- Compatibilidad esperada con `ansible-core 2.14` (ver comentario de version en `requirements.yml`).
+- Coleccion requerida:
+  - `ansible.posix` version `1.5.4` (definida en `requirements.yml`).
+- Acceso SSH a nodos del inventario y permisos de elevacion cuando aplique.
+- Secretos Vault disponibles (`group_vars/all/vault.yml`) y metodo de desbloqueo:
+  - `--ask-vault-pass`, o
+  - `--vault-password-file` con archivo local no versionado.
+
+## Estructura del repositorio
+
+```text
+.
+|-- site.yml
+|-- inventario.ini
+|-- ansible.cfg
+|-- requirements.yml
+|-- group_vars/
+|   |-- all/
+|   |   |-- vars.yml
+|   |   `-- vault.yml
+|   `-- hpc_master.yml
+|-- host_vars/
+|   |-- master.yml
+|   |-- worker1.yml
+|   `-- worker2.yml
+|-- roles/
+|   |-- common/
+|   |-- network_internal/
+|   |-- cluster_routing/
+|   |-- firewall/
+|   |-- nfs_hpc/
+|   |-- nvidia_cuda/
+|   |-- slurm_*/
+|   |-- llm_env/
+|   `-- validate/
+`-- docs/
+    |-- 00-indice.md
+    |-- 07-verificacion-rapida.md
+    |-- 07-runbooks-operativos.md
+    `-- runbooks/
 ```
 
-2) Vault (obligatorio):
-- Guía: `docs/vault.md`
-- Ejecución interactiva:
-```bash
-ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
-```
-- Ejecución reproducible sin prompt (archivo local, no se commitea):
-```bash
-ANSIBLE_VAULT_PASSWORD_FILE=~/.config/hpc-ansible/vault-pass.txt ansible-playbook -i inventario.ini site.yml --syntax-check
-```
+## Quickstart reproducible
 
-### Configuración mínima para replicar
-
-Archivos que normalmente debes editar para adaptar el clúster a tu laboratorio:
-- `inventario.ini` (hosts/grupos y `ansible_host`/usuarios)
-- `group_vars/all/vars.yml` (defaults globales: baseline + variables operacionales de red/Slurm/firewall)
-- `group_vars/hpc_master.yml` (settings específicos del master: router/NFS/MariaDB/SlurmDBD)
-- `host_vars/*.yml` (overrides por nodo, si aplica)
-- `group_vars/all/vault.yml` (secretos cifrados; ver `docs/vault.md`)
-
-Referencias:
-- `docs/06-referencia-archivos.md`
-- `docs/audit/vars-map.md`
-
-### Preflight seguro (no cambia nodos)
+### 1) Clonar el repositorio
 
 ```bash
-ansible-inventory -i inventario.ini --graph --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --list-tasks --ask-vault-pass
+git clone <url-del-repositorio>
+cd hpc-ansible
 ```
 
-### Orden recomendado de ejecución (por etapas/tags)
-
-La fuente de verdad es `docs/audit/ansible-entrypoints.md`. Resumen:
-- Baseline: `--tags common,ssh`
-- Red/ruteo: `--tags network,routing` (HIGH-RISK)
-- Firewall: `--tags firewall` (HIGH-RISK)
-- CUDA: `--tags cuda` (HIGH-RISK; puede requerir reboot)
-- NFS: `--tags nfs` (HIGH-RISK)
-- Slurm: `--tags slurm,slurm_install,slurm_config,munge,identities,slurmdb` (HIGH-RISK)
-- LLM: `--tags llm`
-- Validación: `--tags validate,slurm_validate`
-
-### Ejemplos seguros (recomendado con `--limit`)
-
-Dry-run (preflight de idempotencia) sobre un solo nodo:
-```bash
-ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1 --ask-vault-pass --skip-tags debug
-```
-
-Baseline en un solo nodo:
-```bash
-ansible-playbook -i inventario.ini site.yml --tags common,ssh --limit worker1 --ask-vault-pass --skip-tags debug
-```
-
-Ejecución completa (cuando ya probaste por etapas):
-```bash
-ansible-playbook -i inventario.ini site.yml --ask-vault-pass --skip-tags debug
-```
-
-## Configurar inventario (inventario.ini)
-
-- Edita `inventario.ini` para reflejar tus IPs/usuarios y grupos (`hpc_master`, `workers_*`, `slurm_*`).
-- Recomendado: ejecutar con `--limit` al inicio (un worker primero).
-
-## Configuracion minima para adaptar a tu laboratorio
-
-Edita estos archivos (en este orden) para replicar el despliegue:
-
-1. `inventario.ini`
-- IPs/hostnames reales (`ansible_host`), usuarios (`ansible_user`) y pertenencia a grupos.
-
-2. `group_vars/all/vars.yml`
-- Defaults globales (baseline + topología operacional): paquetes, SSH, CIDRs/subredes internas, puertos, particiones Slurm, UID/GID, etc.
-
-3. `group_vars/hpc_master.yml`
-- Interfaces internas del master (`hpc_router_internal_ifaces`) y settings del master (NFS/MariaDB/SlurmDBD).
-
-4. `group_vars/all/vault.yml` (cifrado) y `.secrets/` (local)
-- Secretos via Vault. Ver `docs/vault.md`.
-- El “vault password file” es local (no se commitea).
-
-## Vault (secretos)
-
-Este repo usa Ansible Vault.
-
-- Guía: `docs/vault.md`
-- Validación rápida:
-
-```bash
-ansible-inventory -i inventario.ini --graph --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
-```
-
-Alternativa reproducible sin prompt (archivo local fuera del repo):
-
-```bash
-ANSIBLE_VAULT_PASSWORD_FILE=~/.config/hpc-ansible/vault-pass.txt ansible-playbook -i inventario.ini site.yml --syntax-check
-```
-
-## Documentacion completa
-
-Toda la documentacion detallada esta en `docs/`.
-
-- `docs/00-indice.md`: mapa completo de la documentacion.
-- `docs/01-guia-rapida-no-especialistas.md`: introduccion para personas fuera de HPC.
-- `docs/02-arquitectura-ejecucion.md`: arquitectura y flujo de `site.yml`.
-- `docs/03-inventario-y-variables.md`: inventario, `group_vars` y `host_vars`.
-- `docs/04-playbooks-roles-y-tags.md`: playbooks, roles y tags.
-- `docs/05-referencia-roles.md`: comportamiento de cada rol.
-- `docs/06-referencia-archivos.md`: referencia de todos los archivos activos.
-- `docs/07-verificacion-rapida.md`: checklist smoke mínimo y canary recomendado.
-- `docs/07-runbooks-operativos.md`: runbooks de despliegue y operacion segura.
-- `docs/08-validacion-y-evidencia.md`: validacion, evidencia y criterios de salud.
-- `docs/09-glosario.md`: terminos HPC/Slurm explicados en lenguaje simple.
-- `docs/audit/ansible-entrypoints.md`: entrypoint, orden recomendado y advertencias de riesgo.
-- `docs/audit/plan.md`: plan de cambios por paquetes (auditoría).
-- `docs/audit/vars-map.md`: mapa de variables operacionales y hardcodes detectados (auditoría).
-- `docs/runbooks/`: runbooks operativos mínimos (Slurm/GPU/NFS/Munge/Network).
-
-## Mapa del repositorio
-
-- `site.yml`: entrypoint único (orquesta roles por etapas).
-- `inventario.ini`: inventario por defecto (hosts, grupos y conexión).
-- `group_vars/`: variables por alcance (`all`, `hpc_master`, etc.) y Vault (`group_vars/all/vault.yml`).
-- `host_vars/`: overrides por nodo (cuando aplica).
-- `roles/`: roles Ansible (state + validación), organizados por dominio (`common`, `firewall`, `nvidia_cuda`, `slurm_*`, `validate`, etc.).
-- `docs/`: documentación principal (índice, arquitectura, referencia).
-- `docs/runbooks/`: operación/diagnóstico por dominio (comandos y evidencia).
-- `docs/audit/`: auditoría (entrypoints, ledger, matriz de tasks, plan).
-- `tools/`: herramientas auxiliares de análisis (no tocan infraestructura).
-
-## Inicio rapido
-
-Instalar colecciones:
+### 2) Instalar colecciones
 
 ```bash
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Quickstart (sin tocar nodos, solo validaciones locales):
+### 3) Preparar inventario y variables
 
-```bash
-ansible-inventory -i inventario.ini --graph --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --list-tasks --ask-vault-pass
-```
+- Ajustar hosts y grupos en `inventario.ini`.
+- Ajustar parametros globales en `group_vars/all/vars.yml`.
+- Ajustar parametros del master en `group_vars/hpc_master.yml`.
+- Ajustar overrides por host en `host_vars/*.yml` cuando aplique.
+- Preparar Vault segun `docs/vault.md`.
 
-Dry-run sobre un solo nodo:
-
-```bash
-ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1 --ask-vault-pass --skip-tags debug
-```
-
-Ejecucion completa (recomendado por etapas):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --ask-vault-pass --skip-tags debug
-```
-
-## Ejemplos por etapas (tags) y limites
-
-Baseline (paquetes base, EPEL, SSH):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --tags common,ssh --limit worker1 --ask-vault-pass
-```
-
-Red y ruteo (alto riesgo):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --tags network,routing --limit worker1 --ask-vault-pass
-```
-
-GPU/CUDA (alto riesgo, puede requerir reinicio):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --tags cuda --limit worker1 --ask-vault-pass
-```
-
-Slurm (master primero, luego compute):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --tags slurm,munge,identities,slurm_install,slurm_config,slurmdb --limit hpc_master --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit slurm_compute --ask-vault-pass
-```
-
-Validación:
-
-```bash
-ansible-playbook -i inventario.ini site.yml --tags validate,slurm_validate --limit hpc_master --ask-vault-pass --skip-tags debug
-```
-
-## Diagnóstico (salida extra)
-
-Habilitar diagnóstico junto con una etapa (recomendado):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --tags validate,debug --limit worker1 --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags firewall,debug --limit worker1 --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags cuda,debug --limit worker1 --ask-vault-pass
-```
-
-Diagnóstico específico (sub-tags):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --tags firewall,debug_firewall --limit worker1 --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags validate,debug_validate --limit worker1 --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags cuda,debug_cuda --limit worker1 --ask-vault-pass
-```
-
-Omitir diagnóstico (recomendado en ejecución normal):
-
-```bash
-ansible-playbook -i inventario.ini site.yml --skip-tags debug --ask-vault-pass
-```
-
-## Flujo recomendado (instalacion limpia -> HPC listo -> Slurm -> LLM)
-
-1. Instalación limpia del SO (fuera de este repo).
-2. Baseline HPC: `--tags common,ssh` (y luego `network,routing,firewall,cuda,nfs` según aplique).
-3. Slurm: DB (master) -> identidades + munge -> install/controller/compute.
-4. LLM: `--tags llm`.
-5. Validación: `--tags validate,slurm_validate`.
-
-## Validación y troubleshooting
-
-## Verificación rápida (smoke)
-
-Preflight sin cambios (inventario, sintaxis y tags disponibles):
+### 4) Preflight sin cambios
 
 ```bash
 ansible-inventory -i inventario.ini --graph --ask-vault-pass
@@ -276,47 +113,110 @@ ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
 ansible-playbook -i inventario.ini site.yml --list-tags --ask-vault-pass
 ```
 
-Validación rápida de red/Slurm (solo lectura, no cambia configuración):
+### 5) Ejecucion por fases/tags con limite controlado
+
+```bash
+ansible-playbook -i inventario.ini site.yml --check --diff --limit <host_habilitado> --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags common,ssh --limit <host_habilitado> --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags network,routing,firewall --limit <host_habilitado> --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit hpc_master --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit slurm_compute --ask-vault-pass
+```
+
+Nota: `<host_habilitado>` se sustituye por un host activo en `inventario.ini` (ejemplo actual: `worker2`).
+
+## Ejecucion por etapas (site.yml)
+
+Las etapas canonicamente definidas en `site.yml` son:
+
+1. `Etapa 1 | Baseline HPC (common + ssh)` en `all`.
+2. `Etapa 2 | Red interna + ruteo + firewall` en `all`.
+3. `Etapa 3 | CUDA/Driver NVIDIA (solo nodos con GPU)` en `all`.
+4. `Etapa 4 | NFS HPC (server export)` en `hpc_master`.
+5. `Etapa 5 | NFS HPC (clientes mount)` en `all:!hpc_master`.
+6. `Etapa 6 | MariaDB en master` en `hpc_master`.
+7. `Etapa 7 | Preparar SlurmDB en MariaDB (master)` en `hpc_master`.
+8. `Etapa 8 | Configuracion de identidades SLURM` en `slurm_all`.
+9. `Etapa 9 | Configuracion de Munge en nodos SLURM` en `slurm_all`.
+10. `Etapa 10 | Recopilacion de hechos SLURM en nodos SLURM` en `slurm_all`.
+11. `Etapa 11 | Configuracion de SLURM en nodo master` en `hpc_master`.
+12. `Etapa 12 | Configuracion de SLURM en nodos compute` en `slurm_compute`.
+13. `Etapa 13 | Entorno LLM (micromamba + torch)` en `all`.
+14. `Etapa 14 | Validacion general de salud del cluster` en `all`.
+15. `Etapa 15 | Validacion Slurm (sin cambios de configuracion)` en `hpc_master`.
+
+## Validacion y evidencia (smoke/canary)
+
+### Verificacion rapida recomendada
 
 ```bash
 ansible-playbook -i inventario.ini site.yml --ask-vault-pass --tags validate_slurm --limit "hpc_master,slurm_compute"
-```
-
-Smoke real de Slurm (CPU+GPU jobs; ejecutar al final):
-
-```bash
 ansible-playbook -i inventario.ini site.yml --ask-vault-pass --tags slurm_validate_smoke
 ```
 
-Ejemplo equivalente con vault password file local (solo referencia local, no versionar):
+### Canary previo a despliegue amplio
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --vault-password-file .secrets/vault-pass.txt --tags slurm_validate_smoke
+ansible-playbook -i inventario.ini site.yml --ask-vault-pass --limit "hpc_master,<host_habilitado>" -f 10
 ```
 
-`.secrets/vault-pass.txt` NO se commitea; cuando no uses archivo local, usa `--ask-vault-pass`.
+Ejemplo con host habilitado actual:
 
-Nota de interpretación: durante waits del smoke pueden verse líneas `FAILED - RETRYING`; es normal si el job termina en estado OK al final.
-
-Validaciones (rol `validate`) se pueden ejecutar por dominio:
 ```bash
-ansible-playbook -i inventario.ini site.yml --tags validate --limit worker1 --ask-vault-pass --skip-tags debug
-ansible-playbook -i inventario.ini site.yml --tags validate_slurm --limit slurm_all --ask-vault-pass --skip-tags debug
-ansible-playbook -i inventario.ini site.yml --tags validate_cuda --limit worker1 --ask-vault-pass --skip-tags debug
+ansible-playbook -i inventario.ini site.yml --ask-vault-pass --limit "hpc_master,worker2" -f 10
 ```
 
-Smoke tests de Slurm (rol `slurm_validate`, desde el master):
-```bash
-ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_master --ask-vault-pass --skip-tags debug
-```
+### Criterio de resultado "OK"
 
-Runbooks operativos (diagnóstico y evidencia):
+- `ansible-playbook` finaliza sin fallos en tareas criticas.
+- `slurm_validate_smoke` confirma jobs CPU y GPU con estado `COMPLETED|0:0`.
+- Los checks de particiones y estado de nodos Slurm no reportan `DOWN`, `DRAIN` o `FAIL`.
+
+### Donde revisar evidencia y salidas
+
+- Salida de Ansible en consola (incluye `debug` de validaciones).
+- Runbooks de diagnostico en `docs/runbooks/*.md`.
+- Para smoke Slurm, el rol inspecciona `StdOut`/`StdErr` de jobs via `scontrol show job` y los muestra en la ejecucion.
+- Parametros de smoke (workdir, timeout, polling): `roles/slurm_validate/defaults/main.yml`.
+
+## Runbooks operativos
+
+- Orquestacion operativa general: `docs/07-runbooks-operativos.md`
+- Verificacion rapida: `docs/07-verificacion-rapida.md`
 - Slurm: `docs/runbooks/slurm.md`
+- Munge: `docs/runbooks/munge.md`
 - GPU/CUDA: `docs/runbooks/gpu-cuda.md`
 - NFS: `docs/runbooks/nfs.md`
-- Munge: `docs/runbooks/munge.md`
-- Network/Firewall: `docs/runbooks/network-firewall.md`
+- Red/Firewall: `docs/runbooks/network-firewall.md`
+- Indice general de documentacion: `docs/00-indice.md`
 
-## Nota de alcance documental
+## Troubleshooting minimo
 
-La documentacion cubre el proyecto activo. Notas/bitácoras históricas se preservan en `docs/docs_old/` (ver `docs/docs_old/README.md`).
+1. Sintoma: `--syntax-check` falla.
+   - Accion: validar inventario y Vault (`ansible-inventory --graph`, `docs/vault.md`).
+
+2. Sintoma: conectividad inter-nodos inestable tras cambios de red.
+   - Accion: ejecutar por `--limit <host_habilitado>` y revisar `docs/runbooks/network-firewall.md`.
+
+3. Sintoma: `slurmctld` o `slurmd` no inician.
+   - Accion: usar `docs/runbooks/slurm.md` y relanzar `--tags slurm_validate`.
+
+4. Sintoma: `nvidia-smi` no disponible o errores de driver.
+   - Accion: revisar `docs/runbooks/gpu-cuda.md` y rerun `--tags cuda` en canary.
+
+5. Sintoma: jobs GPU no asignan recursos.
+   - Accion: verificar particion GPU y `--gres=gpu:1`; luego correr `--tags slurm_validate_smoke`.
+
+6. Sintoma: mounts NFS no aparecen en nodos de computo.
+   - Accion: revisar export/mount/firewall con `docs/runbooks/nfs.md`.
+
+7. Sintoma: fallos de autenticacion entre componentes Slurm.
+   - Accion: validar clave/permisos/servicio Munge segun `docs/runbooks/munge.md`.
+
+8. Sintoma: drift entre corridas.
+   - Accion: ejecutar `--check --diff` por fases y comparar salidas de validacion en `docs/08-validacion-y-evidencia.md`.
+
+## Licencia y creditos
+
+- Licencia: no se encontro archivo `LICENSE` en la raiz al momento de esta revision. Consultar definicion de licencia con la persona propietaria del repositorio.
+- Creditos: autoria y cambios disponibles en el historial de Git del repositorio.
