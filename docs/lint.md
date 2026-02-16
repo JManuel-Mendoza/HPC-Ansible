@@ -23,6 +23,8 @@ Antes de correr `ansible-lint` (o `ansible-playbook`), instala las colecciones d
 ansible-galaxy collection install -r requirements.yml
 ```
 
+`requirements.yml` fija `ansible.posix` en `1.5.4` para mantener compatibilidad con `ansible-core 2.14`.
+
 ## Cómo ejecutar
 
 Lint general del repo:

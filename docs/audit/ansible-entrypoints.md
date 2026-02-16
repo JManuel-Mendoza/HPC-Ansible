@@ -71,3 +71,31 @@ Estos warnings no invalidan `--syntax-check` ni el parseo de `--list-tasks` para
 - play #13 (all): Entorno LLM (micromamba + torch)	TAGS: []
 - play #14 (all): Validación general de salud del clúster	TAGS: []
 - play #15 (hpc_master): Validación Slurm (sin cambios de configuracion)	TAGS: []
+
+## P16 | Pin de colecciones + optimizacion de facts por tags
+
+Objetivo:
+- Reducir overhead en ejecuciones con `--tags` evitando `Gathering Facts` en plays sin match.
+- Mantener compatibilidad con `ansible-core 2.14` fijando `ansible.posix`.
+
+Cambios aplicados:
+- `requirements.yml`: `ansible.posix` fijado en `1.5.4`.
+- `site.yml`: en los 15 plays, `gather_facts: false` + `pre_tasks` con `ansible.builtin.setup` taggeado con el union real de `TASK TAGS` de cada play.
+- Sin `tags` a nivel play.
+
+Evidencia:
+- Antes:
+  - `ansible-playbook -i inventario.ini site.yml --list-tags --vault-password-file .secrets/vault-pass.txt > /tmp/list-tags.P16.before.txt`
+- Después:
+  - `ansible-playbook -i inventario.ini site.yml --list-tags --vault-password-file .secrets/vault-pass.txt > /tmp/list-tags.P16.after.txt`
+  - `ansible-playbook -i inventario.ini site.yml --list-tasks --vault-password-file .secrets/vault-pass.txt > /tmp/list-tasks.P16.after.txt`
+- Compatibilidad colección:
+  - `ansible-galaxy collection list | rg 'ansible\.posix'`
+  - Resultado: `ansible.posix 1.5.4`
+- Prueba de no-overhead en run por tags (evidencia operativa):
+  - `grep -c "TASK \[Gathering Facts\]" /tmp/salida_nfs.log` => `0`
+  - `grep -c "TASK \[Gathering Facts\]" /tmp/salida_validate_slurm.log` => `0`
+  - `grep -n "Preflight | Recolectar facts" /tmp/salida_nfs.log /tmp/salida_validate_slurm.log`
+    - `/tmp/salida_nfs.log:10:TASK [Preflight | Recolectar facts (play 4)]`
+    - `/tmp/salida_nfs.log:95:TASK [Preflight | Recolectar facts (play 5)]`
+    - `/tmp/salida_validate_slurm.log:30:TASK [Preflight | Recolectar facts (play 14)]`

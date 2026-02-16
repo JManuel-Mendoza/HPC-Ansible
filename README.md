@@ -22,6 +22,7 @@ Alcance tecnico:
 
 - Ansible instalado (recomendado: `>= 2.14`).
 - Colecciones instaladas: ver `requirements.yml` y ejecutar `ansible-galaxy collection install -r requirements.yml`.
+  - Nota: `requirements.yml` fija `ansible.posix` en `1.5.4` por compatibilidad con `ansible-core 2.14`.
 - Acceso SSH a los nodos (idealmente con llave).
 - Vault configurado (ver `docs/vault.md`).
 
