@@ -1,0 +1,148 @@
+\documentclass[12pt,letterpaper,oneside]{report}
+
+% =========================
+% Idioma y codificación
+% =========================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{underscore}
+\usepackage[spanish]{babel}
+
+% =========================
+% Tipografía y calidad
+% =========================
+\usepackage{lmodern}   % evita muchos warnings de fuentes en T1
+\usepackage{microtype} % mejor justificación y corte de palabras
+
+% =========================
+% Página
+% =========================
+\usepackage[margin=1in]{geometry}
+
+% =========================
+% Gráficos y fondo de portada
+% =========================
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{eso-pic}   % para colocar imagen de fondo en portada
+\usepackage{xcolor}
+
+% =========================
+% Enlaces
+% =========================
+\usepackage[hidelinks]{hyperref}
+
+% =========================
+% Formato de títulos
+% =========================
+\usepackage{titlesec}
+
+% Capítulos
+\titleformat{\chapter}
+  {\normalfont\bfseries\LARGE}
+  {\thechapter.}
+  {0.75em}
+  {}
+\titlespacing*{\chapter}{0pt}{1.5ex}{2.0ex}
+
+% Secciones
+\titleformat{\section}
+  {\normalfont\bfseries\Large}
+  {\thesection}
+  {0.75em}
+  {}
+\titlespacing*{\section}{0pt}{1.25ex}{0.75ex}
+
+% Subsecciones
+\titleformat{\subsection}
+  {\normalfont\bfseries\large}
+  {\thesubsection}
+  {0.75em}
+  {}
+\titlespacing*{\subsection}{0pt}{1.0ex}{0.5ex}
+
+% =========================
+% Párrafos y listas
+% =========================
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+
+\usepackage{enumitem}
+\setlist[itemize]{topsep=0.4em, itemsep=0.2em, leftmargin=1.6em}
+\setlist[enumerate]{topsep=0.4em, itemsep=0.2em, leftmargin=1.6em}
+
+% =========================
+% Figuras y tablas (estilo consistente)
+% =========================
+\usepackage{caption}
+\captionsetup{
+  font=small,
+  labelfont=bf,
+  textfont=small
+}
+
+% Carpeta base para imágenes
+\graphicspath{{images/}}
+
+% =========================
+% Variables del documento
+% =========================
+\newcommand{\ManualTitulo}{Manual de uso del clúster HPC}
+\newcommand{\ManualInstitucion}{Universidad Javeriana}
+\newcommand{\ManualVersion}{Versión 0.1}
+\newcommand{\ManualFecha}{\today}
+
+% Autores (4)
+\newcommand{\AutorA}{Juan Guillermo Torres}
+\newcommand{\AutorB}{Juan Manuel Mendoza}
+\newcommand{\AutorC}{Juan Carlos Barrero}
+\newcommand{\ManualAutores}{%
+  \AutorA\\[0.25cm]
+  \AutorB\\[0.25cm]
+  \AutorC\\[0.25cm]
+  % \AutorD%
+}
+
+% Portada: ruta del fondo y color del texto
+% Recomendación: subir la imagen a images/portada/portada.png
+\newcommand{\PortadaFondo}{images/portada/portada.png}
+\newcommand{\PortadaTextoColor}{white} % white si el fondo es oscuro, black si es claro
+
+% =========================
+% Bibliografía global (al final del documento)
+% =========================
+% URLs (reduce overfull hbox)
+\usepackage{xurl}
+
+% Bibliografía global
+\usepackage[backend=biber,style=ieee]{biblatex}
+\addbibresource{bib/references.bib}
+
+% Recomendado por biblatex con babel
+\usepackage{csquotes}
+
+
+
+\begin{document}
+
+% Portada
+\input{portada}
+
+% Índices
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+
+% =========================
+% Capítulos
+% =========================
+\input{chapters/configuración_del_entorno}
+\input{chapters/ansible}
+
+\clearpage
+\addcontentsline{toc}{chapter}{Referencias}
+\printbibliography
+\end{document}
