@@ -24,6 +24,7 @@ ansible-galaxy collection install -r requirements.yml
 ```
 
 `requirements.yml` fija `ansible.posix` en `1.5.4` para mantener compatibilidad con `ansible-core 2.14`.
+Si agregas tags nuevos en un play de `site.yml`, actualiza también el `pre_tasks` de `setup` taggeado de ese play (esquema P16).
 
 ## Cómo ejecutar
 

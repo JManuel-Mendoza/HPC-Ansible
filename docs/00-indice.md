@@ -12,7 +12,8 @@ Este indice organiza la documentacion para tres perfiles:
 3. `docs/03-inventario-y-variables.md`
 4. `docs/05-referencia-roles.md`
 5. `docs/07-runbooks-operativos.md`
-6. `docs/08-validacion-y-evidencia.md`
+6. `docs/07-verificacion-rapida.md`
+7. `docs/08-validacion-y-evidencia.md`
 
 ## Documentos
 
@@ -36,6 +37,9 @@ Este indice organiza la documentacion para tres perfiles:
 
 - `docs/07-runbooks-operativos.md`
   - Procedimientos de despliegue, cambio y recuperacion.
+
+- `docs/07-verificacion-rapida.md`
+  - Checklist smoke mínimo para validar entrypoint, tags y jobs Slurm CPU/GPU.
 
 - `docs/08-validacion-y-evidencia.md`
   - Como validar correctamente, que evidencia guardar y criterios de aceptacion.

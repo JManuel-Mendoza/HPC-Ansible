@@ -150,6 +150,7 @@ Toda la documentacion detallada esta en `docs/`.
 - `docs/04-playbooks-roles-y-tags.md`: playbooks, roles y tags.
 - `docs/05-referencia-roles.md`: comportamiento de cada rol.
 - `docs/06-referencia-archivos.md`: referencia de todos los archivos activos.
+- `docs/07-verificacion-rapida.md`: checklist smoke mínimo y canary recomendado.
 - `docs/07-runbooks-operativos.md`: runbooks de despliegue y operacion segura.
 - `docs/08-validacion-y-evidencia.md`: validacion, evidencia y criterios de salud.
 - `docs/09-glosario.md`: terminos HPC/Slurm explicados en lenguaje simple.
@@ -264,6 +265,38 @@ ansible-playbook -i inventario.ini site.yml --skip-tags debug --ask-vault-pass
 5. Validación: `--tags validate,slurm_validate`.
 
 ## Validación y troubleshooting
+
+## Verificación rápida (smoke)
+
+Preflight sin cambios (inventario, sintaxis y tags disponibles):
+
+```bash
+ansible-inventory -i inventario.ini --graph --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --list-tags --ask-vault-pass
+```
+
+Validación rápida de red/Slurm (solo lectura, no cambia configuración):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --ask-vault-pass --tags validate_slurm --limit "hpc_master,slurm_compute"
+```
+
+Smoke real de Slurm (CPU+GPU jobs; ejecutar al final):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --ask-vault-pass --tags slurm_validate_smoke
+```
+
+Ejemplo equivalente con vault password file local (solo referencia local, no versionar):
+
+```bash
+ansible-playbook -i inventario.ini site.yml --vault-password-file .secrets/vault-pass.txt --tags slurm_validate_smoke
+```
+
+`.secrets/vault-pass.txt` NO se commitea; cuando no uses archivo local, usa `--ask-vault-pass`.
+
+Nota de interpretación: durante waits del smoke pueden verse líneas `FAILED - RETRYING`; es normal si el job termina en estado OK al final.
 
 Validaciones (rol `validate`) se pueden ejecutar por dominio:
 ```bash

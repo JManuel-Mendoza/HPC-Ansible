@@ -78,6 +78,15 @@ Objetivo:
 - Reducir overhead en ejecuciones con `--tags` evitando `Gathering Facts` en plays sin match.
 - Mantener compatibilidad con `ansible-core 2.14` fijando `ansible.posix`.
 
+### Facts (P16): gather_facts deshabilitado + setup taggeado
+
+- En `site.yml`, todos los plays usan `gather_facts: false`.
+- Cada play define un `pre_tasks` con `ansible.builtin.setup` taggeado con la unión de `TASK TAGS` reales de ese play.
+- Con esto, al ejecutar `--tags`, solo recolectan facts los plays que efectivamente tienen tareas con match.
+- Se evita el overhead de `Gathering Facts` en plays sin tareas seleccionadas por tags.
+- No se usan `tags` a nivel play para preservar semántica de selección.
+- Mantenimiento: si agregas roles/tareas con tags nuevos en un play, actualiza también el `tags:` del `pre_tasks` `setup` de ese play (unión de tags vigente).
+
 Cambios aplicados:
 - `requirements.yml`: `ansible.posix` fijado en `1.5.4`.
 - `site.yml`: en los 15 plays, `gather_facts: false` + `pre_tasks` con `ansible.builtin.setup` taggeado con el union real de `TASK TAGS` de cada play.
