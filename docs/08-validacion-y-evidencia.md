@@ -25,10 +25,12 @@ Demostrar que el cluster esta operativo sin introducir cambios no controlados.
 ```bash
 ansible-inventory -i inventario.ini --graph
 ansible-playbook -i inventario.ini site.yml --syntax-check
-ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1
+ansible-playbook -i inventario.ini site.yml --check --diff --limit <worker_activo>
 ansible-playbook -i inventario.ini site.yml --tags validate --limit all
 ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_master
 ```
+
+Nota: se debe sustituir `<worker_activo>` por un host habilitado en `inventario.ini` (por ejemplo, `worker2`).
 
 ## Que guardar en bitacora/PR
 

@@ -12,8 +12,9 @@ ansible-playbook -i inventario.ini site.yml --syntax-check
 ```
 3. Dry-run acotado:
 ```bash
-ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1
+ansible-playbook -i inventario.ini site.yml --check --diff --limit <worker_activo>
 ```
+Nota: en los ejemplos con `<worker_activo>`, se debe sustituir por un host habilitado en `inventario.ini` (por ejemplo, `worker2`).
 4. Baseline por capas:
 ```bash
 ansible-playbook -i inventario.ini site.yml --tags common,ssh,firewall,network,routing,nfs,cuda,llm --limit all
@@ -39,7 +40,7 @@ ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_ma
   1. Ajustar `network_internal_links` y/o `hpc_internal_subnets`.
   2. Aplicar primero en un worker:
 ```bash
-ansible-playbook -i inventario.ini site.yml --tags network,routing --limit worker1
+ansible-playbook -i inventario.ini site.yml --tags network,routing --limit <worker_activo>
 ```
   3. Verificar acceso SSH y rutas.
   4. Escalar gradualmente al resto.
@@ -48,11 +49,11 @@ ansible-playbook -i inventario.ini site.yml --tags network,routing --limit worke
 
 1. Probar en un nodo GPU:
 ```bash
-ansible-playbook -i inventario.ini site.yml --tags cuda --limit worker1
+ansible-playbook -i inventario.ini site.yml --tags cuda --limit <worker_activo>
 ```
 2. Validar:
 ```bash
-ansible-playbook -i inventario.ini site.yml --tags validate --limit worker1
+ansible-playbook -i inventario.ini site.yml --tags validate --limit <worker_activo>
 ```
 3. Revisar si el rol solicita reboot.
 4. Escalar a otros nodos por lotes pequenos.

@@ -11,7 +11,7 @@ Rutas/vars relevantes (ver `docs/audit/vars-map.md`):
 - Controller host: `slurm_control_machine` (default: `master`)
 - Puertos: `slurmctld_port=6817`, `slurmd_port=6818`, `slurmdbd_port=6819`
 
-Nota: los comandos usan los defaults (`/etc/slurm`, `/var/log/slurm`, `master`). Si tu laboratorio los sobreescribio en `group_vars/*`, ajusta esos literales.
+Nota: los comandos usan los defaults (`/etc/slurm`, `/var/log/slurm`, `master`). Si el laboratorio los sobrescribio en `group_vars/*`, se recomienda ajustar esos literales.
 
 ## Checklist rápida (5 min)
 

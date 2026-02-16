@@ -33,11 +33,13 @@ En lugar de configurar cada servidor a mano, se declara el estado deseado y Ansi
 ansible-galaxy collection install -r requirements.yml
 ansible-inventory -i inventario.ini --graph
 ansible-playbook -i inventario.ini site.yml --syntax-check
-ansible-playbook -i inventario.ini site.yml --check --diff --limit worker1
+ansible-playbook -i inventario.ini site.yml --check --diff --limit <worker_activo>
 ansible-playbook -i inventario.ini site.yml
 ansible-playbook -i inventario.ini site.yml --tags validate --limit all
 ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_master
 ```
+
+Nota: se debe sustituir `<worker_activo>` por un host habilitado en `inventario.ini` (por ejemplo, `worker2`).
 
 ## Que no hacer
 
