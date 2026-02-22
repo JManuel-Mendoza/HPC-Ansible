@@ -27,6 +27,16 @@
     mode: "0755"
   tags: [slurmdbd_hygiene]
 
+- name: SlurmDBD | Crear slurmdbd.conf base si falta
+  ansible.builtin.copy:
+    dest: "{{ slurm_etc_dir }}/slurmdbd.conf"
+    content: ""
+    owner: slurm
+    group: slurm
+    mode: "0600"
+    force: false
+  tags: [slurmdbd_hygiene]
+
 - name: SlurmDBD | Asegurar PidFile en slurmdbd.conf
   ansible.builtin.lineinfile:
     path: "{{ slurm_etc_dir }}/slurmdbd.conf"

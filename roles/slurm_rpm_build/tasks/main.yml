@@ -21,7 +21,7 @@
       - hwloc-devel
       - munge-devel
       - mariadb-devel
-      - cuda-toolkit
+      - cuda-nvml-devel-12-8
     state: present
   when: ansible_facts['os_family'] == 'RedHat'
   tags: [slurm, slurm_build]
@@ -32,6 +32,15 @@
     dest: "/root/slurm-{{ slurm_version }}.tar.bz2"
     mode: "0644"
   when: ansible_facts['os_family'] == 'RedHat'
+  tags: [slurm, slurm_build]
+
+- name: Slurm | Force rebuild if NVML plugin missing in built RPM (Rocky/RHEL)
+  ansible.builtin.file:
+    path: "/root/rpmbuild/RPMS/x86_64/.slurm_{{ slurm_version }}_built"
+    state: absent
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - not (lookup('ansible.builtin.pipe', 'sudo rpm -qlp /root/rpmbuild/RPMS/x86_64/slurm-' ~ slurm_version ~ '-*.x86_64.rpm 2>/dev/null | grep -q "/usr/lib64/slurm/gpu_nvml.so" && echo yes || echo no') == "yes")
   tags: [slurm, slurm_build]
 
 - name: Slurm | Build RPMs with rpmbuild (Rocky/RHEL)

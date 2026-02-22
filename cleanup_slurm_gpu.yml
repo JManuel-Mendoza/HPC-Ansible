@@ -4,9 +4,14 @@
   become: true
   gather_facts: true
   serial: 1
+
   vars:
     cleanup_preserve_ssh: true
     cleanup_srun_port_range: "{{ slurm_srun_port_range | default('60001-60100') }}"
+    cleanup_firewalld_zone: "{{ slurm_firewalld_zone | default('public') }}"
+    cleanup_internal_cidr: "{{ slurm_internal_cidr | default('192.168.34.0/24') }}"
+    cleanup_slurmctld_port: "{{ slurmctld_port | default(6817) }}"
+    cleanup_slurmd_port: "{{ slurmd_port | default(6818) }}"
 
   tasks:
     - name: Limpieza | Definir servicio SSH por sistema operativo
@@ -30,12 +35,11 @@
       failed_when: false
       when:
         - ansible_facts.os_family == 'RedHat'
-        - cleanup_preserve_ssh | bool
       tags: [cleanup, cleanup_safety, cleanup_firewall]
 
-    - name: Limpieza | Mantener servicio SSH permitido en firewalld
+    - name: Limpieza | Mantener servicio SSH permitido en firewalld (antes)
       ansible.posix.firewalld:
-        zone: "{{ slurm_firewalld_zone | default('public') }}"
+        zone: "{{ cleanup_firewalld_zone }}"
         service: ssh
         state: enabled
         permanent: true
@@ -82,6 +86,7 @@
         state: absent
         purge: true
         autoremove: true
+        update_cache: true
       when: ansible_facts.os_family == 'Debian'
       tags: [cleanup, cleanup_packages]
 
@@ -103,6 +108,8 @@
         - /etc/tmpfiles.d/slurm-run.conf
         - /etc/profile.d/slurm-defaults.sh
         - /etc/yum.repos.d/cuda-rhel9.repo
+        - /root/rpmbuild
+        - /root/slurm-*.tar.bz2
       tags: [cleanup, cleanup_files]
 
     - name: Limpieza | Eliminar repo CUDA en Ubuntu
@@ -122,13 +129,13 @@
       when: ansible_facts.os_family == 'Debian'
       tags: [cleanup, cleanup_files]
 
-    - name: Limpieza | Remover reglas rich de Slurm en firewalld (6817)
+    - name: Limpieza | Remover reglas rich de Slurm en firewalld (slurmctld 6817)
       ansible.posix.firewalld:
-        zone: "{{ slurm_firewalld_zone | default('public') }}"
+        zone: "{{ cleanup_firewalld_zone }}"
         rich_rule: >-
           rule family="ipv4"
-          source address="{{ slurm_internal_cidr | default('192.168.34.0/24') }}"
-          port port="{{ slurmctld_port | default(6817) }}" protocol="tcp"
+          source address="{{ cleanup_internal_cidr }}"
+          port port="{{ cleanup_slurmctld_port }}" protocol="tcp"
           accept
         state: disabled
         permanent: true
@@ -139,13 +146,13 @@
         - cleanup_firewalld_active.rc == 0
       tags: [cleanup, cleanup_firewall]
 
-    - name: Limpieza | Remover reglas rich de Slurm en firewalld (6818)
+    - name: Limpieza | Remover reglas rich de Slurm en firewalld (slurmd 6818)
       ansible.posix.firewalld:
-        zone: "{{ slurm_firewalld_zone | default('public') }}"
+        zone: "{{ cleanup_firewalld_zone }}"
         rich_rule: >-
           rule family="ipv4"
-          source address="{{ slurm_internal_cidr | default('192.168.34.0/24') }}"
-          port port="{{ slurmd_port | default(6818) }}" protocol="tcp"
+          source address="{{ cleanup_internal_cidr }}"
+          port port="{{ cleanup_slurmd_port }}" protocol="tcp"
           accept
         state: disabled
         permanent: true
@@ -158,7 +165,7 @@
 
     - name: Limpieza | Remover SrunPortRange en firewalld
       ansible.posix.firewalld:
-        zone: "{{ slurm_firewalld_zone | default('public') }}"
+        zone: "{{ cleanup_firewalld_zone }}"
         port: "{{ cleanup_srun_port_range }}/tcp"
         state: disabled
         permanent: true
@@ -169,9 +176,9 @@
         - cleanup_firewalld_active.rc == 0
       tags: [cleanup, cleanup_firewall]
 
-    - name: Limpieza | Mantener SSH permitido en firewalld al finalizar
+    - name: Limpieza | Mantener SSH permitido en firewalld (después)
       ansible.posix.firewalld:
-        zone: "{{ slurm_firewalld_zone | default('public') }}"
+        zone: "{{ cleanup_firewalld_zone }}"
         service: ssh
         state: enabled
         permanent: true
@@ -188,9 +195,10 @@
       register: cleanup_ssh_active
       changed_when: false
       failed_when: cleanup_ssh_active.stdout | trim != 'active'
+      when: cleanup_preserve_ssh | bool
       tags: [cleanup, cleanup_safety]
 
-    - name: Limpieza | Reportar paquetes residuales Slurm/Munge/NVIDIA/CUDA
+    - name: Limpieza | Reportar paquetes residuales Slurm/Munge/NVIDIA/CUDA (RHEL)
       ansible.builtin.shell: |
         set -euo pipefail
         rpm -qa | grep -Ei '^(slurm|munge|nvidia|cuda)' || true

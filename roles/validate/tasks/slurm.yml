@@ -99,11 +99,11 @@
     - inventory_hostname in groups.get('hpc_master', [])
   tags: [validate, validate_slurm]
 
-# (Opcional) Validar firewall rich-rules mínimas, según tu patrón:
-# - master: 6817 + rango srun
+# (Opcional) Validar firewall/rules mínimas, según tu patrón:
+# - master: rich rule 6817 + port range srun
 # - workers: 6818
-- name: Validate | Master firewalld rich rules present (6817 and srun range)
-  ansible.builtin.command: firewall-cmd --zone=public --list-rich-rules
+- name: Validate | Master firewalld rich rules present (6817)
+  ansible.builtin.command: firewall-cmd --zone={{ slurm_firewalld_zone | default('public') }} --list-rich-rules
   register: _fw_master_rules
   changed_when: false
   failed_when: false
@@ -113,15 +113,29 @@
     - (_validate_firewall_cmd.stat.exists | default(false))
   tags: [validate, validate_slurm, validate_firewall]
 
-- name: Validate | Firewall | Fallar si faltan rich rules en master (6817 y rango srun)
+- name: Validate | Master firewalld port present (srun range)
+  ansible.builtin.command: >-
+    firewall-cmd --zone={{ slurm_firewalld_zone | default('public') }}
+    --query-port={{ slurm_srun_port_range | default('60001-60100') }}/tcp
+  register: _fw_master_srun_port
+  changed_when: false
+  failed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+    - (_validate_firewall_cmd.stat.exists | default(false))
+  tags: [validate, validate_slurm, validate_firewall]
+
+- name: Validate | Firewall | Fallar si faltan reglas esperadas en master (6817 y rango srun)
   ansible.builtin.assert:
     that:
-      - _fw_master_rules.stdout is search('port=\"6817\"')
-      - _fw_master_rules.stdout is search('port=\"60001-60100\"')
+      - _fw_master_rules.stdout is search('port=\"' ~ (slurmctld_port | default(6817) | string) ~ '\"')
+      - _fw_master_srun_port.rc == 0
     fail_msg: >-
-      Faltan rich rules esperadas en el master para Slurm (6817 y/o rango srun 60001-60100).
+      Faltan reglas esperadas en el master para Slurm (6817 rich-rule y/o rango srun).
       Accion: ejecutar `--tags firewall,slurm_firewall` y verificar zona/puertos.
-      Evidencia: rules={{ _fw_master_rules.stdout | default('') | trim }}
+      Evidencia: rules={{ _fw_master_rules.stdout | default('') | trim }};
+      srun_query_rc={{ _fw_master_srun_port.rc | default('n/a') }}
   when:
     - _validate_slurm_present | default(false) | bool
     - inventory_hostname in groups.get('hpc_master', [])
