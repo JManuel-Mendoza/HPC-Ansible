@@ -3,6 +3,144 @@
 ## Table of Contents
 - TBD
 
+## 2026-02-20 17:18 (UTC-05) — corrección de comparación de estado instalado y chequeo grubby en nvidia_cuda
+**Contexto:** con evidencia `-vv` del master, el rol seguía marcando cambios porque:
+- la verificación “stack objetivo instalado” daba falso negativo usando `rpm -q` con NEVRA (con epoch),
+- `_grubby_missing_nouveau_args` resultaba `true` aunque los argumentos ya estaban presentes en todas las entradas.
+**Detalles de los cambios (cómo se hizo):**
+- En `roles/nvidia_cuda/tasks/main.yml` se reemplazó el check de `rpm -q <nevra>` por consulta de estado instalado con:
+  `dnf repoquery --installed ... --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}'`,
+  y comparación normalizada/sort de listas `objetivo vs instalado`.
+- Se actualizó la condición de instalación del stack para ejecutar solo cuando esas listas difieren.
+- Se simplificó el cálculo de `_grubby_missing_nouveau_args` a verificación por línea usando `reject('search', '...')` para detectar de forma robusta si falta alguno de los dos argumentos de blacklist.
+**Razón de la acción (por qué se hizo):**
+- El formato de consulta anterior no representaba correctamente el estado instalado y provocaba reinstalación permanente; además el matcher de grubby estaba generando falso positivo y forzando cambios/reinicio.
+**Propósito de la acción (para qué se hizo):**
+- Restablecer idempotencia real en RHEL: sin reinstalación del stack ni actualización de GRUB cuando el nodo ya está convergido.
+**Archivos cambiados:**
+- `roles/nvidia_cuda/tasks/main.yml`
+- `docs/docs_old/bitacora_codex.md`
+**Validación realizada:**
+- `ANSIBLE_LOCAL_TEMP=/tmp/.ansible/tmp ANSIBLE_REMOTE_TEMP=/tmp/.ansible/tmp ansible-playbook -i inventario.ini site.yml --syntax-check` (exit code 0).
+**Notas de validación:**
+- Persisten warnings de permisos del sandbox al cargar plugins (`[Errno 13] Permission denied`) sin bloquear la validación sintáctica.
+
+## 2026-02-20 17:15 (UTC-05) — eliminar remoción agresiva de incompatibles en RHEL para evitar bloqueo y drift
+**Contexto:** durante `--tags cuda --limit master`, la tarea `Remover paquetes NVIDIA incompatibles detectados` se quedaba congelada y seguía marcando cambios recurrentes.
+**Detalles de los cambios (cómo se hizo):**
+- En `roles/nvidia_cuda/tasks/main.yml` se retiró el bloque RHEL que detectaba/removía “paquetes NVIDIA incompatibles” por heurística de nombre/versión.
+- Se retiró la verificación post RHEL basada en la misma heurística, que podía amplificar falsos positivos.
+- Se ajustó `_nvidia_reboot_required` para quitar la dependencia de `_nvidia_incompatible_remove`.
+- Se mantiene la convergencia por instalación explícita de NEVRA objetivo (`nvidia-driver` + `nvidia-driver-cuda`) con `allowerasing`, más `assert` de major instalado.
+**Razón de la acción (por qué se hizo):**
+- La remoción heurística de incompatibles introducía riesgo de transacciones largas/bloqueadas y ruido de idempotencia sin evidencia estable de valor adicional frente a la instalación NEVRA objetivo.
+**Propósito de la acción (para qué se hizo):**
+- Evitar congelamientos del playbook y estabilizar la idempotencia del rol `nvidia_cuda` manteniendo el objetivo funcional (driver correcto + `nvidia-smi` operativo).
+**Archivos cambiados:**
+- `roles/nvidia_cuda/tasks/main.yml`
+- `docs/docs_old/bitacora_codex.md`
+**Validación realizada:**
+- `ANSIBLE_LOCAL_TEMP=/tmp/.ansible/tmp ANSIBLE_REMOTE_TEMP=/tmp/.ansible/tmp ansible-playbook -i inventario.ini site.yml --syntax-check` (exit code 0).
+**Notas de validación:**
+- En este entorno continuaron warnings de permisos al cargar plugins por sandbox (`[Errno 13] Permission denied`), sin bloquear la validación sintáctica.
+
+## 2026-02-20 17:05 (UTC-05) — segunda corrección de idempotencia en nvidia_cuda (estado objetivo exacto)
+**Contexto:** tras el ajuste anterior, la ejecución seguía reportando `changed` en tareas de remoción/instalación del stack NVIDIA.
+**Detalles de los cambios (cómo se hizo):**
+- En `roles/nvidia_cuda/tasks/main.yml` se afinó la lista de paquetes considerados “incompatibles” para evaluar solo componentes estrictamente acoplados al stream del driver (se excluyeron utilidades auxiliares con versionado independiente).
+- Se reemplazó la comparación de listas NEVRA por una verificación exacta con `rpm -q <nevra_driver> <nevra_driver_cuda>`; ahora la tarea de instalación del stack solo ejecuta si ese check falla (`rc != 0`).
+- Se robusteció la lectura de argumentos de `grubby` para evitar falsos faltantes por formato (`awk` sobre `grubby --info=ALL` usando patrón `args=` no anclado al inicio de línea).
+- Se mantuvo la validación post igualada a la lógica pre para evitar drift de criterio.
+**Razón de la acción (por qué se hizo):**
+- Persistían cambios recurrentes por diferencias de detección/normalización que no representaban desviaciones reales del estado deseado.
+**Propósito de la acción (para qué se hizo):**
+- Forzar convergencia idempotente real: si el nodo ya está en el estado objetivo, no debe marcar cambios ni activar reinicio/handlers por falsos positivos.
+**Archivos cambiados:**
+- `roles/nvidia_cuda/tasks/main.yml`
+- `docs/docs_old/bitacora_codex.md`
+**Validación realizada:**
+- `ANSIBLE_LOCAL_TEMP=/tmp/.ansible/tmp ANSIBLE_REMOTE_TEMP=/tmp/.ansible/tmp ansible-playbook -i inventario.ini site.yml --syntax-check` (exit code 0).
+**Notas de validación:**
+- En este entorno continuaron warnings de permisos al cargar plugins por sandbox (`[Errno 13] Permission denied`), sin bloquear la validación sintáctica.
+
+## 2026-02-20 16:56 (UTC-05) — corrección de idempotencia en detección/remoción e instalación del stack NVIDIA
+**Contexto:** en `--tags cuda --limit master` los tasks `Remover paquetes NVIDIA incompatibles detectados` e `Instalar stack NVIDIA compatible (driver + nvidia-smi)` reportaban `changed` en cada corrida.
+**Detalles de los cambios (cómo se hizo):**
+- En `roles/nvidia_cuda/tasks/main.yml` se reemplazó la detección de incompatibles por una lista explícita de paquetes del stack de driver (familias `nvidia-driver*`, `kmod-nvidia*`, `xorg-x11-drv-nvidia*`, etc.) evaluando major sobre EVR; se eliminó el filtro amplio que incluía paquetes no vinculados al stream del driver.
+- Se aplicó la misma lógica de detección en la validación post-instalación para mantener coherencia pre/post.
+- Se agregó pre-chequeo de NEVRA instalado (`nvidia-driver` y `nvidia-driver-cuda`) y la instalación del stack ahora solo corre cuando el estado instalado difiere del objetivo (`repoquery`), evitando reinstalaciones innecesarias.
+- En RHEL se reforzó la idempotencia de `grubby`: ahora valida argumentos en **todas** las entradas (`grubby --info=ALL`) y solo ejecuta `--update-kernel=ALL --args=...` cuando realmente falta algún argumento de blacklist.
+**Razón de la acción (por qué se hizo):**
+- El rol tenía señales de drift por heurísticas de detección demasiado amplias y por falta de comparación explícita entre estado instalado y estado objetivo, lo que producía `changed` permanente.
+**Propósito de la acción (para qué se hizo):**
+- Garantizar idempotencia real del rol `nvidia_cuda` (sin cambios en corridas consecutivas cuando el nodo ya está convergido) y evitar reinicios/handlers innecesarios derivados de falsos cambios.
+**Archivos cambiados:**
+- `roles/nvidia_cuda/tasks/main.yml`
+- `docs/docs_old/bitacora_codex.md`
+**Validación realizada:**
+- `ANSIBLE_LOCAL_TEMP=/tmp/.ansible/tmp ANSIBLE_REMOTE_TEMP=/tmp/.ansible/tmp ansible-playbook -i inventario.ini site.yml --syntax-check` (exit code 0).
+**Notas de validación:**
+- En este entorno persistieron warnings de permisos al cargar plugins (`[Errno 13] Permission denied`) por sandbox, sin bloquear `syntax-check`.
+
+## 2026-02-20 16:35 (UTC-05) — ajuste de idempotencia para evitar reinicio falso en nvidia_cuda
+**Contexto:** tras convergencia correcta de CUDA (`nvidia-smi` operativo), el rol seguía marcando reinicio requerido en corridas posteriores.
+**Detalles de los cambios (cómo se hizo):**
+- En `roles/nvidia_cuda/tasks/main.yml` se cambió `changed_when` a `false` en:
+  - `NVIDIA/CUDA | Resetear stream si no coincide`
+  - `NVIDIA/CUDA | Cambiar a stream fijado {{ nvidia_driver_stream }}`
+- En el cálculo de `_nvidia_reboot_required` se removieron `_nvidia_module_reset` y `_nvidia_module_switch` como disparadores de reinicio.
+**Razón de la acción (por qué se hizo):**
+- La detección de cambios de esos comandos dependía de parsing textual de salida (`Nothing to do`), lo que puede dar falsos positivos por variaciones de salida/localización y provocar solicitudes de reinicio aunque el nodo ya esté correcto.
+**Propósito de la acción (para qué se hizo):**
+- Evitar solicitudes de reinicio no justificadas y asegurar idempotencia del rol cuando el stack NVIDIA/CUDA ya está en estado deseado.
+**Archivos cambiados:**
+- `roles/nvidia_cuda/tasks/main.yml`
+- `docs/docs_old/bitacora_codex.md`
+**Ejecución de Ansible:** no se ejecutó `ansible-playbook` en esta acción.
+
+## 2026-02-20 16:20 (UTC-05) — nvidia_cuda autosuficiente (driver + nvidia-smi + reinicio en la misma corrida)
+**Contexto:** ajuste solicitado para que `--tags cuda` deje el nodo listo sin pasos manuales posteriores.
+**Detalles de los cambios (cómo se hizo):**
+- En `roles/nvidia_cuda/tasks/main.yml` se añadió selección e instalación explícita de `nvidia-driver-cuda` compatible con `nvidia_driver_stream` (mismo major), junto con `nvidia-driver`, dentro del bloque principal de instalación en RHEL.
+- Se eliminó la ruta tardía/condicional que intentaba instalar `nvidia-smi` solo si faltaba el binario; ahora el paquete proveedor se instala de forma determinística durante la instalación principal.
+- Se actualizó el cálculo de reinicio para contemplar cambios de `_nvidia_stack_install`.
+- Se añadió `meta: flush_handlers` antes de las validaciones para que `dracut/update-initramfs` y `reboot` (si aplica) ocurran en la misma ejecución, antes de comprobar módulos y `nvidia-smi`.
+- Se simplificó la validación de `nvidia-smi`: falla directa si sigue ausente tras la instalación y posible reinicio.
+- En `roles/nvidia_cuda/defaults/main.yml` se cambió `nvidia_cuda_reboot` a `true` por defecto para priorizar convergencia autosuficiente.
+**Razón de la acción (por qué se hizo):**
+- El flujo anterior podía abortar o validar antes del reinicio, y la instalación de `nvidia-driver-cuda` podía no ocurrir, dejando `nvidia-smi` ausente y requiriendo intervención manual.
+**Propósito de la acción (para qué se hizo):**
+- Garantizar que una sola corrida del rol `nvidia_cuda` deje el nodo con driver + `nvidia-smi` operativo (incluyendo reinicio cuando sea necesario), sin comandos manuales posteriores.
+**Archivos cambiados:**
+- `roles/nvidia_cuda/tasks/main.yml`
+- `roles/nvidia_cuda/defaults/main.yml`
+- `docs/docs_old/bitacora_codex.md`
+**Validación realizada:**
+- `ANSIBLE_LOCAL_TEMP=/tmp/.ansible/tmp ANSIBLE_REMOTE_TEMP=/tmp/.ansible/tmp ansible-playbook -i inventario.ini site.yml --syntax-check` (exit code 0).
+**Notas de validación:**
+- En este entorno salieron warnings de permisos al cargar plugins (`[Errno 13] Permission denied`), pero el `syntax-check` terminó correctamente.
+
+## 2026-02-20 15:30 (America/Bogota) — corrección mínima de rol nvidia_cuda (sin ejecución de Ansible)
+**Contexto:** host de trabajo local; repositorio `hpc-ansible`; alcance: `roles/nvidia_cuda/tasks/main.yml`.
+**Detalles de los cambios (cómo se hizo):**
+- Se agregó derivación explícita del major objetivo desde `nvidia_driver_stream` (`_nvidia_driver_major`) para usarlo de forma consistente.
+- Se reemplazó la detección/eliminación hardcodeada de paquetes `590` por detección genérica de paquetes NVIDIA incompatibles con el major objetivo.
+- Se reemplazó la instalación genérica de `nvidia-driver` por selección e instalación de NEVRA compatible con el major objetivo (via `repoquery`), con `assert` posterior de versión instalada.
+- Se corrigió la extracción de `GRUB_CMDLINE_LINUX` en la rama Ubuntu (`regex_replace` con `\\1`).
+- Se eliminó el bloque duplicado de “forzar 580 si quedan 590” y se sustituyó por un `fail` único si persisten paquetes incompatibles.
+- Se relajó el patrón de selección del proveedor de `nvidia-smi` para aceptar epoch variable.
+- Se cambió la captura de `dmesg` a `shell` con `pipefail` para evitar pérdida de evidencia por pipes.
+- Se añadió validación explícita de nodos de dispositivo `/dev/nvidia*` cuando `nvidia-smi` responde.
+**Razón de la acción (por qué se hizo):**
+- El diagnóstico en `master` mostró GPU Pascal Quadro P1000 (`10de:1cb1`) con driver `590.48.01`, combinación no soportada por NVIDIA para ese hardware, y ausencia de `nvidia-smi`.
+- El rol tenía puntos frágiles que permitían drift hacia ramas incompatibles y dejaban validación incompleta del estado real del driver.
+**Propósito de la acción (para qué se hizo):**
+- Forzar convergencia del rol hacia el major de driver configurado (580 para Pascal), evitar reinstalaciones incompatibles y mejorar diagnóstico/validación final del estado NVIDIA/CUDA.
+**Archivos cambiados:**
+- `roles/nvidia_cuda/tasks/main.yml`
+- `docs/docs_old/bitacora_codex.md`
+**Ejecución de Ansible:** no se ejecutó `ansible` ni `ansible-playbook` en esta acción (por solicitud explícita).
+
 ## 2026-01-26 17:39 (UTC-05) — agregar numba al env llm
 **Context:** hosts: all; playbook: site.yml; tags: llm; branch: llm
 **Symptom:** N/A (solicitud de paquete)
