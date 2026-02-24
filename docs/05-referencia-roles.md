@@ -129,6 +129,7 @@ Este documento cubre todos los roles activos bajo `roles/`.
   - `roles/slurm_db_prep/tasks/main.yml`
   - `roles/slurm_db_prep/handlers/main.yml`
 - Entradas: `slurmdb_mysql_*`, `mariadb_slurm_tuning`.
+- Nota: `slurmdb_mysql_user` puede declararse como string o lista; el rol normaliza ambos formatos antes de crear usuarios/grants.
 - Salidas:
   - `/etc/my.cnf.d/slurm.cnf`,
   - DB y usuarios,

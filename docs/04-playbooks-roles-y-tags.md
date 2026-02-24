@@ -4,6 +4,8 @@
 
 - `site.yml`
   - Orquestacion completa del cluster por capas.
+- `cleanup_slurm_gpu.yml`
+  - Limpieza total (alto riesgo) para reprovision de Slurm/GPU desde cero.
 
 ## Orden real de plays en site.yml
 
@@ -31,6 +33,7 @@ Nota: la secuencia canonica es la definida en `site.yml`; cualquier cambio en `s
 - DB/accounting: `mariadb`, `slurmdb`
 - Slurm: `slurm`, `slurm_install`, `slurm_config`, `slurmctld`, `slurmd`, `slurmdbd`
 - Validacion: `validate`, `slurm_validate`, `slurm_validate_smoke`
+- Limpieza: `cleanup`, `cleanup_safety`, `cleanup_services`, `cleanup_packages`, `cleanup_files`, `cleanup_firewall`, `cleanup_verify`
 
 ## Ejecuciones parciales sugeridas
 
@@ -48,4 +51,9 @@ ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_con
 - Ejecutar validacion Slurm:
 ```bash
 ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_master
+```
+
+- Ejecutar limpieza total de Slurm/GPU en un solo nodo (alto riesgo):
+```bash
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado> --tags cleanup,cleanup_verify
 ```

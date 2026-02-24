@@ -8,6 +8,7 @@ La guia resume como configurar inventario y variables, ejecutar por etapas/tags 
 ## Caracteristicas principales
 
 - Orquestacion declarativa por etapas en un entrypoint unico: `site.yml`.
+- Playbook de limpieza controlada para reprovision (`cleanup_slurm_gpu.yml`) en escenarios de reconstruccion total.
 - Ejecucion parcial por tags para despliegues controlados (`common`, `network`, `slurm`, `validate`, entre otros).
 - Soporte de nodos de control y nodos de computo con grupos de inventario dedicados.
 - Integracion de servicios base HPC: `firewalld`, rutas internas, NFS compartido, Slurm y Munge.
@@ -44,6 +45,8 @@ Referencia: `inventario.ini`.
 - Coleccion requerida:
   - `ansible.posix` version `1.5.4` (definida en `requirements.yml`).
 - Acceso SSH a nodos del inventario y permisos de elevacion cuando aplique.
+- Resolucion de nombres/IP coherente para `master` y `workers` (DNS interno o `/etc/hosts` gestionado por `network_internal`).
+- Interfaces internas y subredes declaradas en `network_internal_links` y `hpc_internal_subnets` antes de ejecutar cambios de red.
 - Secretos Vault disponibles (`group_vars/all/vault.yml`) y metodo de desbloqueo:
   - `--ask-vault-pass`, o
   - `--vault-password-file` con archivo local no versionado.
@@ -53,6 +56,7 @@ Referencia: `inventario.ini`.
 ```text
 .
 |-- site.yml
+|-- cleanup_slurm_gpu.yml
 |-- inventario.ini
 |-- ansible.cfg
 |-- requirements.yml
@@ -145,6 +149,25 @@ Las etapas canonicamente definidas en `site.yml` son:
 14. `Etapa 14 | Validacion general de salud del cluster` en `all`.
 15. `Etapa 15 | Validacion Slurm (sin cambios de configuracion)` en `hpc_master`.
 
+## Playbook de limpieza total (alto riesgo)
+
+`cleanup_slurm_gpu.yml` elimina servicios/paquetes/configuracion de Slurm, Munge, NVIDIA/CUDA y reglas de firewall asociadas, para reprovisionar desde cero.
+
+Reglas operativas minimas:
+- Ejecutar en ventana de mantenimiento.
+- Empezar con `--limit` a un solo nodo.
+- Verificar tags y alcance antes de ejecutar.
+
+Comandos recomendados:
+
+```bash
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --list-tags
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado> --tags cleanup,cleanup_verify --ask-vault-pass
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado> --ask-vault-pass
+```
+
+Referencia operativa: `docs/runbooks/cleanup-slurm-gpu.md`.
+
 ## Validacion y evidencia (smoke/canary)
 
 ### Verificacion rapida recomendada
@@ -184,6 +207,7 @@ ansible-playbook -i inventario.ini site.yml --ask-vault-pass --limit "hpc_master
 - Orquestacion operativa general: `docs/07-runbooks-operativos.md`
 - Verificacion rapida: `docs/07-verificacion-rapida.md`
 - Slurm: `docs/runbooks/slurm.md`
+- Limpieza total Slurm/GPU: `docs/runbooks/cleanup-slurm-gpu.md`
 - Munge: `docs/runbooks/munge.md`
 - GPU/CUDA: `docs/runbooks/gpu-cuda.md`
 - NFS: `docs/runbooks/nfs.md`
@@ -215,6 +239,9 @@ ansible-playbook -i inventario.ini site.yml --ask-vault-pass --limit "hpc_master
 
 8. Sintoma: drift entre corridas.
    - Accion: ejecutar `--check --diff` por fases y comparar salidas de validacion en `docs/08-validacion-y-evidencia.md`.
+
+9. Sintoma: se requiere reconstruccion completa de Slurm + GPU/CUDA.
+   - Accion: seguir `docs/runbooks/cleanup-slurm-gpu.md` y reprovisionar por etapas con `site.yml`.
 
 ## Licencia y creditos
 

@@ -10,6 +10,7 @@ Rutas/vars relevantes (ver `docs/audit/vars-map.md`):
 - Logs: `slurm_log_dir` (default: `/var/log/slurm`)
 - Controller host: `slurm_control_machine` (default: `master`)
 - Puertos: `slurmctld_port=6817`, `slurmd_port=6818`, `slurmdbd_port=6819`
+- DB users: `slurmdb_mysql_user` (string o lista; `slurmdbd_storage_user` usa el primer usuario efectivo)
 
 Nota: los comandos usan los defaults (`/etc/slurm`, `/var/log/slurm`, `master`). Si el laboratorio los sobrescribio en `group_vars/*`, se recomienda ajustar esos literales.
 

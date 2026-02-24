@@ -53,6 +53,8 @@ Runbooks mínimos, orientados a comandos y evidencia:
 
 - `docs/runbooks/slurm.md`
   - Operación/diagnóstico de `slurmctld`, `slurmd`, `slurmdbd` y accounting.
+- `docs/runbooks/cleanup-slurm-gpu.md`
+  - Limpieza total (alto riesgo) de Slurm + Munge + NVIDIA/CUDA para reprovisionar desde cero.
 - `docs/runbooks/munge.md`
   - Permisos de key, pruebas `munge -n | unmunge` y fallas comunes.
 - `docs/runbooks/gpu-cuda.md`

@@ -59,6 +59,7 @@ Bloques clave:
   - `slurmdb_mysql_hosts`
   - `mariadb_slurm_tuning`
   - `slurmdbd_port`, `slurmdbd_host`, `slurmdbd_storage_*`
+  - `slurmdb_mysql_user` admite string o lista; internamente se normaliza y `slurmdbd_storage_user` usa el primer usuario efectivo.
 
 ## Variables por host
 

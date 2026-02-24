@@ -8,6 +8,16 @@
 # - Heredadas desde site.yml y/o invocaciones parciales por --tags.
 
 ---
+- name: SlurmDB | Normalizar usuarios objetivo
+  ansible.builtin.set_fact:
+    _slurmdb_mysql_users: >-
+      {{
+        (slurmdb_mysql_user is string)
+        | ternary([slurmdb_mysql_user], (slurmdb_mysql_user | default([]) | list))
+      }}
+  changed_when: false
+  tags: [mariadb, slurmdb]
+
 - name: SlurmDB | Ensure MariaDB tuning file
   ansible.builtin.copy:
     dest: /etc/my.cnf.d/slurm.cnf
@@ -32,7 +42,7 @@
 - name: SlurmDB | Create users
   ansible.builtin.command: >-
     mariadb -N -B -e "CREATE USER IF NOT EXISTS '{{ item.0 }}'@'{{ item.1 }}' IDENTIFIED BY '{{ slurmdb_mysql_password }}';"
-  loop: "{{ (slurmdb_mysql_user | list) | product(slurmdb_mysql_hosts | unique) | list }}"
+  loop: "{{ _slurmdb_mysql_users | product(slurmdb_mysql_hosts | unique) | list }}"
   changed_when: false
   no_log: true
   tags: [mariadb, slurmdb]
@@ -40,7 +50,7 @@
 - name: SlurmDB | Grant privileges
   ansible.builtin.command: >-
     mariadb -N -B -e "GRANT ALL PRIVILEGES ON {{ slurmdb_mysql_db }}.* TO '{{ item.0 }}'@'{{ item.1 }}' WITH GRANT OPTION;"
-  loop: "{{ (slurmdb_mysql_user | list) | product(slurmdb_mysql_hosts | unique) | list }}"
+  loop: "{{ _slurmdb_mysql_users | product(slurmdb_mysql_hosts | unique) | list }}"
   changed_when: false
   tags: [mariadb, slurmdb]
 
@@ -57,7 +67,7 @@
 
 - name: Verify | Slurm DB exists and grants are readable
   ansible.builtin.command: >
-    mariadb -u {{ (slurmdb_mysql_user | list | first | default('slurm')) }} -p{{ slurmdb_mysql_password }} -N -B -e "SHOW DATABASES LIKE '{{ slurmdb_mysql_db }}'; SHOW GRANTS;"
+    mariadb -u {{ (_slurmdb_mysql_users | first | default('slurm')) }} -p{{ slurmdb_mysql_password }} -N -B -e "SHOW DATABASES LIKE '{{ slurmdb_mysql_db }}'; SHOW GRANTS;"
   register: _slurmdb_verify
   changed_when: false
   no_log: true

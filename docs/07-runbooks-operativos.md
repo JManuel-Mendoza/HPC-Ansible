@@ -86,3 +86,23 @@ ansible-playbook -i inventario.ini site.yml --tags slurm_validate --limit hpc_ma
   - confirmar particion `gpu`,
   - confirmar `--gres=gpu:1`,
   - correr `slurm_validate` smoke.
+
+## Runbook 6: limpieza total de Slurm/GPU (alto riesgo)
+
+Usar solo para reprovisionar desde cero cuando el estado del nodo no es recuperable con reconfiguracion normal.
+
+1. Revisar tags disponibles:
+```bash
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --list-tags
+```
+2. Ejecutar primero en un solo nodo:
+```bash
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado> --tags cleanup,cleanup_verify
+```
+3. Si la limpieza fue correcta, ejecutar limpieza completa en el mismo nodo:
+```bash
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado>
+```
+4. Reprovisionar el nodo con `site.yml` por etapas (`slurm`, `cuda`, `validate`, `slurm_validate`).
+
+Referencia detallada: `docs/runbooks/cleanup-slurm-gpu.md`.

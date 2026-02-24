@@ -38,5 +38,5 @@ slurmdbd_port: 6819
 slurmdbd_host: "localhost"
 slurmdbd_storage_host: "localhost"
 slurmdbd_storage_loc: "{{ slurmdb_mysql_db }}"   # slurm_acct_db
-slurmdbd_storage_user: "{{ slurmdb_mysql_user | first}}" # slurm
+slurmdbd_storage_user: "{{ (((slurmdb_mysql_user is string) | ternary([slurmdb_mysql_user], (slurmdb_mysql_user | default([]) | list))) | first) | default('slurm') }}"
 slurmdbd_storage_pass: "{{ slurmdb_mysql_password }}"
