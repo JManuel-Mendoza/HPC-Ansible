@@ -1,0 +1,138 @@
+\chapter{Arquitectura del clúster HPC}
+\label{chap:arquitectura_hpc}
+
+La arquitectura del clúster HPC se define como un sistema integrado en el que el plano de control, el plano de cómputo y los servicios de soporte convergen bajo automatización declarativa. Más que una colección de componentes, constituye un modelo de operación orientado a control de estado, consistencia distribuida y reproducibilidad operativa, en correspondencia directa con la configuración vigente del repositorio Ansible.
+
+\section{Propósito y alcance de la arquitectura}
+\label{sec:arq_proposito_alcance}
+
+El diseño persigue una plataforma estable para ejecutar cargas CPU y GPU mediante Slurm, con administración centralizada y comportamiento verificable entre nodos. Desde esa perspectiva, la infraestructura como código no solo simplifica despliegues: fija una semántica común de configuración que reduce variabilidad operativa y facilita la convergencia del sistema hacia un estado esperado.
+
+La solución adoptada combina funciones de control y capacidad de cómputo en el nodo \textit{master}, mientras los \textit{workers} sostienen el escalamiento horizontal. Esta elección incrementa el aprovechamiento de recursos en entornos de capacidad contenida, aunque exige disciplina en priorización de servicios críticos para evitar que la carga de usuario degrade funciones de coordinación.
+
+\section{Topología física y roles de nodos}
+\label{sec:arq_topologia_roles}
+
+La topología contempla un nodo \textit{master} y un conjunto de nodos \textit{worker}. El inventario formaliza esta disposición con grupos como \texttt{hpc\_master}, \texttt{workers}, \texttt{slurm\_all}, \texttt{slurm\_compute} y \texttt{slurm\_gpu}; por tanto, la organización física y el modelo lógico de ejecución quedan acoplados de forma explícita, lo que favorece trazabilidad entre arquitectura declarada y arquitectura desplegada.
+
+Esa correspondencia no se limita al inventario. La estructura del repositorio, articulada en roles y playbooks con responsabilidades diferenciadas, reproduce el mismo criterio de separación entre control, cómputo y servicios transversales, de manera que la arquitectura técnica puede leerse tanto en los nodos como en la organización del código declarativo.
+
+En términos de ingeniería, esta alineación entre topología física y topología documental reduce ambigüedad de diseño, mejora la auditabilidad de cambios y refuerza la consistencia del ciclo de vida operativo: lo que se modela en el repositorio es, de forma verificable, lo que se materializa en la infraestructura.
+
+\subsection{Rol del nodo master}
+\label{subsec:arq_master}
+
+El \textit{master} cumple un papel híbrido: concentra orquestación Ansible, control del planificador y servicios de estado, y al mismo tiempo puede participar en ejecución de trabajos al integrarse en \texttt{slurm\_compute}. Técnicamente, esta decisión reduce infraestructura ociosa y mejora la utilización global del clúster; en contrapartida, eleva la criticidad del nodo al superponer responsabilidades de control y datos en un único punto operativo.
+
+\subsection{Rol de los nodos worker}
+\label{subsec:arq_workers}
+
+Sobre los \textit{workers} recae la mayor parte del cómputo efectivo. Allí residen los servicios de ejecución y el consumo de almacenamiento compartido, con especialización opcional de nodos GPU mediante pertenencia a \texttt{slurm\_gpu}. El crecimiento de capacidad se resuelve de manera incremental al extender inventario y grupos funcionales, preservando la separación de responsabilidades entre coordinación central y ejecución distribuida.
+
+\subsection{Diagrama lógico de la arquitectura}
+\label{subsec:arq_diagrama}
+
+\begin{codeblock}
+                 Red de administración (acceso operador/SSH)
+                         10.195.x.x (gestión)
+                                 |
+                                 v
+ +---------------------------------------------------------------+
+ |                        Nodo master                            |
+ |  Funciones de control:                                        |
+ |  - Ansible (control node)                                     |
+ |  - slurmctld                                                  |
+ |  - slurmdbd + MariaDB (accounting)                            |
+ |  - munge (fuente de clave)                                    |
+ |  - NFS server (/srv/nfs/llm)                                  |
+ |  Funciones de cómputo:                                        |
+ |  - slurmd (master también participa en slurm_compute)         |
+ +---------------------------------------------------------------+
+             |                     Red interna exclusiva HPC
+             |               192.168.34.0/24 (segmentada en /28)
+             |                     Tráfico de clúster
+             |        (Slurm, NFS, automatización y validaciones)
+             v
+ +---------------------------+     +---------------------------+
+ |         worker1..N        | ... |         worker2           |
+ | - slurmd                  |     | - slurmd                  |
+ | - munge                   |     | - munge                   |
+ | - NFS client (/mnt/llm)   |     | - NFS client (/mnt/llm)   |
+ | - GPU opcional (slurm_gpu)|     | - GPU opcional (slurm_gpu)|
+ +---------------------------+     +---------------------------+
+
+ Particiones Slurm (intención):
+ - debug -> grupo slurm_compute (incluye master y workers habilitados)
+ - gpu   -> grupo slurm_gpu (subconjunto con capacidad GPU)
+\end{codeblock}
+
+\section{Red y segmentación}
+\label{sec:arq_red_segmentacion}
+
+La conectividad se organiza en dos planos: una red de administración para acceso remoto y una red interna exclusiva para tráfico de coordinación y datos del clúster. Este esquema de segmentación reduce superficie de exposición, acota dominios de fallo y permite aplicar políticas de filtrado más precisas sobre servicios sensibles, especialmente cuando coexisten control distribuido y transferencia de datos compartidos.
+
+Dentro de la red interna circulan señales de control de Slurm, operaciones NFS y tareas de automatización y validación. La configuración vigente establece la superred \texttt{192.168.34.0/24}, subdividida en enlaces punto a punto mediante \texttt{network\_internal\_links}; con ello se ordena el direccionamiento entre \textit{master} y \textit{workers} y se reduce ambigüedad en rutas de servicio. Esta separación contribuye a aislar fallos de conectividad dentro del dominio HPC sin propagar impacto al plano de administración, y al mismo tiempo mejora el control de latencia al mantener el tráfico crítico en un segmento dedicado. Como contrapartida, la estabilidad del clúster depende de preservar la salud de ese tejido interno.
+
+\section{Servicios y dependencias}
+\label{sec:arq_servicios_dependencias}
+
+\subsection{Munge}
+\label{subsec:arq_munge}
+
+La autenticación entre componentes Slurm descansa en Munge. Al generarse la clave en el \textit{master} y distribuirse al conjunto \texttt{slurm\_all}, se conserva un dominio criptográfico homogéneo que sostiene confianza entre nodos y evita divergencias de identidad durante la ejecución distribuida.
+
+\subsection{Slurm}
+\label{subsec:arq_slurm}
+
+La coordinación de recursos se centraliza en \texttt{slurmctld} sobre el \textit{master}, mientras \texttt{slurmd} opera en los nodos de cómputo, incluido el propio \textit{master} cuando participa como ejecutor. Bajo esta organización, la partición \texttt{debug} representa el plano general de ejecución y \texttt{gpu} delimita el subconjunto acelerado, lo que permite al planificador expresar políticas diferenciadas sin romper el principio de consistencia del estado global del clúster.
+
+\subsection{MariaDB y SlurmDBD}
+\label{subsec:arq_db_slurmdbd}
+
+La persistencia de \textit{accounting} se ubica en el \textit{master} mediante MariaDB y \texttt{slurmdbd}. La cercanía entre control y registro transaccional reduce complejidad de integración, simplifica gobierno del estado histórico de trabajos y facilita trazabilidad operativa en un único dominio administrativo. A cambio, se introduce una concentración funcional que exige atención sobre disponibilidad del nodo central.
+
+\subsection{NFS}
+\label{subsec:arq_nfs}
+
+El almacenamiento compartido se resuelve con servidor NFS en el \textit{master} y clientes en nodos no-master. En la configuración actual, \texttt{/srv/nfs/llm} se exporta hacia \texttt{/mnt/llm}, preservando una relación clara entre origen de datos y puntos de consumo. Esta disposición favorece uniformidad del entorno de ejecución entre nodos y reduce discrepancias de rutas en cargas distribuidas.
+
+\subsection{Firewall y puertos críticos}
+\label{subsec:arq_firewall}
+
+El firewall actúa como mecanismo de contención de exposición y de preservación de fronteras de servicio. Se consideran críticos \texttt{22/tcp} para administración SSH, \texttt{6817/tcp} para \texttt{slurmctld}, \texttt{6818/tcp} para \texttt{slurmd}, \texttt{6819/tcp} para \texttt{slurmdbd}, \texttt{2049/tcp} para NFS y el rango \texttt{SrunPortRange} asociado a ejecución de Slurm; en conjunto, estas aperturas delimitan el mínimo funcional necesario para coordinación y operación de jobs.
+
+\section{Flujo de operación a alto nivel}
+\label{sec:arq_flujo_operacion}
+
+\subsection{Despliegue por capas}
+\label{subsec:arq_despliegue_capas}
+
+El despliegue se modela por etapas en \texttt{site.yml}: primero se establece baseline y acceso, luego se aplican red y firewall, a continuación almacenamiento, base de datos y autenticación, y finalmente la capa Slurm con validaciones. Esta secuencia expresa dependencias de forma explícita y favorece convergencia progresiva del estado, de modo que cada fase se apoya en precondiciones ya estabilizadas.
+
+\subsection{Flujo cuando un usuario envía un job}
+\label{subsec:arq_flujo_job}
+
+Cuando un usuario envía un trabajo, \texttt{slurmctld} evalúa partición objetivo, disponibilidad de recursos y restricciones de política antes de seleccionar un nodo elegible, que puede ser un \textit{worker} o el \textit{master} en modo híbrido. La ejecución recae sobre \texttt{slurmd}, con acceso al almacenamiento compartido cuando la carga lo requiere, mientras el ciclo de vida del job queda registrado a través de la cadena \texttt{slurmdbd}/MariaDB para mantener coherencia entre asignación, ejecución y contabilidad.
+
+\subsection{Criterios de clúster operativo}
+\label{subsec:arq_operativo}
+
+Se considera operativo un clúster en el que los servicios críticos estén activos en los nodos previstos, las particiones CPU y GPU se publiquen como disponibles y los \textit{smoke tests} de ejecución (\texttt{srun}/\texttt{sbatch}) concluyan sin desvíos funcionales. A ello se suma la trazabilidad del \textit{accounting} en \texttt{slurmdbd}/MariaDB, condición necesaria para validar que el control de estado se mantiene consistente entre planos de control y ejecución.
+
+\section{Consideraciones de diseño y decisiones}
+\label{sec:arq_consideraciones}
+
+\subsection{Modularidad y separación de responsabilidades}
+\label{subsec:arq_modularidad}
+
+El diseño combina separación de responsabilidades con modularidad implementada en roles y grupos de inventario. Esa organización, propia de infraestructura como código, desacopla dominios de red, cómputo, almacenamiento, seguridad y validación, y al mismo tiempo preserva una coordinación central suficiente para operar el clúster como sistema coherente.
+
+\subsection{Beneficios y limitaciones del diseño}
+\label{subsec:arq_beneficios_limitaciones}
+
+Entre los beneficios sobresalen la reproducibilidad operativa derivada del enfoque declarativo, la escalabilidad incremental al incorporar \textit{workers} y la administración concentrada de servicios críticos. No obstante, el diseño también impone restricciones: la criticidad del \textit{master} crece por su carácter híbrido, la red interna se vuelve un activo estructural para la estabilidad del conjunto y la capa de \textit{accounting} permanece centralizada, con las implicaciones de disponibilidad que ello conlleva.
+
+\subsection{Riesgos y mitigación conceptual}
+\label{subsec:arq_riesgos_mitigacion}
+
+En conjunto, el diseño mantiene el control centralizado en el \textit{master}, distribuye la ejecución sobre nodos de cómputo, integra almacenamiento compartido y servicios de soporte como parte del plano operativo, y vincula todo ello a una base declarativa común en Ansible. Esa convergencia entre arquitectura física, organización del repositorio y control de estado permite operar el clúster con criterios reproducibles y técnicamente verificables.
