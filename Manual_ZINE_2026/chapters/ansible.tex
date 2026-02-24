@@ -107,21 +107,21 @@ Conceptos mínimos de YAML:
 \end{itemize}
 
 Ejemplo simple de YAML (lista de paquetes):
-\begin{codeblock}
+\begin{yamlcode}
 packages:
   - vim
   - git
   - htop
-\end{codeblock}
+\end{yamlcode}
 
 Y ejemplo con mapas y listas combinadas:
-\begin{codeblock}
+\begin{yamlcode}
 server:
   name: nodo01
   services:
     - ssh
     - firewalld
-\end{codeblock}
+\end{yamlcode}
 
 En Ansible, un playbook es una \textbf{lista} de \textit{plays}; por eso suele comenzar con un guion. La indentación y los guiones indican la estructura del documento. \cite{ansible_playbooks_intro}
 
@@ -418,9 +418,9 @@ Es importante que la ruta de destino exista en los nodos de destino (por ejemplo
 Una vez escrito un playbook, se ejecuta con el comando \texttt{ansible-playbook}. El objetivo es que Ansible lea el archivo, se conecte a los hosts definidos en el inventario, ejecute las tareas en orden y reporte el resultado de cada una.
 
 Comando general de ejecución:
-\begin{terminalblock}
+\begin{bashcode}
 ansible-playbook -i inventory.ini mi-playbook.yml
-\end{terminalblock}
+\end{bashcode}
 
 Componentes del comando:
 \begin{itemize}
@@ -479,7 +479,7 @@ Los ejemplos de esta sección sirven para entender el uso básico. En la impleme
 
 Un inventario INI mínimo define hosts y grupos:
 
-\begin{codeblock}
+\begin{iniccode}
 inventory.ini (ejemplo)
 [master]
 master ansible_host=10.195.34.17
@@ -490,7 +490,7 @@ worker2 ansible_host=10.195.34.22
 
 [all:vars]
 ansible_user=sistemas
-\end{codeblock}
+\end{iniccode}
 
 Este formato permite apuntar a los hosts por nombre (\texttt{worker1}) y conservar la IP como variable (\texttt{ansible\_host}). \cite{ansible_inventory_intro}
 
@@ -506,9 +506,9 @@ Este formato permite apuntar a los hosts por nombre (\texttt{worker1}) y conserv
 
 Los \textbf{ad hoc commands} son comandos de una sola tarea que se ejecutan sin escribir playbooks. Son útiles para pruebas rápidas. \cite{ansible_adhoc_intro}
 
-\begin{terminalblock}
+\begin{bashcode}
 ansible -i inventory.ini all -m ping
-\end{terminalblock}
+\end{bashcode}
 
 Si la conectividad y credenciales son correctas, cada host responde con \texttt{pong}.
 
@@ -527,9 +527,9 @@ worker2 | SUCCESS => {"ping": "pong"}
 \subsection{Ejemplo 3: ejecutar un comando simple en varios hosts}
 \label{subsec:ansible_ej3_command}
 
-\begin{terminalblock}
+\begin{bashcode}
 ansible -i inventory.ini workers -m command -a "hostname"
-\end{terminalblock}
+\end{bashcode}
 
 Este ejemplo consulta el hostname en todos los \textit{workers}. Para comandos que requieren shell (pipes, redirecciones), se usa el módulo \texttt{shell} con cuidado.
 
@@ -554,9 +554,9 @@ La idempotencia implica que, si \texttt{htop} ya está instalado, la tarea no vu
 
 Para ejecutarlo:
 
-\begin{terminalblock}
+\begin{bashcode}
 ansible-playbook -i inventory.ini install-tools.yml
-\end{terminalblock}
+\end{bashcode}
 
 % \begin{figure}[h]
 %   \centering
@@ -742,7 +742,7 @@ nano inventario.ini
 
 En el editor se escribió el siguiente contenido y se guardó el archivo.
 
-\begin{codeblock}
+\begin{iniccode}
 [hpc_master]
 master ansible_host=10.195.34.17 ansible_user=sistemas
 
@@ -753,7 +753,7 @@ worker2 ansible_host=10.195.34.19 ansible_user=sistemas
 [all:vars]
 ansible_python_interpreter=/usr/bin/python3
 ansible_ssh_private_key_file=~/.ssh/id_ed25519
-\end{codeblock}
+\end{iniccode}
 
 Para guardar en \texttt{nano} se usó \texttt{Ctrl+O}, luego \texttt{Enter}, y para salir \texttt{Ctrl+X}.
 
@@ -782,14 +782,14 @@ nano ansible.cfg
 
 En el editor se escribió el siguiente contenido y se guardó el archivo:
 
-\begin{codeblock}
+\begin{iniccode}
 [defaults]
 inventory = inventario.ini
 timeout = 30
 
 [ssh_connection]
 pipelining = True
-\end{codeblock}
+\end{iniccode}
 
 \begin{figure}[H]
   \centering

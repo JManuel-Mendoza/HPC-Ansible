@@ -27,10 +27,11 @@
 \usepackage{eso-pic}   % para colocar imagen de fondo en portada
 \usepackage{xcolor}
 \usepackage{listings}
+\usepackage{minted}
 \usepackage[most]{tcolorbox}
 
 % =========================
-% Esquema visual (Overleaf, sin shell-escape)
+% Esquema visual
 % =========================
 \definecolor{zineBlueDark}{HTML}{0F2A3B}
 \definecolor{zineBlueMid}{HTML}{1C4E69}
@@ -45,6 +46,29 @@
 \definecolor{zineOkFrame}{HTML}{2E7D32}
 \definecolor{zineFailBg}{HTML}{FDECEC}
 \definecolor{zineFailFrame}{HTML}{B3261E}
+\definecolor{zineMintBg}{HTML}{F7FAFC}
+\definecolor{zineMintFrame}{HTML}{C8D9E6}
+\definecolor{zineMintText}{HTML}{111111}
+\definecolor{zineMintComment}{HTML}{6B7280}
+
+% Requisito de compilación: en Overleaf habilitar "shell escape" para usar minted.
+\usemintedstyle{friendly}
+\setminted{
+  bgcolor=zineMintBg,
+  fontsize=\small,
+  linenos=true,
+  frame=single,
+  framesep=2mm,
+  rulecolor=\color{zineMintFrame},
+  breaklines=true,
+  tabsize=2
+}
+
+\newminted[yamlcode]{yaml}{}
+\newminted[bashcode]{bash}{}
+\newminted[iniccode]{ini}{}
+% Entorno genérico base (texto); extensible por lenguaje en una iteración futura.
+\newminted[codeblock]{text}{}
 
 \lstdefinestyle{zineListing}{
   basicstyle=\ttfamily\small,
@@ -127,13 +151,6 @@
   title={Terminal},
   colback=zineTermBg,
   colframe=zineTermFrame
-}
-
-\newtcblisting{codeblock}{
-  zineblock,
-  title={Código},
-  colback=zineCodeBg,
-  colframe=zineCodeFrame
 }
 
 \newtcblisting{outputblock}{
