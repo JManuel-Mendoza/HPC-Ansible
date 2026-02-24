@@ -1,0 +1,72 @@
+\section{Estructura y organización del repositorio}
+
+\subsection{Vista general del proyecto}
+
+La organización del repositorio materializa, en términos operativos, el modelo de automatización definido para el clúster: una base declarativa única, separación de responsabilidades y control explícito del estado. Por esa razón, en la raíz se concentran los puntos de entrada, el inventario y los directorios de configuración efectiva (\texttt{roles/}, \texttt{group\_vars/}, \texttt{host\_vars/}), mientras que los artefactos de soporte se mantienen fuera de la ruta de ejecución.
+
+\begin{verbatim}
+.
+|-- site.yml
+|-- cleanup_slurm_gpu.yml
+|-- inventario.ini
+|-- ansible.cfg
+|-- requirements.yml
+|-- group_vars/
+|   |-- all/
+|   `-- hpc_master.yml
+|-- host_vars/
+|   |-- master.yml
+|   |-- worker1.yml
+|   `-- worker2.yml
+|-- roles/
+|   |-- common/
+|   |-- users_ssh/
+|   |-- network_internal/
+|   |-- cluster_routing/
+|   |-- firewall/
+|   |-- nfs_hpc/
+|   |-- nvidia_cuda/
+|   |-- mariadb_server/
+|   |-- slurm_install/
+|   |-- slurm_controller/
+|   |-- slurm_compute/
+|   |-- slurm_validate/
+|   `-- validate/
+|-- docs/
+|   |-- runbooks/
+|   `-- audit/
+`-- Manual_ZINE_2026/
+    `-- chapters/
+\end{verbatim}
+
+Esta disposición prioriza trazabilidad: el lector puede identificar rápidamente qué archivos controlan el estado del clúster, cuáles ajustan comportamiento por grupo o nodo y cuáles cumplen función documental.
+
+\subsection{Playbook principal y puntos de entrada}
+
+El punto de entrada canónico es \texttt{site.yml}. Su función estructural es actuar como contenedor principal de la definición declarativa del clúster, concentrando en un único archivo la referencia a los alcances de inventario y a los roles que componen la operación.
+
+Junto a ese entrypoint existe \texttt{cleanup\_slurm\_gpu.yml}, destinado a escenarios de limpieza y reprovisión. La coexistencia de ambos playbooks responde a una separación intencional entre operación ordinaria y operación destructiva, evitando mezclar objetivos de naturaleza distinta en un mismo flujo.
+
+\subsection{Organización de roles por dominios funcionales}
+
+La carpeta \texttt{roles/} se estructura por dominios operativos del clúster. El dominio baseline y acceso queda en \texttt{common} y \texttt{users\_ssh}; la capa de red en \texttt{network\_internal}, \texttt{cluster\_routing} y \texttt{firewall}; GPU/CUDA en \texttt{nvidia\_cuda}; almacenamiento compartido en \texttt{nfs\_hpc}; y base de datos en \texttt{mariadb\_server} junto con \texttt{slurm\_db\_prep}.
+
+El dominio scheduler se distribuye en varios roles especializados (\texttt{slurm\_identities}, \texttt{munge}, \texttt{slurm\_facts}, \texttt{slurm\_rpm\_build}, \texttt{slurm\_install}, \texttt{slurm\_controller}, \texttt{slurm\_compute}), y la verificación queda separada en \texttt{validate} y \texttt{slurm\_validate}. Esta agrupación permite ubicar cada responsabilidad técnica sin necesidad de entrar todavía al detalle interno de tareas.
+
+\subsection{Jerarquía de variables}
+
+En términos físicos, la configuración se reparte entre \texttt{roles/*/defaults/main.yml}, \texttt{group\_vars/} y \texttt{host\_vars/}. En la práctica del repositorio, \texttt{group\_vars/all/vars.yml} concentra parámetros transversales, \texttt{group\_vars/hpc\_master.yml} define ajustes del grupo controlador y \texttt{host\_vars/<hostname>.yml} encapsula particularidades de nodos concretos.
+
+La precedencia aplicada sigue el patrón operativo del proyecto: primero defaults de rol, luego variables globales de \texttt{group\_vars/all}, después variables de grupo específico y, por último, overrides por host en \texttt{host\_vars/<hostname>.yml}. En caso de conflicto, prevalece el ámbito más específico, lo que hace explícito dónde se decide cada ajuste efectivo.
+
+\subsection{Gestión de secretos}
+
+Los secretos se ubican en \texttt{group\_vars/all/vault.yml}, archivo cifrado con Ansible Vault. Esta ubicación mantiene las credenciales fuera de los archivos de configuración en claro y preserva la separación entre parámetros públicos y material sensible.
+
+La referencia a secretos se realiza mediante variables simbólicas \texttt{vault\_*} consumidas desde archivos no cifrados. Por ejemplo, \texttt{group\_vars/hpc\_master.yml} utiliza \texttt{vault\_slurmdb\_mysql\_password} para credenciales de base de datos, y el inventario define credenciales de elevación de grupo mediante claves \texttt{vault\_*}, sin exponer valores en texto plano.
+
+\subsection{Documentación y artefactos auxiliares}
+
+La carpeta \texttt{docs/} contiene documentación operativa y de gobernanza del repositorio: guías de referencia, runbooks, material de auditoría y notas de soporte. Su propósito es concentrar contexto de operación, criterios de validación y evidencia, sin mezclar esa información con la lógica ejecutable de los playbooks y roles.
+
+En conjunto, esta distribución mantiene coherencia estructural entre código, variables, secretos y documentación, y conserva alineado el repositorio con el modelo de automatización adoptado. El resultado es un mapa técnico consistente que permite abordar el análisis del sistema con criterios sistemáticos, delimitando con precisión dónde reside cada decisión operativa.
