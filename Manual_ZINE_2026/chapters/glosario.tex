@@ -1,0 +1,48 @@
+\chapter{Glosario técnico mínimo}
+\label{chap:glosario}
+
+Este glosario resume términos usados en el manual para facilitar una lectura operativa sin conocimientos previos.
+
+\begin{description}
+  \item[HPC] Computación de alto rendimiento (\textit{High Performance Computing}). Se refiere al uso coordinado de varios nodos para ejecutar cargas intensivas.
+
+  \item[Nodo] Equipo individual que forma parte del clúster. Puede cumplir funciones de control, cómputo o ambas.
+
+  \item[Master] Nodo principal de administración y control. En este proyecto también puede ejecutar trabajos según la partición configurada.
+
+  \item[Worker] Nodo de cómputo que ejecuta tareas enviadas por el planificador. Su función principal es aportar capacidad de procesamiento.
+
+  \item[Red de administración] Red usada para acceso remoto y operación administrativa (por ejemplo, SSH). Es el plano de entrada al clúster.
+
+  \item[Red interna] Red exclusiva del clúster para tráfico operativo entre nodos. Se usa para Slurm, NFS y automatización interna.
+
+  \item[SSH] Protocolo de acceso remoto seguro (\textit{Secure Shell}). Permite conectarse y ejecutar comandos en otros nodos.
+
+  \item[Ansible] Herramienta de automatización declarativa para configurar múltiples nodos de forma consistente. Opera sin agentes permanentes en los hosts gestionados.
+
+  \item[Inventario] Archivo que define hosts, grupos y variables de conexión para Ansible. En este proyecto se usa \texttt{inventario.ini}.
+
+  \item[Playbook] Archivo YAML que describe qué acciones ejecutar y sobre qué hosts. En este proyecto, el playbook principal es \texttt{site.yml}.
+
+  \item[Rol] Estructura reutilizable de Ansible que agrupa tareas, variables, handlers y plantillas. Organiza la automatización por dominio funcional.
+
+  \item[Idempotencia] Propiedad por la cual ejecutar varias veces la misma automatización mantiene el mismo estado final. Evita cambios repetitivos no deseados.
+
+  \item[Tags] Etiquetas de Ansible para ejecutar subconjuntos de tareas o roles. Permiten focalizar operaciones como \texttt{--tags validate}.
+
+  \item[Handlers] Tareas especiales de Ansible que se ejecutan solo cuando otra tarea reporta cambios. Se usan para acciones diferidas como reinicios.
+
+  \item[Template] Plantilla Jinja2 que genera archivos de configuración dinámicos con variables. Se despliega con el módulo \texttt{ansible.builtin.template}.
+
+  \item[Slurm] Planificador de recursos y trabajos del clúster. Gestiona colas, asignación de nodos y ejecución de jobs.
+
+  \item[Partición] Agrupación lógica de nodos en Slurm con políticas de uso. Ejemplos típicos: \texttt{debug} (CPU) y \texttt{gpu} (acelerada).
+
+  \item[Munge] Servicio de autenticación usado por Slurm para validar identidad entre nodos. Requiere una clave compartida consistente en el dominio Slurm.
+
+  \item[NFS] Sistema de archivos de red (\textit{Network File System}). Permite compartir directorios entre el master y los workers.
+
+  \item[SlurmDBD] Servicio de contabilidad de Slurm. Registra histórico de trabajos y uso de recursos en una base de datos.
+
+  \item[Vault] Mecanismo de Ansible para cifrar variables sensibles (credenciales, claves, secretos). Evita exponer datos críticos en texto plano.
+\end{description}

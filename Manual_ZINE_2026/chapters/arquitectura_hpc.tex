@@ -1,7 +1,7 @@
 \chapter{Arquitectura del clúster HPC}
 \label{chap:arquitectura_hpc}
 
-La arquitectura del clúster HPC se define como un sistema integrado en el que el plano de control, el plano de cómputo y los servicios de soporte convergen bajo automatización declarativa. Más que una colección de componentes, constituye un modelo de operación orientado a control de estado, consistencia distribuida y reproducibilidad operativa, en correspondencia directa con la configuración vigente del repositorio Ansible.
+La arquitectura del clúster HPC se define como un sistema integrado en el que el plano de control, el plano de cómputo y los servicios de soporte convergen bajo automatización declarativa. Más que una colección de componentes, constituye un modelo de operación orientado a control de estado, consistencia distribuida y reproducibilidad operativa, en correspondencia directa con la configuración del repositorio Ansible.
 
 \section{Propósito y alcance de la arquitectura}
 \label{sec:arq_proposito_alcance}
@@ -32,46 +32,53 @@ Sobre los \textit{workers} recae la mayor parte del cómputo efectivo. Allí res
 \subsection{Diagrama lógico de la arquitectura}
 \label{subsec:arq_diagrama}
 
-\begin{codeblock}
-                 Red de administración (acceso operador/SSH)
-                         10.195.x.x (gestión)
-                                 |
-                                 v
- +---------------------------------------------------------------+
- |                        Nodo master                            |
- |  Funciones de control:                                        |
- |  - Ansible (control node)                                     |
- |  - slurmctld                                                  |
- |  - slurmdbd + MariaDB (accounting)                            |
- |  - munge (fuente de clave)                                    |
- |  - NFS server (/srv/nfs/llm)                                  |
- |  Funciones de cómputo:                                        |
- |  - slurmd (master también participa en slurm_compute)         |
- +---------------------------------------------------------------+
-             |                     Red interna exclusiva HPC
-             |               192.168.34.0/24 (segmentada en /28)
-             |                     Tráfico de clúster
-             |        (Slurm, NFS, automatización y validaciones)
-             v
- +---------------------------+     +---------------------------+
- |         worker1..N        | ... |         worker2           |
- | - slurmd                  |     | - slurmd                  |
- | - munge                   |     | - munge                   |
- | - NFS client (/mnt/llm)   |     | - NFS client (/mnt/llm)   |
- | - GPU opcional (slurm_gpu)|     | - GPU opcional (slurm_gpu)|
- +---------------------------+     +---------------------------+
+\begin{center}
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw, rectangle, align=left, inner sep=6pt, text width=11.0cm},
+  worker/.style={draw, rectangle, align=left, inner sep=6pt, text width=5.1cm},
+  net/.style={draw, rectangle, align=center, inner sep=5pt},
+  node distance=8mm and 10mm
+]
+  \node[net, text width=6.8cm] (admin) {Red de administración\\\texttt{10.195.x.x}\\Acceso operador/SSH};
 
- Particiones Slurm (intención):
- - debug -> grupo slurm_compute (incluye master y workers habilitados)
- - gpu   -> grupo slurm_gpu (subconjunto con capacidad GPU)
-\end{codeblock}
+  \node[box, below=of admin] (master) {\textbf{Nodo master (control + cómputo)}\\
+  \textbf{Control:} Ansible, \texttt{slurmctld}, \texttt{slurmdbd} + MariaDB, \texttt{munge}\\
+  \textbf{Servicios:} NFS server (\texttt{/srv/nfs/llm})\\
+  \textbf{Cómputo:} \texttt{slurmd} (participa en \texttt{slurm\_compute})};
+
+  \node[net, below=of master, text width=11.0cm] (internal) {Red interna del clúster (exclusiva)\\\texttt{192.168.34.0/24} segmentada en /28\\Tráfico: Slurm, NFS, automatización y validaciones};
+
+  \node[worker, below=10mm of internal.south west, anchor=north west] (w1) {\textbf{Nodos worker (worker1..N)}\\
+  \texttt{slurmd}\\
+  \texttt{munge}\\
+  NFS client (\texttt{/mnt/llm})\\
+  GPU opcional (\texttt{slurm\_gpu})};
+
+  \node[worker, below=10mm of internal.south east, anchor=north east] (w2) {\textbf{Nodos worker (worker2)}\\
+  \texttt{slurmd}\\
+  \texttt{munge}\\
+  NFS client (\texttt{/mnt/llm})\\
+  GPU opcional (\texttt{slurm\_gpu})};
+
+  \path (w1.south) -- (w2.south) node[midway] (workersmid) {};
+  \node[align=left, text width=11.0cm, below=8mm of workersmid] (parts) {\textbf{Particiones Slurm:}\\
+  \texttt{debug} $\rightarrow$ grupo \texttt{slurm\_compute} (incluye master y workers habilitados)\\
+  \texttt{gpu} $\rightarrow$ grupo \texttt{slurm\_gpu} (subconjunto con capacidad GPU)};
+
+  \draw (admin.south) -- (master.north);
+  \draw (master.south) -- (internal.north);
+  \draw (internal.south west) -- (w1.north);
+  \draw (internal.south east) -- (w2.north);
+\end{tikzpicture}
+\end{center}
 
 \section{Red y segmentación}
 \label{sec:arq_red_segmentacion}
 
-La conectividad se organiza en dos planos: una red de administración para acceso remoto y una red interna exclusiva para tráfico de coordinación y datos del clúster. Este esquema de segmentación reduce superficie de exposición, acota dominios de fallo y permite aplicar políticas de filtrado más precisas sobre servicios sensibles, especialmente cuando coexisten control distribuido y transferencia de datos compartidos.
+La conectividad se organiza en dos planos: una red de administración para acceso remoto y una red interna del clúster para tráfico de coordinación y datos. Este esquema de segmentación reduce superficie de exposición, acota dominios de fallo y permite aplicar políticas de filtrado más precisas sobre servicios sensibles, especialmente cuando coexisten control distribuido y transferencia de datos compartidos.
 
-Dentro de la red interna circulan señales de control de Slurm, operaciones NFS y tareas de automatización y validación. La configuración vigente establece la superred \texttt{192.168.34.0/24}, subdividida en enlaces punto a punto mediante \texttt{network\_internal\_links}; con ello se ordena el direccionamiento entre \textit{master} y \textit{workers} y se reduce ambigüedad en rutas de servicio. Esta separación contribuye a aislar fallos de conectividad dentro del dominio HPC sin propagar impacto al plano de administración, y al mismo tiempo mejora el control de latencia al mantener el tráfico crítico en un segmento dedicado. Como contrapartida, la estabilidad del clúster depende de preservar la salud de ese tejido interno.
+Dentro de la red interna del clúster circulan señales de control de Slurm, operaciones NFS y tareas de automatización y validación. La superred \texttt{192.168.34.0/24}, subdividida en enlaces punto a punto mediante \texttt{network\_internal\_links}, ordena el direccionamiento entre \textit{master} y \textit{workers} y reduce ambigüedad en rutas de servicio. Esta separación contribuye a aislar fallos de conectividad dentro del dominio HPC sin propagar impacto al plano de administración, y al mismo tiempo mejora el control de latencia al mantener el tráfico crítico en un segmento dedicado. Como contrapartida, la estabilidad del clúster depende de preservar la salud de ese tejido interno.
 
 \section{Servicios y dependencias}
 \label{sec:arq_servicios_dependencias}
@@ -94,7 +101,7 @@ La persistencia de \textit{accounting} se ubica en el \textit{master} mediante M
 \subsection{NFS}
 \label{subsec:arq_nfs}
 
-El almacenamiento compartido se resuelve con servidor NFS en el \textit{master} y clientes en nodos no-master. En la configuración actual, \texttt{/srv/nfs/llm} se exporta hacia \texttt{/mnt/llm}, preservando una relación clara entre origen de datos y puntos de consumo. Esta disposición favorece uniformidad del entorno de ejecución entre nodos y reduce discrepancias de rutas en cargas distribuidas.
+El almacenamiento compartido se resuelve con servidor NFS en el \textit{master} y clientes en nodos no-master. La exportación de \texttt{/srv/nfs/llm} hacia \texttt{/mnt/llm} preserva una relación clara entre origen de datos y puntos de consumo. Esta disposición favorece uniformidad del entorno de ejecución entre nodos y reduce discrepancias de rutas en cargas distribuidas.
 
 \subsection{Firewall y puertos críticos}
 \label{subsec:arq_firewall}
@@ -130,7 +137,7 @@ El diseño combina separación de responsabilidades con modularidad implementada
 \subsection{Beneficios y limitaciones del diseño}
 \label{subsec:arq_beneficios_limitaciones}
 
-Entre los beneficios sobresalen la reproducibilidad operativa derivada del enfoque declarativo, la escalabilidad incremental al incorporar \textit{workers} y la administración concentrada de servicios críticos. No obstante, el diseño también impone restricciones: la criticidad del \textit{master} crece por su carácter híbrido, la red interna se vuelve un activo estructural para la estabilidad del conjunto y la capa de \textit{accounting} permanece centralizada, con las implicaciones de disponibilidad que ello conlleva.
+Entre los beneficios sobresalen la reproducibilidad operativa derivada del enfoque declarativo, la escalabilidad incremental al incorporar \textit{workers} y la administración concentrada de servicios críticos. No obstante, el diseño también impone restricciones: la criticidad del \textit{master} crece por su carácter híbrido, la red interna del clúster se vuelve un activo estructural para la estabilidad del conjunto y la capa de \textit{accounting} permanece centralizada, con las implicaciones de disponibilidad que ello conlleva.
 
 \subsection{Riesgos y mitigación conceptual}
 \label{subsec:arq_riesgos_mitigacion}

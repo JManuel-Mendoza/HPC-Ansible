@@ -29,6 +29,9 @@
 \usepackage{listings}
 \usepackage{minted}
 \usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\tcbuselibrary{minted}
 
 % =========================
 % Esquema visual
@@ -56,7 +59,7 @@
 \setminted{
   bgcolor=zineMintBg,
   fontsize=\small,
-  linenos=true,
+  linenos=false,
   frame=single,
   framesep=2mm,
   rulecolor=\color{zineMintFrame},
@@ -69,6 +72,21 @@
 \newminted[iniccode]{ini}{}
 % Entorno genérico base (texto); extensible por lenguaje en una iteración futura.
 \newminted[codeblock]{text}{}
+\newtcblisting{filecode}[1]{
+  listing engine=minted,
+  listing only,
+  minted language=yaml,
+  minted options={linenos=false},
+  breakable=false,
+  boxrule=0.4pt,
+  arc=2pt,
+  left=6pt,right=6pt,top=6pt,bottom=6pt,
+  colback=zineCodeBg,
+  colframe=zineCodeFrame,
+  title={\small\texttt{Archivo: #1}},
+  fonttitle=\normalfont,
+  coltitle=zineBlueDark
+}
 
 \lstdefinestyle{zineListing}{
   basicstyle=\ttfamily\small,
@@ -220,10 +238,16 @@
 % Figuras y tablas (estilo consistente)
 % =========================
 \usepackage{caption}
+\usepackage{longtable}
+\usepackage{array}
 \captionsetup{
   font=small,
   labelfont=bf,
   textfont=small
+}
+\addto\captionsspanish{%
+  \renewcommand{\tablename}{Tabla}%
+  \renewcommand{\listtablename}{Índice de tablas}%
 }
 
 % Carpeta base para imágenes
@@ -271,7 +295,10 @@
 \begin{document}
 
 % Portada
+\hypersetup{pageanchor=false}
 \input{portada}
+\clearpage
+\hypersetup{pageanchor=true}
 
 % Índices
 \tableofcontents
@@ -287,6 +314,9 @@
 \input{chapters/configuración_del_entorno}
 \input{chapters/ansible}
 \input{chapters/arquitectura_hpc}
+\input{chapters/modelo_automatizacion}
+\input{chapters/estructura_organizacion_repositorio}
+\input{chapters/flujo_despliegue}
 
 \clearpage
 \addcontentsline{toc}{chapter}{Referencias}

@@ -1,0 +1,86 @@
+\chapter{Hoja de parámetros del clúster}
+\label{chap:hoja_parametros}
+
+Completar esta hoja antes de iniciar la ejecución de playbooks. La información diligenciada reduce errores de inventario, red y servicios.
+
+\section{Identificación de nodos}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Parámetros por nodo}
+\label{tab:parametros_nodos}
+\begin{tabular}{|p{2.3cm}|p{2.5cm}|p{2.8cm}|p{2.8cm}|p{2.3cm}|p{2.0cm}|}
+\hline
+\textbf{Rol} & \textbf{Hostname} & \textbf{IP admin} & \textbf{IP interna} & \textbf{Interfaz interna} & \textbf{GPU} \\
+\hline
+Master & \texttt{\textless master\textgreater} & \texttt{\textless ip\_admin\textgreater} & \texttt{\textless ip\_interna\textgreater} & \texttt{\textless if\_interna\textgreater} & Sí / No \\
+\hline
+Worker 1 & \texttt{\textless worker1\textgreater} & \texttt{\textless ip\_admin\textgreater} & \texttt{\textless ip\_interna\textgreater} & \texttt{\textless if\_interna\textgreater} & Sí / No \\
+\hline
+Worker 2 & \texttt{\textless worker2\textgreater} & \texttt{\textless ip\_admin\textgreater} & \texttt{\textless ip\_interna\textgreater} & \texttt{\textless if\_interna\textgreater} & Sí / No \\
+\hline
+Worker N & \texttt{\textless workerN\textgreater} & \texttt{\textless ip\_admin\textgreater} & \texttt{\textless ip\_interna\textgreater} & \texttt{\textless if\_interna\textgreater} & Sí / No \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Parámetros de red y acceso}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Red, acceso y segmentación}
+\label{tab:parametros_red_acceso}
+\begin{tabular}{|p{4.5cm}|p{8.8cm}|}
+\hline
+\textbf{Campo} & \textbf{Valor a completar} \\
+\hline
+Red de administración (CIDR) & \texttt{\textless red\_admin\_cidr\textgreater} \\
+\hline
+Gateway de administración & \texttt{\textless gateway\_admin\textgreater} \\
+\hline
+Red interna del clúster (CIDR) & \texttt{\textless red\_interna\_cidr\textgreater} \\
+\hline
+Interfaz de administración por defecto (master) & \texttt{\textless if\_admin\_master\textgreater} \\
+\hline
+Usuario administrativo SSH & \texttt{\textless usuario\_admin\textgreater} \\
+\hline
+Ruta de llave privada SSH en nodo de control & \texttt{\textless ruta\_llave\_ssh\textgreater} \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Parámetros de servicios del clúster}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Servicios compartidos y scheduler}
+\label{tab:parametros_servicios}
+\begin{tabular}{|p{4.5cm}|p{8.8cm}|}
+\hline
+\textbf{Campo} & \textbf{Valor a completar} \\
+\hline
+Directorio exportado por NFS (master) & \texttt{\textless nfs\_export\_path\textgreater} \\
+\hline
+Mountpoint NFS en workers & \texttt{\textless nfs\_mountpoint\textgreater} \\
+\hline
+Nodo controlador Slurm & \texttt{\textless slurm\_controller\textgreater} \\
+\hline
+Partición CPU (nombre) & \texttt{\textless particion\_cpu\textgreater} \\
+\hline
+Partición GPU (nombre) & \texttt{\textless particion\_gpu\textgreater} \\
+\hline
+Rango de puertos \texttt{SrunPortRange} & \texttt{\textless srun\_port\_range\textgreater} \\
+\hline
+\end{tabular}
+\end{table}
+
+\section*{Checklist previo de uso}
+
+\begin{itemize}
+  \item Confirmar que todos los hostnames e IPs del inventario coinciden con esta hoja.
+  \item Verificar conectividad SSH desde el nodo de control a todos los workers.
+  \item Validar que rutas NFS y particiones Slurm estén definidas antes de ejecutar \texttt{site.yml}.
+\end{itemize}

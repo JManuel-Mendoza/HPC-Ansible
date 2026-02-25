@@ -77,6 +77,34 @@ Un \textbf{rol (role)} organiza automatizaciones en una estructura reutilizable 
   \item[Privilege escalation (become):] mecanismo para ejecutar tareas con privilegios elevados (similar a \texttt{sudo}). \cite{ansible_become}
 \end{description}
 
+\begin{table}[H]
+\centering
+\small
+\caption{Conceptos de Ansible y ubicación en este proyecto}
+\label{tab:ansible_conceptos_donde}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{0.22\textwidth}|>{\raggedright\arraybackslash}p{0.38\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|}
+\hline
+\textbf{Concepto} & \textbf{Dónde se ve en este proyecto} & \textbf{Qué aporta} \\
+\hline
+Inventario & \texttt{inventario.ini} & Define hosts, grupos y variables de conexión. \\
+\hline
+Playbook & \texttt{site.yml} & Orquesta etapas y roles sobre grupos del clúster. \\
+\hline
+Role & \texttt{roles/common/}, \texttt{roles/slurm\_install/}, \texttt{roles/slurm\_validate/} & Encapsula tareas reutilizables por dominio funcional. \\
+\hline
+\texttt{group\_vars} & \texttt{group\_vars/all/vars.yml}, \texttt{group\_vars/hpc\_master.yml} & Centraliza variables globales y por grupo. \\
+\hline
+\texttt{host\_vars} & \texttt{host\_vars/master.yml}, \texttt{host\_vars/worker2.yml} & Permite ajustes específicos por nodo. \\
+\hline
+Vault & \texttt{group\_vars/all/vault.yml} & Guarda variables sensibles cifradas. \\
+\hline
+Templates & \path{roles/slurm_install/templates/slurm.conf.j2}, \path{roles/nfs_hpc/templates/exports.j2} & Genera archivos de configuración dinámicos con variables. \\
+\hline
+Handlers & \path{roles/firewall/handlers/main.yml}, \path{roles/users_ssh/handlers/main.yml} & Ejecuta acciones diferidas solo cuando hubo cambios. \\
+\hline
+\end{tabular}
+\end{table}
+
 \section{Requisitos mínimos para usar Ansible}
 \label{sec:ansible_requisitos}
 
@@ -156,7 +184,7 @@ Esta estructura permite separar responsabilidades: un \textit{play} puede dedica
 
 El siguiente ejemplo muestra un playbook con dos \textit{plays}: uno para tareas base en todos los nodos y otro específico para un grupo \texttt{web}.
 
-\begin{codeblock}
+\begin{yamlcode}
 multi-play.yml (ejemplo)
 - name: Preparar sistema base
   hosts: all
@@ -185,7 +213,7 @@ multi-play.yml (ejemplo)
         name: nginx
         enabled: true
         state: started
-\end{codeblock}
+\end{yamlcode}
 
 Aquí se observa que el primer \textit{play} es general (\texttt{all}) y el segundo se limita a un grupo específico (\texttt{web}). Cada \textit{play} puede tener sus propias tareas y variables.
 
@@ -197,7 +225,7 @@ Un \textbf{\textit{handler}} es una tarea especial que \textbf{solo se ejecuta s
 
 Este ejemplo ilustra cómo una tarea puede disparar un \textit{handler} para reiniciar un servicio únicamente si hubo cambios en un archivo:
 
-\begin{codeblock}
+\begin{yamlcode}
 config-app.yml (ejemplo)
 - name: Desplegar configuración de una app
   hosts: app
@@ -216,7 +244,7 @@ config-app.yml (ejemplo)
       ansible.builtin.systemd:
         name: app
         state: restarted
-\end{codeblock}
+\end{yamlcode}
 
 La relación entre tareas y \textit{handlers} es clave para mantener idempotencia y evitar reinicios innecesarios.
 
@@ -233,12 +261,12 @@ Componentes básicos de una tarea con módulo:
 \end{itemize}
 
 Ejemplo de tarea usando un módulo:
-\begin{codeblock}
+\begin{yamlcode}
 - name: Asegurar que htop esté instalado
   ansible.builtin.dnf:
     name: htop
     state: present
-\end{codeblock}
+\end{yamlcode}
 
 Otros módulos comunes:
 \begin{itemize}
@@ -247,24 +275,24 @@ Otros módulos comunes:
   \item \textbf{\texttt{ansible.builtin.systemd}} para habilitar o reiniciar servicios.
 \end{itemize}
 
-Comprender los módulos es clave porque cada uno tiene parámetros propios y resultados distintos. En capítulos posteriores se profundiza en los módulos más usados dentro del clúster.
+Comprender los módulos es clave porque cada uno tiene parámetros propios y resultados distintos para instalación, configuración y validación del clúster.
 
-\section{Playbook principal del proyecto (\texttt{site.yml}): estructura base}
+\section{Playbook principal del proyecto (\texttt{site.yml})}
 \label{sec:ansible_site_base}
 
-El archivo \texttt{site.yml} es el punto de entrada del proyecto de automatización. En esta etapa se presenta una \textbf{estructura base simplificada} que se irá completando a medida que avanzan los capítulos. Esta versión inicial permite entender la organización general sin entrar aún en todo el detalle.
+El archivo \texttt{site.yml} es el punto de entrada del proyecto de automatización. En el repositorio se utiliza como playbook principal para ejecutar etapas sobre grupos específicos del inventario y aplicar roles en orden controlado.
 
-\begin{codeblock}
-site.yml (estructura base inicial)
-- name: Baseline para todos los nodos
+\begin{yamlcode}
+site.yml (extracto representativo)
+- name: Etapa 1 | Baseline HPC (common + ssh)
   hosts: all
   become: true
   roles:
-    - common
-    # (se agregan más roles de base en capítulos posteriores)
-\end{codeblock}
+    - { role: common, tags: ["common"] }
+    - { role: users_ssh, tags: ["ssh"] }
+\end{yamlcode}
 
-En los siguientes apartados se muestra cómo esta estructura se va enriqueciendo con roles adicionales hasta llegar a la versión actual del proyecto.
+Esta estructura se complementa con etapas adicionales del mismo \texttt{site.yml} para red, almacenamiento, Slurm, entorno LLM y validaciones.
 
 
 \section{Roles en Ansible}
@@ -312,7 +340,7 @@ roles/
 \end{codeblock}
 
 Ejemplo de \texttt{tasks/main.yml}:
-\begin{codeblock}
+\begin{yamlcode}
 roles/mi_servicio/tasks/main.yml
 - name: Instalar paquete del servicio
   ansible.builtin.dnf:
@@ -324,16 +352,16 @@ roles/mi_servicio/tasks/main.yml
     src: mi_servicio.conf.j2
     dest: /etc/mi_servicio/mi_servicio.conf
   notify: Reiniciar mi servicio
-\end{codeblock}
+\end{yamlcode}
 
 Ejemplo de \texttt{handlers/main.yml}:
-\begin{codeblock}
+\begin{yamlcode}
 roles/mi_servicio/handlers/main.yml
 - name: Reiniciar mi servicio
   ansible.builtin.systemd:
     name: mi-servicio
     state: restarted
-\end{codeblock}
+\end{yamlcode}
 
 Cómo funciona todo en conjunto:
 \begin{itemize}
@@ -354,7 +382,7 @@ Esta sección explica tres conceptos esenciales para hacer playbooks y roles fle
 Una \textbf{variable} es un valor que puede cambiar sin modificar el playbook. Sirve para parametrizar nombres de paquetes, rutas, puertos o usuarios. En Ansible, las variables se definen en diferentes lugares (por ejemplo, dentro del playbook, en \texttt{group\_vars/}, \texttt{host\_vars/} o en \texttt{defaults/} de un rol) y luego se usan con la sintaxis \texttt{\{\{ variable \}\}}. \cite{ansible_variables}
 
 Ejemplo simple de variables en un playbook:
-\begin{codeblock}
+\begin{yamlcode}
 - name: Configurar un servicio con variables
   hosts: all
   become: yes
@@ -366,9 +394,29 @@ Ejemplo simple de variables en un playbook:
       ansible.builtin.dnf:
         name: "{{ servicio }}"
         state: present
-\end{codeblock}
+\end{yamlcode}
 
 En este ejemplo, cambiar \texttt{servicio} o \texttt{puerto} modifica el comportamiento del playbook sin reescribir tareas.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Precedencia de variables aplicada en el proyecto (de menor a mayor prioridad)}
+\label{tab:ansible_precedencia_aplicada}
+\begin{tabular}{|c|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\raggedright\arraybackslash}p{0.52\textwidth}|}
+\hline
+\textbf{Orden} & \textbf{Ubicación} & \textbf{Ejemplo real del proyecto} \\
+\hline
+1 & \texttt{roles/nfs\_hpc/defaults/main.yml} & \texttt{nfs\_hpc\_server\_enabled: false} define el valor por defecto del rol. \\
+\hline
+2 & \texttt{group\_vars/all/vars.yml} & Variables globales para todos los hosts (por ejemplo \texttt{nfs\_export\_path}); no sobrescribe \texttt{nfs\_hpc\_server\_enabled}. \\
+\hline
+3 & \texttt{group\_vars/hpc\_master.yml} & \texttt{nfs\_hpc\_server\_enabled: true} sobrescribe el default para el grupo \texttt{hpc\_master}. \\
+\hline
+4 & \texttt{host\_vars/<host>.yml} & Si se define allí, el valor por host tiene prioridad final sobre defaults y group\_vars. \\
+\hline
+\end{tabular}
+\end{table}
 
 \subsection{Plantillas (Jinja2)}
 \label{subsec:ansible_templates_intro}
@@ -385,12 +433,12 @@ log_path={{ log_dir }}/app.log
 \end{codeblock}
 
 Ejemplo de tarea que renderiza la plantilla:
-\begin{codeblock}
+\begin{yamlcode}
 - name: Generar configuración desde plantilla
   ansible.builtin.template:
     src: templates/app.conf.j2
     dest: /etc/mi_app/app.conf
-\end{codeblock}
+\end{yamlcode}
 
 Si cambian las variables \texttt{puerto} o \texttt{log\_dir}, el archivo generado será diferente. Esto permite mantener una sola plantilla para múltiples nodos con configuraciones específicas.
 
@@ -400,7 +448,7 @@ Si cambian las variables \texttt{puerto} o \texttt{log\_dir}, el archivo generad
 Un \textbf{archivo estático} es un archivo que se copia exactamente igual al host remoto, sin reemplazo de variables. Se usa para binarios, scripts, certificados, o archivos de texto que no requieren personalización. El módulo típico es \texttt{ansible.builtin.copy}, y los archivos suelen vivir en la carpeta \texttt{files/} del rol.
 
 Ejemplo de tarea con archivo estático:
-\begin{codeblock}
+\begin{yamlcode}
 - name: Copiar banner estático
   ansible.builtin.copy:
     src: banner.txt
@@ -408,7 +456,7 @@ Ejemplo de tarea con archivo estático:
     owner: root
     group: root
     mode: "0644"
-\end{codeblock}
+\end{yamlcode}
 
 Es importante que la ruta de destino exista en los nodos de destino (por ejemplo, \texttt{/etc/} o \texttt{/opt/mi\_app/}). Si el directorio no existe, la tarea fallará, por lo que normalmente se crea antes con un módulo como \texttt{ansible.builtin.file}.
 
@@ -538,7 +586,7 @@ Este ejemplo consulta el hostname en todos los \textit{workers}. Para comandos q
 
 Un playbook describe tareas repetibles. Este ejemplo asegura que un paquete esté presente:
 
-\begin{codeblock}
+\begin{yamlcode}
 install-tools.yml (ejemplo)
 - name: Instalar herramientas básicas
   hosts: workers
@@ -548,7 +596,7 @@ install-tools.yml (ejemplo)
       ansible.builtin.dnf:
         name: htop
         state: present
-\end{codeblock}
+\end{yamlcode}
 
 La idempotencia implica que, si \texttt{htop} ya está instalado, la tarea no vuelve a instalarlo. \cite{ansible_playbooks_intro,ansible_modules_intro}
 
@@ -568,7 +616,7 @@ ansible-playbook -i inventory.ini install-tools.yml
 \subsection{Ejemplo 5: copiar un archivo de configuración}
 \label{subsec:ansible_ej5_copy}
 
-\begin{codeblock}
+\begin{yamlcode}
 copy-example.yml (ejemplo)
 - name: Copiar archivo a /etc
   hosts: master
@@ -581,7 +629,7 @@ copy-example.yml (ejemplo)
         owner: root
         group: root
         mode: "0644"
-\end{codeblock}
+\end{yamlcode}
 
 Este tipo de automatización es útil para estandarizar configuraciones entre nodos.
 
@@ -764,7 +812,7 @@ Para guardar en \texttt{nano} se usó \texttt{Ctrl+O}, luego \texttt{Enter}, y p
   \label{fig:p05_inventory_ini_nano}
 \end{figure}
 
-En este punto, \texttt{worker1} y \texttt{worker2} pueden resolverse por nombre si existe DNS o si posteriormente se agregan entradas en \texttt{/etc/hosts}. Si aún no hay resolución de nombres, el inventario se completa asignando \texttt{ansible\_host=<IP>} a cada worker.
+En este punto, \texttt{worker1} y \texttt{worker2} pueden resolverse por nombre si existe DNS o si ya existen entradas en \texttt{/etc/hosts}. Si no hay resolución de nombres, el inventario se completa asignando \texttt{ansible\_host=<IP>} a cada worker.
 
 \subsection{Configuración local del proyecto (\texttt{ansible.cfg})}
 \label{subsec:ansible_cfg_local_minimo}

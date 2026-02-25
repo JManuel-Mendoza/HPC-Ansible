@@ -34,7 +34,7 @@ Una imagen \textit{ISO} es el archivo que contiene el instalador completo del si
     \label{fig:iso_rocky}
 \end{figure}
 
-Al finalizar la descarga, el archivo ISO quedó disponible localmente con el nombre \texttt{Rocky-9.x-x86\_64-minimal.iso} (o un nombre equivalente si el navegador añadió sufijos), y con un tamaño del orden de gigabytes, coherente con una imagen de instalación. \cite{rocky_9_isos}
+Al finalizar la descarga, el archivo ISO quedó disponible localmente con el nombre \path{Rocky-9.x-x86_64-minimal.iso} (o un nombre equivalente si el navegador añadió sufijos), y con un tamaño del orden de gigabytes, coherente con una imagen de instalación. \cite{rocky_9_isos}
 
 \subsection{Preparación de la USB booteable con Ventoy}
 Una USB \textit{booteable} permite que el computador arranque desde la memoria USB y ejecute el instalador. Para este proyecto se utilizó Ventoy porque permite mantener una USB multipropósito: una vez instalado Ventoy en la USB, basta con copiar el archivo ISO a la partición principal sin tener que “flashear” la memoria cada vez. La documentación oficial de Ventoy indica que el usuario solo necesita copiar las imágenes (\textit{ISO}, entre otros formatos) a la primera partición y Ventoy las listará automáticamente en el menú de arranque. \cite{ventoy_start,ventoy_home}
@@ -42,7 +42,7 @@ Una USB \textit{booteable} permite que el computador arranque desde la memoria U
 \subsubsection*{Procedimiento realizado}
 \begin{enumerate}
   \item Se conectó una memoria USB al computador utilizado para preparar el instalador.
-  \item Se descargó el software Ventoy desde su página oficial \hyperlink{https://www.ventoy.net/en/download.html}{https://www.ventoy.net/en/download.html}
+  \item Se descargó el software Ventoy desde su página oficial (\url{https://www.ventoy.net/en/download.html}).
 
   \begin{figure}[H]
       \centering
@@ -495,10 +495,25 @@ Estas salidas permitieron confirmar que el disco del sistema tenía particiones 
 \end{figure}
 \end{enumerate}
 
-\section{Red de administración del clúster (red ``global'')}
-\label{sec:red_global}
+\section{Red de administración del clúster}
+\label{sec:red_administracion}
 
-Esta sección describe cómo se verificó la conectividad de administración del clúster. En este proyecto se denomina \textit{red global} a la red institucional existente que permite acceder por SSH a cada nodo (por ejemplo, para administración inicial). Esta red es distinta de la red interna del clúster (que se configura más adelante para aislar los \textit{workers}).
+Esta sección describe cómo se verificó la conectividad de administración del clúster. En este proyecto se utiliza el término \textit{red de administración} para la red institucional existente que permite acceder por SSH a cada nodo. Esta red es distinta de la \textit{red interna del clúster}, reservada para tráfico exclusivo entre nodos.
+
+\begin{table}[H]
+\centering
+\caption{Nomenclatura de redes usada en el manual.}
+\label{tab:nomenclatura_redes}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.38\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}@{}}
+\hline
+\textbf{Término} & \textbf{Significado} & \textbf{Uso principal} \\
+\hline
+\textit{red de administración} & Red institucional de acceso remoto a nodos del clúster. & SSH, instalación inicial y operación remota. \\
+\textit{red externa de administración} & Variante para enfatizar que la red de administración es externa al plano interno del clúster. & Contrastar explícitamente con la red interna del clúster. \\
+\textit{red interna del clúster} & Red exclusiva entre nodos del clúster para tráfico operativo interno. & Slurm, NFS, automatización y validación entre nodos. \\
+\hline
+\end{tabular}
+\end{table}
 
 \subsection{Verificación de interfaz y ruta por defecto en el nodo master}
 \label{subsec:verificacion_red_master}
@@ -550,12 +565,12 @@ En la salida se observó la ruta por defecto y el segmento local configurado en 
 % 10.195.34.0/24 dev eno1 proto kernel scope link src 10.195.34.17 metric 100
 % \end{verbatim}
 
-Esto confirmó dos aspectos operativos: (1) el gateway fue \texttt{10.195.34.1} y (2) la IP del \textit{master} en la red global fue \texttt{10.195.34.17}. Además, el texto \texttt{proto dhcp} evidenció que la configuración fue obtenida mediante DHCP (asignación automática de red). \cite{iproute2_ip_route}
+Esto confirmó dos aspectos operativos: (1) el gateway fue \texttt{10.195.34.1} y (2) la IP del \textit{master} en la red de administración fue \texttt{10.195.34.17}. Además, el texto \texttt{proto dhcp} evidenció que la configuración fue obtenida mediante DHCP (asignación automática de red). \cite{iproute2_ip_route}
 
 En redes institucionales es común que una IP obtenida por DHCP se mantenga igual tras reinicios, ya sea porque existe una reserva para el equipo o porque el servidor DHCP renueva la concesión (\textit{lease}) con la misma dirección. Por esa razón, aunque la IP no cambió después de reiniciar, el indicador \texttt{proto dhcp} mostró que el método de asignación es DHCP.
 
 \subsection{Estrategia de direccionamiento en la red de administración (DHCP durante la fase inicial)}
-\label{subsec:dhcp_red_global}
+\label{subsec:dhcp_red_administracion}
 
 En la red de administración del clúster, el direccionamiento puede ser automático (DHCP) o manual (IP estática). En esta fase del proyecto se mantiene DHCP para el nodo \textit{master} mientras se completa la configuración base, porque reduce el riesgo de perder acceso remoto por un error de configuración. En entornos institucionales es común que, aun usando DHCP, una dirección IP se conserve por periodos largos debido a renovaciones de concesión (\textit{lease}) o reservas en el servidor DHCP.
 
@@ -564,7 +579,7 @@ A partir de la tabla de rutas se confirmó que el método activo era DHCP (indic
 % \begin{figure}[h]
 %   \centering
 %   \includegraphics[width=0.92\textwidth]{images/cap_config_entorno/b03_decision_dhcp.png}
-%   \caption{Evidencia de direccionamiento por DHCP en la red global (fragmento de \texttt{ip route} con \texttt{proto dhcp}).}
+%   \caption{Evidencia de direccionamiento por DHCP en la red de administración (fragmento de \texttt{ip route} con \texttt{proto dhcp}).}
 %   \label{fig:b03_decision_dhcp}
 % \end{figure}
 
@@ -826,7 +841,7 @@ En la salida se observó el hostname correspondiente (\texttt{worker1} y \texttt
 
 El clúster quedó con un sistema base consistente y una vía de administración funcional. Se instaló Rocky Linux 9.x en todos los nodos usando la imagen \textit{Minimal}, con particionado manual para controlar el uso del almacenamiento y asegurar que el sistema operativo y los espacios de trabajo quedaran separados. En el nodo \textit{master} se definió el esquema en \texttt{nvme0n1} para el sistema (\texttt{/}, \texttt{/var}, \texttt{/opt}, \texttt{/home}, \texttt{/boot} y \texttt{/boot/efi}) y se reservaron volúmenes de alta capacidad en \texttt{sda} para \texttt{/data} y \texttt{/scratch}, lo que facilita organizar datos persistentes y archivos temporales de trabajo sin comprometer el sistema.
 
-La conectividad de administración (\textit{red global}) quedó verificada en el \textit{master}, identificando la interfaz utilizada (\texttt{eno1}) y confirmando la salida por una ruta por defecto válida. Se mantuvo el direccionamiento por DHCP durante la fase inicial para disminuir el riesgo de perder acceso remoto, priorizando estabilidad operativa mientras se avanzaba en la configuración del clúster.
+La conectividad de administración (\textit{red de administración}) quedó verificada en el \textit{master}, identificando la interfaz utilizada (\texttt{eno1}) y confirmando la salida por una ruta por defecto válida. Se mantuvo el direccionamiento por DHCP durante la fase inicial para disminuir el riesgo de perder acceso remoto, priorizando estabilidad operativa mientras se avanzaba en la configuración del clúster.
 
 En cuanto al acceso remoto, se habilitó el servicio SSH en el \textit{master} y se garantizó que fuera alcanzable a través del firewall. Cuando fue necesario para recuperar y mantener acceso durante la fase inicial, se habilitó autenticación por contraseña en SSH. Posteriormente, se migró la administración a autenticación por llaves SSH, primero desde el computador del usuario hacia el \textit{master}, y luego desde el \textit{master} hacia los \textit{workers}. Esta transición dejó el clúster listo para administración no interactiva desde el nodo \textit{master}, requisito para automatización y orquestación con herramientas como Ansible.
 
