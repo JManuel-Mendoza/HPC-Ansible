@@ -1,4 +1,5 @@
 .DS_Store
 ._*
 .agents
-tests/results/
+.vscode
+.secrets
