@@ -12,6 +12,7 @@
     cleanup_internal_cidr: "{{ slurm_internal_cidr | default('192.168.34.0/24') }}"
     cleanup_slurmctld_port: "{{ slurmctld_port | default(6817) }}"
     cleanup_slurmd_port: "{{ slurmd_port | default(6818) }}"
+    cleanup_package_name_regex: '^(slurm|munge|nvidia|cuda|libnvidia|kmod-nvidia)(-|$)'
 
   tasks:
     - name: Limpieza | Definir servicio SSH por sistema operativo
@@ -64,30 +65,42 @@
       failed_when: false
       tags: [cleanup, cleanup_services]
 
-    - name: Limpieza | Remover paquetes Slurm/Munge/NVIDIA/CUDA (RHEL)
-      ansible.builtin.dnf:
-        name:
-          - "slurm*"
-          - "munge*"
-          - "nvidia*"
-          - "cuda*"
-        state: absent
-        autoremove: true
-      when: ansible_facts.os_family == 'RedHat'
+    - name: Limpieza | Recopilar paquetes instalados
+      ansible.builtin.package_facts:
+        manager: auto
       tags: [cleanup, cleanup_packages]
 
-    - name: Limpieza | Remover paquetes Slurm/Munge/NVIDIA/CUDA (Debian/Ubuntu)
+    - name: Limpieza | Calcular paquetes instalados a remover
+      ansible.builtin.set_fact:
+        cleanup_installed_target_packages: >-
+          {{
+            ansible_facts.packages.keys()
+            | select('match', cleanup_package_name_regex)
+            | list
+          }}
+      changed_when: false
+      tags: [cleanup, cleanup_packages]
+
+    - name: Limpieza | Remover paquetes instalados Slurm/Munge/NVIDIA/CUDA (RHEL)
+      ansible.builtin.dnf:
+        name: "{{ cleanup_installed_target_packages }}"
+        state: absent
+        autoremove: true
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_installed_target_packages | length > 0
+      tags: [cleanup, cleanup_packages]
+
+    - name: Limpieza | Remover paquetes instalados Slurm/Munge/NVIDIA/CUDA (Debian/Ubuntu)
       ansible.builtin.apt:
-        name:
-          - "slurm*"
-          - "munge*"
-          - "nvidia*"
-          - "cuda*"
+        name: "{{ cleanup_installed_target_packages }}"
         state: absent
         purge: true
         autoremove: true
         update_cache: true
-      when: ansible_facts.os_family == 'Debian'
+      when:
+        - ansible_facts.os_family == 'Debian'
+        - cleanup_installed_target_packages | length > 0
       tags: [cleanup, cleanup_packages]
 
     - name: Limpieza | Eliminar archivos y directorios de Slurm/Munge/CUDA
@@ -201,7 +214,7 @@
     - name: Limpieza | Reportar paquetes residuales Slurm/Munge/NVIDIA/CUDA (RHEL)
       ansible.builtin.shell: |
         set -euo pipefail
-        rpm -qa | grep -Ei '^(slurm|munge|nvidia|cuda)' || true
+        rpm -qa | grep -Ei '{{ cleanup_package_name_regex }}' || true
       args:
         executable: /bin/bash
       register: cleanup_residual_pkgs

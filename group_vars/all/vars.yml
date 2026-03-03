@@ -83,8 +83,8 @@ llm_python_packages:
 # =====================
 # Export en el master (server) y punto de montaje en workers (clients).
 # Importante: el montaje en clientes debe usar IP del master (no el hostname literal "master").
-nfs_export_path: "/srv/nfs/llm"
-nfs_client_mountpoint: "/mnt/llm"
+nfs_export_path: "/data/nfs"
+nfs_client_mountpoint: "/data/nfs"
 
 # IP del server NFS (master) que usarán los clientes.
 # Este cluster tiene enlaces punto-a-punto master<->worker; por eso se prioriza la IP del master
