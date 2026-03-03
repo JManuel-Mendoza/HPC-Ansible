@@ -713,6 +713,97 @@
     - _nvidia_smi_full.rc == 0
     - _nvidia_dev_nodes.rc != 0
 
+- name: NVIDIA/CUDA | Instalar plugin versionlock para DNF
+  ansible.builtin.dnf:
+    name: "{{ nvidia_cuda_versionlock_plugin_package }}"
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Comprobar plugin versionlock para DNF
+  ansible.builtin.command: dnf -q versionlock list
+  register: _nvidia_versionlock_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Fallar si el plugin versionlock no esta disponible
+  ansible.builtin.fail:
+    msg: >-
+      El plugin de congelacion DNF no esta disponible tras instalar
+      {{ nvidia_cuda_versionlock_plugin_package }}.
+      stdout: {{ _nvidia_versionlock_check.stdout | default('') }}
+      stderr: {{ _nvidia_versionlock_check.stderr | default('') }}
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+    - _nvidia_versionlock_check.rc != 0
+
+- name: NVIDIA/CUDA | Obtener paquetes NVIDIA instalados para versionlock (RHEL)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    rpm -qa --qf '%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n' |
+    grep -E '{{ nvidia_cuda_hold_package_regex_redhat }}' |
+    sort -u || true
+  args:
+    executable: /bin/bash
+  register: _nvidia_hold_packages_redhat
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Asegurar directorio de versionlock
+  ansible.builtin.file:
+    path: "{{ nvidia_cuda_versionlock_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Congelar paquetes NVIDIA instalados con versionlock (RHEL)
+  ansible.builtin.lineinfile:
+    path: "{{ nvidia_cuda_versionlock_file }}"
+    line: "{{ item }}"
+    state: present
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _nvidia_hold_packages_redhat.stdout_lines | default([]) }}"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Obtener paquetes NVIDIA instalados para hold (Ubuntu)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    dpkg-query -W -f='${Package}\n' |
+    grep -E '{{ nvidia_cuda_hold_package_regex_debian }}' |
+    sort -u || true
+  args:
+    executable: /bin/bash
+  register: _nvidia_hold_packages_debian
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Congelar paquetes NVIDIA instalados con hold (Ubuntu)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ _nvidia_hold_packages_debian.stdout_lines | default([]) }}"
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_hold_drivers | bool
+
 - name: NVIDIA/CUDA | Obtener version de driver y nombre GPU desde nvidia-smi
   ansible.builtin.command: nvidia-smi --query-gpu=driver_version,name --format=csv,noheader
   register: _nvidia_smi_query

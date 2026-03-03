@@ -80,8 +80,8 @@ Edicion recomendada (en este orden):
 - `roles/nfs_hpc/templates/exports.j2`: linea de export NFS.
 
 ### nvidia_cuda
-- `roles/nvidia_cuda/defaults/main.yml`: defaults driver/repo/validacion.
-- `roles/nvidia_cuda/tasks/main.yml`: instalacion y validacion GPU/CUDA.
+- `roles/nvidia_cuda/defaults/main.yml`: defaults driver/repo/validacion y politica de freeze (`hold` / `versionlock`).
+- `roles/nvidia_cuda/tasks/main.yml`: instalacion, validacion GPU/CUDA y congelacion posterior de paquetes NVIDIA.
 - `roles/nvidia_cuda/handlers/main.yml`: initramfs/reboot.
 
 ### llm_env

@@ -12,6 +12,11 @@ nvidia_driver_stream: "580-dkms"
 nvidia_cuda_reboot: false
 nvidia_cuda_repo_enabled: true
 nvidia_cuda_validate: true
+nvidia_cuda_hold_drivers: true
+nvidia_cuda_hold_package_regex_redhat: "^(nvidia|kmod-nvidia|dkms-nvidia)"
+nvidia_cuda_hold_package_regex_debian: "^(nvidia|libnvidia|cuda-drivers)"
+nvidia_cuda_versionlock_plugin_package: "python3-dnf-plugin-versionlock"
+nvidia_cuda_versionlock_file: "/etc/dnf/plugins/versionlock.list"
 
 nvidia_cuda_repo_file: "/etc/yum.repos.d/cuda-rhel9.repo"
 nvidia_cuda_repo_url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo"

@@ -45,6 +45,34 @@ Si se sobreescribieron vars, ajusta el comando usando:
 - `llm_micromamba_bin`
 - `llm_env_name`
 
+## Freeze del driver / versionlock
+
+El rol `roles/nvidia_cuda` puede congelar paquetes NVIDIA después de instalar y validar el driver.
+
+- Control:
+  - `nvidia_cuda_hold_drivers` (default: `true`)
+- En RHEL/Rocky:
+  - instala `python3-dnf-plugin-versionlock`
+  - escribe locks en `/etc/dnf/plugins/versionlock.list`
+- En Debian/Ubuntu:
+  - aplica `hold` con `dpkg_selections`
+
+Comprobaciones útiles:
+
+RHEL/Rocky:
+```bash
+dnf -q versionlock list || true
+grep -Ei 'nvidia|kmod-nvidia|dkms-nvidia' /etc/dnf/plugins/versionlock.list || true
+```
+
+Debian/Ubuntu:
+```bash
+apt-mark showhold | grep -Ei 'nvidia|libnvidia|cuda-drivers' || true
+```
+
+Nota:
+- el rol no implementa un flujo automatizado para quitar locks/holds existentes.
+
 ## Problemas comunes
 
 ### 1) `nvidia-smi` no existe

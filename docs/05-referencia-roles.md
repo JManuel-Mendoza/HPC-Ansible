@@ -82,7 +82,10 @@ Este documento cubre todos los roles activos bajo `roles/`.
   - `roles/nvidia_cuda/handlers/main.yml`
 - Entradas clave:
   - `nvidia_driver_stream` (default `580-dkms`),
-  - `nvidia_cuda_reboot`, `nvidia_cuda_repo_enabled`, `nvidia_cuda_validate`.
+  - `nvidia_cuda_reboot`, `nvidia_cuda_repo_enabled`, `nvidia_cuda_validate`,
+  - `nvidia_cuda_hold_drivers`,
+  - `nvidia_cuda_versionlock_plugin_package`,
+  - `nvidia_cuda_versionlock_file`.
 - Flujo tecnico:
   - detecta GPU (`lspci`), termina host si no hay GPU,
   - configura repos CUDA (RHEL/Ubuntu),
@@ -93,9 +96,15 @@ Este documento cubre todos los roles activos bajo `roles/`.
   - aplica blacklist de `nouveau` + initramfs/grub,
   - calcula si requiere reboot y lo programa via handler,
   - valida `nvidia-smi`, modulos y NVML,
+  - congela paquetes NVIDIA instalados tras la validacion:
+    - RHEL/Rocky: `python3-dnf-plugin-versionlock` + escritura de NEVRAs en `versionlock.list`,
+    - Debian/Ubuntu: `dpkg_selections` con `selection: hold`,
   - crea symlink `libnvidia-ml.so` cuando falta (impacta Slurm NVML).
 - Salidas adicionales:
   - fact `slurm_nvml_symlink_changed` para reinicios/reconfigure Slurm.
+- Notas:
+  - la congelacion se controla con `nvidia_cuda_hold_drivers` (default `true`),
+  - no se documenta un flujo automatizado de unfreeze en el rol.
 - Riesgo: puede requerir reinicio de host y tocar boot args.
 
 ## llm_env

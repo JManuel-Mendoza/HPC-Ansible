@@ -93,6 +93,11 @@ Fragmento útil (gating de topología obligatoria):
 | `nvidia_cuda_reboot` | `roles/nvidia_cuda/defaults/main.yml` | Permite reboot automático si cambios lo requieren | `false` |
 | `nvidia_cuda_repo_enabled` | `roles/nvidia_cuda/defaults/main.yml` | Activa repo CUDA oficial | `true` |
 | `nvidia_cuda_validate` | `roles/nvidia_cuda/defaults/main.yml` | Activa validaciones posinstalación | `true` |
+| `nvidia_cuda_hold_drivers` | `roles/nvidia_cuda/defaults/main.yml` | Activa congelación de paquetes NVIDIA tras instalación/validación | `true` |
+| `nvidia_cuda_hold_package_regex_redhat` | `roles/nvidia_cuda/defaults/main.yml` | Regex para descubrir RPMs NVIDIA a congelar con versionlock | `^(nvidia|kmod-nvidia|dkms-nvidia)` |
+| `nvidia_cuda_hold_package_regex_debian` | `roles/nvidia_cuda/defaults/main.yml` | Regex para descubrir paquetes Debian a poner en hold | `^(nvidia|libnvidia|cuda-drivers)` |
+| `nvidia_cuda_versionlock_plugin_package` | `roles/nvidia_cuda/defaults/main.yml` | Plugin DNF requerido para `versionlock` en RHEL | `python3-dnf-plugin-versionlock` |
+| `nvidia_cuda_versionlock_file` | `roles/nvidia_cuda/defaults/main.yml` | Archivo persistente de locks DNF | `/etc/dnf/plugins/versionlock.list` |
 | `nvidia_cuda_repo_url` | `roles/nvidia_cuda/defaults/main.yml` | URL repo CUDA RHEL | `.../cuda-rhel9.repo` |
 | `slurm_node_gres` | derivada en `roles/slurm_facts/tasks/main.yml` o override en `host_vars/group_vars` | GRES por nodo (GPU scheduling) | `gpu:quadro_p1000:1` (ejemplo comentado) |
 | `slurm_validate_torch.*` | `group_vars/all/vars.yml` | Política de test Torch en etapa `slurm_validate` | `enabled: auto` |
@@ -135,6 +140,7 @@ Fragmento útil (gating de reboot obligatorio):
   - existencia/ejecución de `nvidia-smi`.
   - nodos `/dev/nvidia*`.
   - normalización NVML (`libnvidia-ml.so` symlink) + `ldconfig`.
+  - disponibilidad del plugin `dnf versionlock` si `nvidia_cuda_hold_drivers=true` en RHEL.
 - `roles/validate/tasks/main.yml`:
   - `stat /usr/bin/nvidia-smi`, `nvidia-smi -L`, asserts según pertenencia `slurm_gpu`.
   - check Torch CUDA opcional (`validate_llm`, por defecto `false`).
@@ -142,6 +148,18 @@ Fragmento útil (gating de reboot obligatorio):
   - `srun ... --gres=gpu:1 nvidia-smi -L`.
   - smoke GPU con `sbatch` y `sacct` (`COMPLETED|0:0`).
 - Validación explícita de `nvcc` en el repo: **no encontrada**.
+
+### 2.7 Freeze / versionlock de drivers
+- `roles/nvidia_cuda/tasks/main.yml` aplica la congelación **después** de instalar/validar el driver:
+  - RHEL/Rocky:
+    - instala `python3-dnf-plugin-versionlock`,
+    - comprueba `dnf -q versionlock list`,
+    - obtiene RPMs instalados con regex `nvidia_cuda_hold_package_regex_redhat`,
+    - escribe las NEVRAs resultantes en `nvidia_cuda_versionlock_file`.
+  - Debian/Ubuntu:
+    - obtiene paquetes instalados con regex `nvidia_cuda_hold_package_regex_debian`,
+    - aplica `dpkg_selections: selection=hold`.
+- Remoción automatizada de locks/holds en el rol: **no encontrada**.
 
 ---
 
