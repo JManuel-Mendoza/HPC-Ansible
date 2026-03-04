@@ -19,7 +19,7 @@ Modo: **solo auditoría y planificación** (sin cambios en archivos)
 | Paquete | Objetivo | Archivos/roles afectados | Riesgo | Pruebas/validaciones sugeridas | Criterio de aceptación |
 |---|---|---|---|---|---|
 | P1: Baseline y entrypoints | Consolidar ejecución segura de `base.yml`/`site.yml` y orden operativo | `base.yml`, `site.yml`, `ansible.cfg`, `docs/audit/ansible-entrypoints.md` | MEDIUM | `--syntax-check`, `--list-tasks`, `ansible-inventory --graph` | Orden de ejecución documentado y reproducible; sintaxis válida en entorno objetivo |
-| P2: Secretos y datos sensibles | Eliminar credenciales en claro y preparar Vault | `inventario.ini`, `group_vars/hpc_master.yml` | HIGH | `ansible-vault view/edit`, `--check --diff` con `--limit` | Sin secretos en texto plano en repo; despliegue funcional con vars cifradas |
+| P2: Secretos y datos sensibles | Centralizar y proteger credenciales operativas | `inventario.ini`, `group_vars/hpc_master.yml` | HIGH | `--check --diff` con `--limit`, revisión de exposición | Credenciales ubicadas en puntos de consumo y estrategia de protección definida |
 | P3: Red interna (network) | Hacer cambios de NM más predecibles e idempotentes | `roles/network_internal/defaults/main.yml`, `roles/network_internal/tasks/main.yml`, `roles/network_internal/tasks/master_link.yml` | HIGH | `--list-tasks --tags network`, `--check --diff --limit worker1`, pruebas de conectividad | No pérdida de conectividad; segunda ejecución sin cambios inesperados |
 | P4: Ruteo (routing) | Controlar rutas persistentes por nodo y rollback claro | `roles/cluster_routing/tasks/main.yml` | HIGH | `--tags routing --limit worker1`, `ip route`, validación inter-subred | Rutas correctas en workers; rollback probado |
 | P5: Firewall | Reducir ruido y centralizar recargas/reinicios en handlers | `roles/firewall/tasks/main.yml`, `roles/slurm_install/tasks/main.yml`, `roles/nfs_hpc/tasks/main.yml` | HIGH | `--tags firewall,slurm_firewall,nfs_firewall --check --diff`, `firewall-cmd --list-all` | Reglas esperadas aplicadas una sola vez y recargas controladas |
@@ -41,7 +41,7 @@ Modo: **solo auditoría y planificación** (sin cambios en archivos)
 9. validate (`validate`, `slurm_validate`)
 
 ## 3) Lista priorizada de cambios (backlog)
-1. Vault para `inventario.ini` y `group_vars/hpc_master.yml`.
+1. Definir una estrategia de protección para `inventario.ini` y `group_vars/hpc_master.yml`.
 2. Paquete dedicado de red/routing con rollback por host.
 3. Mover reinicios directos de Slurm a handlers.
 4. Reducir `shell` en provisioning (network/nvidia/slurm_install).

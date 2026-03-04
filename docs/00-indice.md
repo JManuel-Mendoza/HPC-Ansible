@@ -73,7 +73,7 @@ Runbooks mínimos, orientados a comandos y evidencia:
   - Plan de cambios por paquetes (auditoria) y backlog priorizado.
 
 - `docs/vault.md`
-  - Como crear/editar Vault y ejecutar playbooks con `--ask-vault-pass` o `--vault-password-file`.
+  - Estado actual de credenciales y nota de que Vault fue retirado.
 
 ## Cobertura
 

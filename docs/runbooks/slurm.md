@@ -127,7 +127,7 @@ sacctmgr -n show cluster || true
 ```
 
 Acción si falla por credenciales:
-- La contraseña viene de Vault (ver `docs/vault.md`) mediante `vault_slurmdb_mysql_password` (referenciada desde `group_vars/hpc_master.yml`).
+- Verifica el valor literal de `slurmdb_mysql_password` en `group_vars/hpc_master.yml` y que coincida con la cuenta `slurm` en MariaDB.
 
 Evidencia para escalar:
 - `journalctl -u slurmdbd -n 200 --no-pager`

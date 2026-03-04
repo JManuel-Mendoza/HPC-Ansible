@@ -50,9 +50,9 @@ Use el mismo archivo de configuración para detectar regresiones de sintaxis y e
 
 ## Exclusiones críticas
 - `.secrets/`: carpetas de claves y material temporal nunca deben linterse.
-- `group_vars/all/vault.yml`: está cifrado; no queremos que ansible-lint consulte datos sensibles.
+- Archivos locales de secretos temporales (por ejemplo `.secrets/`): no deben linterse ni versionarse.
 
-La configuración ya excluye estas rutas en `exclude_paths`. Si abre nuevos archivos cifrados, añádalos ahí en lugar de replicar limpieza manual.
+La configuración ya excluye estas rutas en `exclude_paths`. Si reaparecen archivos locales de secretos, añádalos ahí en lugar de replicar limpieza manual.
 
 ## Estrategia progresiva
 1. Parta del archivo `.ansible-lint` existente: perfil conservador + exclusiones + `skip_list` de reglas ruidosas.

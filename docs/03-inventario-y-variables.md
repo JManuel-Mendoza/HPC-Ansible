@@ -75,4 +75,4 @@ Estado actual:
 
 - Mantener defaults en `defaults/main.yml` de cada rol y overrides en `group_vars/` o `host_vars/`.
 - Evitar hardcode de valores de red/GPU fuera de variables.
-- Mover secretos a Vault (`ansible-vault`).
+- Mantener credenciales sensibles acotadas a los archivos donde realmente se consumen.

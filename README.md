@@ -13,7 +13,7 @@ La guia resume como configurar inventario y variables, ejecutar por etapas/tags 
 - Soporte de nodos de control y nodos de computo con grupos de inventario dedicados.
 - Integracion de servicios base HPC: `firewalld`, rutas internas, NFS compartido, Slurm y Munge.
 - Pipeline de validacion con checks generales (`validate`) y smoke jobs Slurm CPU/GPU (`slurm_validate_smoke`).
-- Manejo de secretos con Ansible Vault (`group_vars/all/vault.yml`).
+- Credenciales operativas definidas directamente en `inventario.ini` y `group_vars/hpc_master.yml`.
 
 ## Arquitectura resumida
 
@@ -47,9 +47,9 @@ Referencia: `inventario.ini`.
 - Acceso SSH a nodos del inventario y permisos de elevacion cuando aplique.
 - Resolucion de nombres/IP coherente para `master` y `workers` (DNS interno o `/etc/hosts` gestionado por `network_internal`).
 - Interfaces internas y subredes declaradas en `network_internal_links` y `hpc_internal_subnets` antes de ejecutar cambios de red.
-- Secretos Vault disponibles (`group_vars/all/vault.yml`) y metodo de desbloqueo:
-  - `--ask-vault-pass`, o
-  - `--vault-password-file` con archivo local no versionado.
+- Credenciales operativas configuradas directamente en:
+  - `inventario.ini` para `ansible_become_password`.
+  - `group_vars/hpc_master.yml` para `slurmdb_mysql_password`.
 
 ## Estructura del repositorio
 
@@ -62,8 +62,7 @@ Referencia: `inventario.ini`.
 |-- requirements.yml
 |-- group_vars/
 |   |-- all/
-|   |   |-- vars.yml
-|   |   `-- vault.yml
+|   |   `-- vars.yml
 |   `-- hpc_master.yml
 |-- host_vars/
 |   |-- master.yml
@@ -107,24 +106,24 @@ ansible-galaxy collection install -r requirements.yml
 - Ajustar parametros globales en `group_vars/all/vars.yml`.
 - Ajustar parametros del master en `group_vars/hpc_master.yml`.
 - Ajustar overrides por host en `host_vars/*.yml` cuando aplique.
-- Preparar Vault segun `docs/vault.md`.
+- Revisar las credenciales directas en `inventario.ini` y `group_vars/hpc_master.yml`.
 
 ### 4) Preflight sin cambios
 
 ```bash
-ansible-inventory -i inventario.ini --graph --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --syntax-check --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --list-tags --ask-vault-pass
+ansible-inventory -i inventario.ini --graph
+ansible-playbook -i inventario.ini site.yml --syntax-check
+ansible-playbook -i inventario.ini site.yml --list-tags
 ```
 
 ### 5) Ejecucion por fases/tags con limite controlado
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --check --diff --limit <host_habilitado> --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags common,ssh --limit <host_habilitado> --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags network,routing,firewall --limit <host_habilitado> --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit hpc_master --ask-vault-pass
-ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit slurm_compute --ask-vault-pass
+ansible-playbook -i inventario.ini site.yml --check --diff --limit <host_habilitado>
+ansible-playbook -i inventario.ini site.yml --tags common,ssh --limit <host_habilitado>
+ansible-playbook -i inventario.ini site.yml --tags network,routing,firewall --limit <host_habilitado>
+ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit hpc_master
+ansible-playbook -i inventario.ini site.yml --tags slurm,slurm_install,slurm_config --limit slurm_compute
 ```
 
 Nota: `<host_habilitado>` se sustituye por un host activo en `inventario.ini` (ejemplo actual: `worker2`).
@@ -162,8 +161,8 @@ Comandos recomendados:
 
 ```bash
 ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --list-tags
-ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado> --tags cleanup,cleanup_verify --ask-vault-pass
-ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado> --ask-vault-pass
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado> --tags cleanup,cleanup_verify
+ansible-playbook -i inventario.ini cleanup_slurm_gpu.yml --limit <host_habilitado>
 ```
 
 Referencia operativa: `docs/runbooks/cleanup-slurm-gpu.md`.
@@ -173,20 +172,20 @@ Referencia operativa: `docs/runbooks/cleanup-slurm-gpu.md`.
 ### Verificacion rapida recomendada
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --ask-vault-pass --tags validate_slurm --limit "hpc_master,slurm_compute"
-ansible-playbook -i inventario.ini site.yml --ask-vault-pass --tags slurm_validate_smoke
+ansible-playbook -i inventario.ini site.yml --tags validate_slurm --limit "hpc_master,slurm_compute"
+ansible-playbook -i inventario.ini site.yml --tags slurm_validate_smoke
 ```
 
 ### Canary previo a despliegue amplio
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --ask-vault-pass --limit "hpc_master,<host_habilitado>" -f 10
+ansible-playbook -i inventario.ini site.yml --limit "hpc_master,<host_habilitado>" -f 10
 ```
 
 Ejemplo con host habilitado actual:
 
 ```bash
-ansible-playbook -i inventario.ini site.yml --ask-vault-pass --limit "hpc_master,worker2" -f 10
+ansible-playbook -i inventario.ini site.yml --limit "hpc_master,worker2" -f 10
 ```
 
 ### Criterio de resultado "OK"
@@ -217,7 +216,7 @@ ansible-playbook -i inventario.ini site.yml --ask-vault-pass --limit "hpc_master
 ## Troubleshooting minimo
 
 1. Sintoma: `--syntax-check` falla.
-   - Accion: validar inventario y Vault (`ansible-inventory --graph`, `docs/vault.md`).
+   - Accion: validar inventario y revisar las credenciales directas en `inventario.ini` y `group_vars/hpc_master.yml`.
 
 2. Sintoma: conectividad inter-nodos inestable tras cambios de red.
    - Accion: ejecutar por `--limit <host_habilitado>` y revisar `docs/runbooks/network-firewall.md`.

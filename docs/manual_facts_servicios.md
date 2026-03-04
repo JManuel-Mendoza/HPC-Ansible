@@ -258,7 +258,7 @@ Fragmento útil (bifurcación server/client):
 | `slurm_srun_port_range` | `group_vars/all/vars.yml` | rango TCP retorno srun | `60001-60100` |
 | `slurm_cgroup_conf` | `group_vars/all/vars.yml` | contenido `cgroup.conf` | `ConstrainDevices=yes` |
 | `slurmdb_mysql_db`, `slurmdb_mysql_user`, `slurmdb_mysql_hosts` | `group_vars/hpc_master.yml` | DB y grants de accounting | `slurm_acct_db`, `slurm`, `localhost/master` |
-| `slurmdb_mysql_password` | `group_vars/hpc_master.yml` (Vault) | password DB Slurm | **sensible (no se expone)** |
+| `slurmdb_mysql_password` | `group_vars/hpc_master.yml` | password DB Slurm | **sensible (definido en claro en repo)** |
 | `slurmdbd_port`, `slurmdbd_host`, `slurmdbd_storage_*` | `group_vars/hpc_master.yml` | parámetros `slurmdbd.conf` | `6819`, `localhost` |
 | `slurm_controller_reconfigure_*`, `slurm_controller_autoresume_*` | `roles/slurm_controller/defaults/main.yml` | política reconfigure/autoresume | `true`, estados `DRAIN/INVALID_REG` |
 | `slurm_node_gres`, `slurm_cpus`, `slurm_real_memory` | facts en `slurm_facts` + posibles overrides host/group | recursos por nodo para `slurm.conf` | `gpu:...:1` |
