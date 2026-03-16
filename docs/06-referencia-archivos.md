@@ -10,6 +10,7 @@ Esta referencia cubre los archivos de codigo y operacion del proyecto. Documenta
 - `requirements.yml`: colecciones Ansible requeridas.
 - `README.md`: entrada principal del repositorio.
 - `AGENTS.md`: reglas operativas para agentes en este repo.
+- `.ansible-lint`: configuracion de reglas de linting para `ansible-lint`.
 
 ## Soporte para agentes/documentacion
 

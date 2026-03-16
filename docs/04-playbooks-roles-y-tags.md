@@ -29,7 +29,11 @@ Nota: la secuencia canonica es la definida en `site.yml`; cualquier cambio en `s
 
 ## Tags mas utiles
 
-- Baseline: `common`, `ssh`, `firewall`, `network`, `routing`, `nfs`, `cuda`, `llm`
+- Baseline: `common`, `ssh`
+- Red/ruteo/firewall: `network`, `network_internal`, `routing`, `firewall`
+- Storage: `nfs`, `nfs_server`, `nfs_client`
+- GPU/CUDA: `cuda`
+- LLM: `llm`
 - DB/accounting: `mariadb`, `slurmdb`
 - Slurm: `slurm`, `slurm_install`, `slurm_config`, `slurmctld`, `slurmd`, `slurmdbd`
 - Validacion: `validate`, `slurm_validate`, `slurm_validate_smoke`

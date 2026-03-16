@@ -1,54 +1,56 @@
-# Guía rápida de Ansible Vault
+# Ansible Vault
 
-Esta guía define el uso recomendado de Ansible Vault en este proyecto para evitar credenciales en claro dentro del repositorio.
+## Estado actual
 
-## Objetivo
+Vault no esta habilitado en este repositorio. Las credenciales residen en texto plano en:
 
-Los secretos deben mantenerse cifrados en un único archivo:
+- `inventario.ini`: `ansible_become_password` (grupo `workers_u`).
+- `group_vars/hpc_master.yml`: `slurmdb_mysql_password`.
 
-- `group_vars/all/vault.yml`
+## Procedimiento para habilitar Vault
 
-Las referencias funcionales deben permanecer en:
+Si se decide cifrar los secretos del repositorio, seguir los pasos descritos a continuacion.
 
-- `inventario.ini`
-- `group_vars/hpc_master.yml`
+### Secretos que se recomienda migrar a Vault
 
-## Secretos que deben vivir en Vault
-
-Para el estado actual del repositorio, como mínimo:
+Como minimo:
 
 - `vault_ansible_become_password_workers_u`
 - `vault_slurmdb_mysql_password`
 
-## Puntos de consumo recomendados
+El archivo cifrado destino seria:
 
-### 1. `inventario.ini`
+- `group_vars/all/vault.yml`
 
-En el grupo `workers_u:vars`, la contraseña de elevación debe referenciar Vault:
+### Puntos de consumo a actualizar
+
+#### 1. `inventario.ini`
+
+En el grupo `workers_u:vars`, reemplazar el valor literal por una referencia Vault:
 
 ```ini
 [workers_u:vars]
 ansible_become_password="{{ vault_ansible_become_password_workers_u }}"
 ```
 
-### 2. `group_vars/hpc_master.yml`
+#### 2. `group_vars/hpc_master.yml`
 
-La contraseña de MariaDB para Slurm debe referenciar Vault:
+Reemplazar el valor literal de la contraseña de MariaDB:
 
 ```yaml
 slurmdb_mysql_password: "{{ vault_slurmdb_mysql_password }}"
 ```
 
-## Estructura recomendada del archivo cifrado
+### Crear el archivo cifrado
 
-Se recomienda crear un archivo temporal en claro con este contenido:
+Crear un archivo temporal en claro con los secretos:
 
 ```yaml
 vault_ansible_become_password_workers_u: "CAMBIAR_ESTE_VALOR"
 vault_slurmdb_mysql_password: "CAMBIAR_ESTE_VALOR"
 ```
 
-Después debe cifrarse y moverse a la ruta definitiva:
+Cifrarlo y moverlo a la ruta definitiva:
 
 ```bash
 cat > /tmp/vault.yml <<'EOF'
@@ -60,15 +62,15 @@ ansible-vault encrypt /tmp/vault.yml
 mv /tmp/vault.yml group_vars/all/vault.yml
 ```
 
-## Edición posterior de secretos
+### Edicion posterior de secretos
 
 ```bash
 ansible-vault edit group_vars/all/vault.yml
 ```
 
-## Ejecución habitual con Vault
+### Ejecucion habitual con Vault
 
-Opción interactiva:
+Opcion interactiva:
 
 ```bash
 ansible-inventory -i inventario.ini --graph --ask-vault-pass
@@ -77,7 +79,7 @@ ansible-playbook -i inventario.ini site.yml --list-tags --ask-vault-pass
 ansible-playbook -i inventario.ini site.yml --check --diff --limit worker2 --ask-vault-pass
 ```
 
-Opción con archivo local de password no versionado:
+Opcion con archivo local de password no versionado:
 
 ```bash
 mkdir -p ~/.config/hpc-ansible
@@ -91,19 +93,16 @@ ansible-playbook -i inventario.ini site.yml \
 
 ## Reglas operativas recomendadas
 
-- No dejar credenciales literales en `inventario.ini`, `group_vars/` ni `host_vars/`.
-- Mantener en Vault solo secretos; no mezclar variables operativas comunes con datos sensibles.
 - No versionar archivos como `.secrets/` o `~/.config/hpc-ansible/vault-pass.txt`.
+- Mantener en Vault solo secretos; no mezclar variables operativas comunes con datos sensibles.
 - Antes de ejecutar sobre varios nodos, validar con `--syntax-check`, `--check --diff` y `--limit`.
 
-## Migración mínima esperada en este repo
-
-Si el repositorio se encuentra temporalmente con secretos en claro, la migración mínima esperada es:
+## Pasos de migracion resumidos
 
 1. Crear `group_vars/all/vault.yml` cifrado con las dos variables `vault_*`.
 2. Reemplazar en `inventario.ini` el valor literal de `ansible_become_password` por `{{ vault_ansible_become_password_workers_u }}`.
 3. Reemplazar en `group_vars/hpc_master.yml` el valor literal de `slurmdb_mysql_password` por `{{ vault_slurmdb_mysql_password }}`.
-4. Ejecutar las validaciones básicas:
+4. Ejecutar las validaciones basicas:
 
 ```bash
 ansible-inventory -i inventario.ini --graph --ask-vault-pass

@@ -6,8 +6,8 @@ Archivo: `inventario.ini`
 
 Grupos observados:
 - `hpc_master`: nodo master.
-- `workers_r`: workers principales de red interna.
-- `workers_u`: workers adicionales.
+- `workers_r`: workers con Rocky/RHEL.
+- `workers_u`: workers con Ubuntu/Debian (requieren `ansible_become_password`).
 - `workers`: union de workers.
 - `slurm_all`: nodos considerados por dominio Slurm.
 - `slurm_compute`: nodos donde corre `slurmd`.
@@ -31,7 +31,7 @@ Bloques clave:
 - NFS:
   - `nfs_export_path` (export en master)
   - `nfs_client_mountpoint` (mountpoint en workers)
-  - `nfs_server_ip` (IP del master tomada de `ansible_host` en inventario)
+  - `nfs_server_ip` (prioriza `network_internal_links[<worker>].master_ip` por enlace punto-a-punto; fallback a `ansible_host` del master)
 - Firewall Slurm:
   - `slurm_firewalld_zone`, `slurm_internal_cidr`, `slurmctld_port`, `slurmd_port`
 - Identidades:
@@ -40,8 +40,13 @@ Bloques clave:
   - `slurm_version`, `slurm_tarball_url`, `slurm_etc_dir`, `slurm_log_dir`
   - `slurm_control_machine`, `slurm_mem_reserve_mb`, `slurm_partitions`
   - `slurm_srun_port_range`, `slurm_validate_torch`
+  - `slurm_cgroup_conf`
 - Red interna:
   - `hpc_internal_supernet`, `hpc_internal_subnets`
+  - `network_internal_links` (mapa de topologia master<->worker: NIC e IP por extremo)
+  - `network_internal_keep_if` (interfaz a preservar siempre)
+  - `network_internal_exclude_ifaces` (interfaces excluidas de gestion)
+  - `network_internal_exclude_conn_regex` (patron regex para conexiones excluidas)
 
 ## Variables de master
 

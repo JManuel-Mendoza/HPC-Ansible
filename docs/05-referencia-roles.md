@@ -210,7 +210,7 @@ Este documento cubre todos los roles activos bajo `roles/`.
   - en master instala RPMs locales,
   - baja RPMs al controller y los distribuye a workers,
   - en workers instala RPMs staged,
-  - asegura `/etc/slurm` y `cgroup.conf`,
+  - asegura `/etc/slurm` y `cgroup.conf` (contenido controlado por `slurm_cgroup_conf`),
   - abre `SrunPortRange` en firewall del controller,
   - renderiza `slurm.conf` en master y lo copia a workers,
   - genera `gres.conf` por nodo,

@@ -70,12 +70,22 @@ Referencia: `inventario.ini`.
 |   `-- worker2.yml
 |-- roles/
 |   |-- common/
+|   |-- users_ssh/
 |   |-- network_internal/
 |   |-- cluster_routing/
 |   |-- firewall/
 |   |-- nfs_hpc/
 |   |-- nvidia_cuda/
-|   |-- slurm_*/
+|   |-- mariadb_server/
+|   |-- slurm_identities/
+|   |-- munge/
+|   |-- slurm_facts/
+|   |-- slurm_db_prep/
+|   |-- slurm_rpm_build/
+|   |-- slurm_install/
+|   |-- slurm_controller/
+|   |-- slurm_compute/
+|   |-- slurm_validate/
 |   |-- llm_env/
 |   `-- validate/
 `-- docs/
