@@ -1,0 +1,16 @@
+{# Proposito: Renderizar plantilla del rol 'slurm_install' para instalar binarios, unidades y archivos base de Slurm. #}
+{# Supuestos/prerrequisitos: El archivo destino debe existir con permisos definidos por la task de template en el rol. #}
+{# Variables clave consumidas: slurm_gpu_count y variables slurm_node_gres calculadas por host en slurm_facts/slurm_install. #}
+{# Estructura de salida y ramas condicionales: El render respeta condicionales y bucles Jinja para adaptar configuracion por host/grupo. #}
+{# Tags relevantes: Heredadas del task que invoca template dentro del rol. #}
+
+# COMPUTE GRES (ANSIBLE MANAGED)
+# AutoDetect=nvml habilita detección de GPUs y exposición de detalles vía NVML.
+# El tipo se reduce a un identificador corto para scheduling (ej: a100, 3090).
+
+{% set n = slurm_gpu_count | default(0) | int %}
+{% if n > 0 %}
+AutoDetect=nvml
+{% else %}
+# AutoDetect=nvml (sin GPUs detectadas)
+{% endif %}

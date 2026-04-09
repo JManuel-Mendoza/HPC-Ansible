@@ -1,36 +1,419 @@
+# Proposito:
+# - Implementar tareas del rol 'nvidia_cuda' para instalar y validar stack NVIDIA/CUDA.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/nvidia_cuda/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
 ---
-- name: NVIDIA/CUDA | Install prerequisites
+- name: NVIDIA/CUDA | Verificar binario lspci
+  ansible.builtin.stat:
+    path: /usr/sbin/lspci
+  register: _lspci_bin
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Instalar pciutils si falta
   ansible.builtin.dnf:
-    name:
-      - dnf-plugins-core
-      - gcc
-      - gcc-c++
-      - make
-      - perl
-      - dkms
-      - elfutils-libelf-devel
-      - pciutils
+    name: pciutils
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - not _lspci_bin.stat.exists
+
+- name: NVIDIA/CUDA | Verificar binario lspci (Ubuntu)
+  ansible.builtin.stat:
+    path: /usr/bin/lspci
+  register: _lspci_bin_ubuntu
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Instalar pciutils si falta (Ubuntu)
+  ansible.builtin.apt:
+    name: pciutils
     state: present
     update_cache: true
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - not _lspci_bin_ubuntu.stat.exists
 
-- name: NVIDIA/CUDA | Install kernel headers/devel for current kernel (best effort)
+- name: NVIDIA/CUDA | Detectar GPU NVIDIA
+  ansible.builtin.command: "lspci -nn -d 10de:"
+  register: _nvidia_lspci
+  changed_when: false
+  failed_when: false
+
+- name: NVIDIA/CUDA | Definir presencia de GPU
+  ansible.builtin.set_fact:
+    _nvidia_gpu_present: "{{ _nvidia_lspci.rc == 0 and (_nvidia_lspci.stdout | trim) != '' }}"
+
+- name: NVIDIA/CUDA | Informar sin GPU y omitir rol
+  ansible.builtin.debug:
+    msg: "No se detecta GPU NVIDIA (vendor 10de). Se omite el rol nvidia_cuda en este host."
+  when: not _nvidia_gpu_present
+  tags: [debug, debug_cuda]
+
+- name: NVIDIA/CUDA | Saltar host sin GPU
+  ansible.builtin.meta: end_host
+  when: not _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Capturar nombre de GPU
+  ansible.builtin.set_fact:
+    _nvidia_gpu_name: >-
+      {{
+        (
+          (_nvidia_lspci.stdout_lines | first | default(''))
+          | regex_search('\\[[^\\]]+\\]$')
+        )
+        | default((_nvidia_lspci.stdout_lines | first) | default('desconocido'), true)
+        | regex_replace('^\\[|\\]$', '')
+      }}
+  when: _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Asegurar repo CUDA (RHEL9)
+  ansible.builtin.get_url:
+    url: "{{ nvidia_cuda_repo_url }}"
+    dest: "{{ nvidia_cuda_repo_file }}"
+    mode: "0644"
+  register: _cuda_repo_file
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_repo_enabled | bool
+
+- name: NVIDIA/CUDA | Asegurar module_hotfixes=1 en repo CUDA
+  ansible.builtin.lineinfile:
+    path: "{{ nvidia_cuda_repo_file }}"
+    regexp: '^module_hotfixes='
+    line: 'module_hotfixes=1'
+    insertafter: '^\\[cuda-rhel9-x86_64\\]$'
+  register: _cuda_repo_hotfix
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_repo_enabled | bool
+
+- name: NVIDIA/CUDA | Refrescar cache DNF si repo cambia
+  ansible.builtin.dnf:
+    update_cache: true
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_repo_enabled | bool
+    - _cuda_repo_file is changed or _cuda_repo_hotfix is changed
+
+- name: NVIDIA/CUDA | Asegurar keyring CUDA (Ubuntu)
+  ansible.builtin.get_url:
+    url: "{{ nvidia_cuda_repo_ubuntu_key_url }}"
+    dest: "{{ nvidia_cuda_repo_ubuntu_keyring }}"
+    mode: "0644"
+  register: _cuda_repo_key_ubuntu
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_repo_enabled | bool
+
+- name: NVIDIA/CUDA | Asegurar pin CUDA (Ubuntu)
+  ansible.builtin.get_url:
+    url: "{{ nvidia_cuda_repo_ubuntu_pin_url }}"
+    dest: "{{ nvidia_cuda_repo_ubuntu_pin_file }}"
+    mode: "0644"
+  register: _cuda_repo_pin_ubuntu
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_repo_enabled | bool
+
+- name: NVIDIA/CUDA | Asegurar repo CUDA (Ubuntu)
+  ansible.builtin.copy:
+    dest: "{{ nvidia_cuda_repo_file_ubuntu }}"
+    mode: "0644"
+    content: "deb [signed-by={{ nvidia_cuda_repo_ubuntu_keyring }}] {{ nvidia_cuda_repo_ubuntu_baseurl }} /"
+  register: _cuda_repo_file_ubuntu
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_repo_enabled | bool
+
+- name: NVIDIA/CUDA | Refrescar cache APT si repo cambia
+  ansible.builtin.apt:
+    update_cache: true
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_repo_enabled | bool
+    - _cuda_repo_key_ubuntu is changed or _cuda_repo_pin_ubuntu is changed or _cuda_repo_file_ubuntu is changed
+
+- name: NVIDIA/CUDA | Verificar stream habilitado de nvidia-driver
+  ansible.builtin.command: dnf -q module list --enabled nvidia-driver
+  register: _nvidia_module_enabled
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Evaluar stream requerido
+  ansible.builtin.set_fact:
+    _nvidia_module_stream_ok: "{{ nvidia_driver_stream in (_nvidia_module_enabled.stdout | default('')) }}"
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Derivar major objetivo del driver
+  ansible.builtin.set_fact:
+    _nvidia_driver_major: "{{ nvidia_driver_stream.split('-')[0] }}"
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Resetear stream si no coincide
+  ansible.builtin.command: dnf -y module reset nvidia-driver
+  register: _nvidia_module_reset
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - not _nvidia_module_stream_ok
+
+- name: NVIDIA/CUDA | Cambiar a stream fijado {{ nvidia_driver_stream }}
+  ansible.builtin.command: dnf -y module switch-to nvidia-driver:{{ nvidia_driver_stream }} --allowerasing
+  register: _nvidia_module_switch
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - not _nvidia_module_stream_ok
+
+- name: NVIDIA/CUDA | Instalar prerequisitos de compilacion
+  ansible.builtin.dnf:
+    name: "{{ nvidia_cuda_prereq_packages }}"
+    state: present
+  register: _nvidia_prereqs
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Instalar headers/devel del kernel actual (best effort)
   ansible.builtin.dnf:
     name:
       - "kernel-devel-{{ ansible_kernel }}"
       - "kernel-headers-{{ ansible_kernel }}"
     state: present
-  register: _kver
+  register: _nvidia_kernel_specific
   ignore_errors: true
+  when: ansible_facts['os_family'] == 'RedHat'
 
-- name: NVIDIA/CUDA | Fallback to generic kernel headers/devel if versioned packages not available
+- name: NVIDIA/CUDA | Fallback a headers/devel genericos si faltan
   ansible.builtin.dnf:
     name:
       - kernel-devel
       - kernel-headers
     state: present
-  when: _kver is failed
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - _nvidia_kernel_specific is failed
 
-- name: NVIDIA/CUDA | Blacklist nouveau
+- name: NVIDIA/CUDA | Instalar prerequisitos de compilacion (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ nvidia_cuda_prereq_packages_ubuntu }}"
+    state: present
+    update_cache: true
+  register: _nvidia_prereqs
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Configurar DKMS para usar gcc-12 (Ubuntu)
+  ansible.builtin.lineinfile:
+    path: /etc/dkms/framework.conf
+    regexp: '^CC='
+    line: 'CC=/usr/bin/gcc-12'
+    create: true
+    mode: "0644"
+  register: _dkms_cc
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Configurar DKMS para usar g++-12 (Ubuntu)
+  ansible.builtin.lineinfile:
+    path: /etc/dkms/framework.conf
+    regexp: '^CXX='
+    line: 'CXX=/usr/bin/g++-12'
+    create: true
+    mode: "0644"
+  register: _dkms_cxx
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Instalar headers del kernel actual (Ubuntu, best effort)
+  ansible.builtin.apt:
+    name: "linux-headers-{{ ansible_kernel }}"
+    state: present
+  register: _nvidia_kernel_specific
+  ignore_errors: true
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Fallback a headers genericos si faltan (Ubuntu)
+  ansible.builtin.apt:
+    name: linux-headers-generic
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - _nvidia_kernel_specific is failed
+
+- name: NVIDIA/CUDA | Remover paquetes de modulos abiertos
+  ansible.builtin.dnf:
+    name:
+      - "nvidia-open*"
+      - "kmod-nvidia-open*"
+      - "kmod-nvidia-open-dkms*"
+      - "nvidia-driver-open*"
+    state: absent
+  register: _nvidia_open_remove
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Detectar paquetes de modulos abiertos (Ubuntu)
+  ansible.builtin.shell: >-
+    dpkg-query -W -f='${Package}\n' | grep -E
+    '^(nvidia-kernel-open|nvidia-driver-.*-open|nvidia-open)' || true
+  register: _nvidia_open_list
+  changed_when: false
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Remover paquetes de modulos abiertos (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ _nvidia_open_list.stdout_lines }}"
+    state: absent
+    purge: true
+  register: _nvidia_open_remove
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - _nvidia_open_list.stdout_lines | length > 0
+
+- name: NVIDIA/CUDA | Detectar paquetes 590 instalados (Ubuntu)
+  ansible.builtin.shell: "dpkg-query -W -f='${Package}\n' | grep -E '(nvidia|libnvidia|cuda).*590' || true"
+  register: _nvidia_590_list
+  changed_when: false
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Remover paquetes 590 detectados (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ _nvidia_590_list.stdout_lines }}"
+    state: absent
+    purge: true
+  register: _nvidia_590_remove
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - _nvidia_590_list.stdout_lines | length > 0
+
+- name: NVIDIA/CUDA | Obtener candidatos de nvidia-driver en repos
+  ansible.builtin.command: >-
+    /bin/sh -c "dnf -q repoquery --available --whatprovides nvidia-driver
+    --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}'"
+  register: _nvidia_driver_repoquery
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Seleccionar NEVRA de nvidia-driver compatible con {{ nvidia_driver_stream }}
+  ansible.builtin.command: >-
+    /bin/sh -c "dnf -q repoquery --available --whatprovides nvidia-driver
+    --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}' |
+    grep -E '^nvidia-driver-([0-9]+:)?{{ _nvidia_driver_major }}\\.' |
+    sort -V | tail -n 1"
+  register: _nvidia_driver_nevra
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Fallar si no se encuentra nvidia-driver compatible con {{ nvidia_driver_stream }}
+  ansible.builtin.fail:
+    msg: >-
+      No se encontro paquete nvidia-driver compatible con {{ nvidia_driver_stream }}.
+      repoquery (primeras lineas): {{ (_nvidia_driver_repoquery.stdout_lines | default([]))[:30] | join(' | ') }}.
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - (_nvidia_driver_nevra.stdout | default('') | trim) == ''
+
+- name: NVIDIA/CUDA | Obtener candidatos de nvidia-driver-cuda en repos
+  ansible.builtin.command: >-
+    /bin/sh -c "dnf -q repoquery --available --whatprovides nvidia-driver-cuda
+    --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}'"
+  register: _nvidia_smi_repoquery
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Seleccionar NEVRA de nvidia-driver-cuda compatible con {{ nvidia_driver_stream }}
+  ansible.builtin.command: >-
+    /bin/sh -c "dnf -q repoquery --available --whatprovides nvidia-driver-cuda
+    --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}' |
+    grep -E '^nvidia-driver-cuda-([0-9]+:)?{{ _nvidia_driver_major }}\\.' |
+    sort -V | tail -n 1"
+  register: _nvidia_smi_provider
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Fallar si no se encuentra nvidia-driver-cuda compatible con {{ nvidia_driver_stream }}
+  ansible.builtin.fail:
+    msg: >-
+      No se encontro paquete nvidia-driver-cuda compatible con {{ nvidia_driver_stream }}.
+      repoquery (primeras lineas): {{ (_nvidia_smi_repoquery.stdout_lines | default([]))[:30] | join(' | ') }}.
+      Sin este paquete no se instala /usr/bin/nvidia-smi.
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - (_nvidia_smi_provider.stdout | default('') | trim) == ''
+
+- name: NVIDIA/CUDA | Consultar stack NVIDIA instalado (NEVRA)
+  ansible.builtin.command: >-
+    /bin/sh -c "dnf -q repoquery --installed nvidia-driver nvidia-driver-cuda
+    --qf '%{name}-%{epoch}:%{version}-%{release}.%{arch}' | sort -u"
+  register: _nvidia_stack_installed_query
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Normalizar stack objetivo e instalado (NEVRA)
+  ansible.builtin.set_fact:
+    _nvidia_stack_target_nevras: >-
+      {{ [(_nvidia_driver_nevra.stdout | trim), (_nvidia_smi_provider.stdout | trim)] | sort }}
+    _nvidia_stack_installed_nevras: >-
+      {{
+        (_nvidia_stack_installed_query.stdout_lines | default([]))
+        | map('trim')
+        | reject('equalto', '')
+        | sort
+      }}
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Instalar stack NVIDIA compatible (driver + nvidia-smi)
+  ansible.builtin.dnf:
+    name:
+      - "{{ _nvidia_driver_nevra.stdout | trim }}"
+      - "{{ _nvidia_smi_provider.stdout | trim }}"
+    state: present
+    allowerasing: true
+  register: _nvidia_stack_install
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - _nvidia_stack_installed_nevras != _nvidia_stack_target_nevras
+
+- name: NVIDIA/CUDA | Verificar major instalado de nvidia-driver
+  ansible.builtin.command: rpm -q --qf '%{VERSION}\n' nvidia-driver
+  register: _nvidia_driver_version
+  changed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Fallar si nvidia-driver no coincide con major objetivo
+  ansible.builtin.assert:
+    that:
+      - (_nvidia_driver_version.stdout | trim) is match('^' ~ _nvidia_driver_major ~ '\\.')
+    fail_msg: >-
+      nvidia-driver instalado={{ _nvidia_driver_version.stdout | trim }} no coincide con
+      nvidia_driver_stream={{ nvidia_driver_stream }} (major esperado {{ _nvidia_driver_major }}).
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Instalar driver NVIDIA (Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ nvidia_cuda_driver_packages_ubuntu }}"
+    state: present
+  register: _nvidia_driver_install
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Verificar si nouveau esta cargado
+  ansible.builtin.command: lsmod
+  register: _nvidia_lsmod
+  changed_when: false
+  failed_when: false
+
+- name: NVIDIA/CUDA | Definir estado de nouveau
+  ansible.builtin.set_fact:
+    _nouveau_loaded: "{{ 'nouveau' in (_nvidia_lsmod.stdout | default('')) }}"
+
+- name: NVIDIA/CUDA | Blacklist de nouveau
   ansible.builtin.copy:
     dest: /etc/modprobe.d/blacklist-nouveau.conf
     owner: root
@@ -39,62 +422,432 @@
     content: |
       blacklist nouveau
       options nouveau modeset=0
-  register: _nouveau
+  register: _nouveau_blacklist
   notify: Rebuild initramfs
-  when: nvidia_cuda_enabled | bool
 
-- name: NVIDIA/CUDA | Ensure NVIDIA CUDA repo file exists
-  ansible.builtin.get_url:
-    url: "{{ nvidia_cuda_repo_url }}"
-    dest: "{{ nvidia_cuda_repo_file }}"
-    mode: "0644"
-  when: nvidia_cuda_enabled | bool
+- name: NVIDIA/CUDA | Consultar argumentos de kernel en todas las entradas (RHEL)
+  ansible.builtin.shell: >-
+    grubby --info=ALL | awk -F'"' '/args=/{print $2}'
+  register: _grubby_all_args
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
 
-- name: NVIDIA/CUDA | Install driver + toolkit
+- name: NVIDIA/CUDA | Evaluar si faltan argumentos de blacklist en kernel (RHEL)
+  ansible.builtin.set_fact:
+    _grubby_missing_nouveau_args: >-
+      {{
+        (_grubby_all_args.stdout_lines | default([]) | length == 0)
+        or
+        ((_grubby_all_args.stdout_lines | default([]) | reject('search', 'rd.driver.blacklist=nouveau') | list | length) > 0)
+        or
+        ((_grubby_all_args.stdout_lines | default([]) | reject('search', 'modprobe.blacklist=nouveau') | list | length) > 0)
+      }}
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: NVIDIA/CUDA | Agregar argumentos de kernel para nouveau
+  ansible.builtin.command: grubby --update-kernel=ALL --args="rd.driver.blacklist=nouveau modprobe.blacklist=nouveau"
+  register: _grubby_update
+  changed_when: true
+  notify: Rebuild initramfs
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - _grubby_missing_nouveau_args | bool
+
+- name: NVIDIA/CUDA | Leer GRUB_CMDLINE_LINUX (Ubuntu)
+  ansible.builtin.command: /bin/sh -c "grep -E '^GRUB_CMDLINE_LINUX=' /etc/default/grub"
+  register: _grub_cmdline
+  changed_when: false
+  failed_when: false
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Evaluar argumentos de blacklist en GRUB (Ubuntu)
+  ansible.builtin.set_fact:
+    _grub_has_nouveau_args: >-
+      {{
+        'rd.driver.blacklist=nouveau' in (_grub_cmdline.stdout | default(''))
+        and 'modprobe.blacklist=nouveau' in (_grub_cmdline.stdout | default(''))
+      }}
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Preparar GRUB_CMDLINE_LINUX con blacklist (Ubuntu)
+  ansible.builtin.set_fact:
+    _grub_cmdline_updated: >-
+      {{
+        (
+          (_grub_cmdline.stdout | default('') | regex_replace('^GRUB_CMDLINE_LINUX=\"(.*)\"$', '\\1'))
+          ~ ' rd.driver.blacklist=nouveau modprobe.blacklist=nouveau'
+        )
+        | regex_replace('\\s+', ' ')
+        | trim
+      }}
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - not _grub_has_nouveau_args
+
+- name: NVIDIA/CUDA | Agregar argumentos de kernel para nouveau (Ubuntu)
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: "GRUB_CMDLINE_LINUX=\"{{ _grub_cmdline_updated }}\""
+  register: _grub_update
+  notify: Rebuild initramfs
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - not _grub_has_nouveau_args
+
+- name: NVIDIA/CUDA | Actualizar GRUB (Ubuntu)
+  ansible.builtin.command: update-grub
+  register: _update_grub
+  changed_when: true
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - _grub_update is changed
+
+- name: NVIDIA/CUDA | Calcular necesidad de reinicio
+  ansible.builtin.set_fact:
+    _nvidia_reboot_required: >-
+      {{
+        (_nvidia_stack_install is defined and _nvidia_stack_install is changed)
+        or (_nvidia_driver_install is defined and _nvidia_driver_install is changed)
+        or (_nvidia_open_remove is defined and _nvidia_open_remove is changed)
+        or (_nvidia_590_remove is defined and _nvidia_590_remove is changed)
+        or (_nouveau_blacklist is defined and _nouveau_blacklist is changed)
+        or (_grubby_update is defined and _grubby_update is changed)
+        or (_grub_update is defined and _grub_update is changed)
+      }}
+
+- name: NVIDIA/CUDA | Fallar si requiere reinicio y esta deshabilitado
+  ansible.builtin.fail:
+    msg: >-
+      Se requieren cambios (driver/blacklist/initramfs) que necesitan reinicio,
+      pero nvidia_cuda_reboot=false. Reinicie el host manualmente o establezca
+      nvidia_cuda_reboot=true y vuelva a ejecutar el rol.
+  when:
+    - _nvidia_reboot_required | bool
+    - not nvidia_cuda_reboot | bool
+
+- name: NVIDIA/CUDA | Marcar reinicio requerido
+  ansible.builtin.command: /usr/bin/true
+  changed_when: _nvidia_reboot_required | bool
+  notify: Reboot node
+
+- name: NVIDIA/CUDA | Aplicar handlers pendientes antes de validar
+  ansible.builtin.meta: flush_handlers
+  when:
+    - _nvidia_reboot_required | bool
+    - nvidia_cuda_reboot | bool
+
+- name: NVIDIA/CUDA | Verificar ausencia de paquetes 590 (Ubuntu)
+  ansible.builtin.shell: "dpkg-query -W -f='${Package}\n' | grep -E '(nvidia|libnvidia|cuda).*590' || true"
+  register: _nvidia_590_post
+  changed_when: false
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: NVIDIA/CUDA | Fallar si quedan paquetes 590 (Ubuntu)
+  ansible.builtin.fail:
+    msg: >-
+      Se detectaron paquetes 590 en Ubuntu: {{ _nvidia_590_post.stdout | trim }}.
+      Remueva los paquetes 590 y reinstale el driver {{ nvidia_driver_stream }}.
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - _nvidia_590_post.stdout | trim != ''
+
+- name: NVIDIA/CUDA | Validar modulos cargados
+  ansible.builtin.shell: "lsmod | egrep '(^nvidia|nouveau)' || true"
+  register: _nvidia_lsmod_check
+  changed_when: false
+  when: nvidia_cuda_validate | bool
+
+- name: NVIDIA/CUDA | Fallar si nouveau sigue cargado
+  ansible.builtin.fail:
+    msg: >-
+      El modulo nouveau sigue cargado despues de la instalacion. Revise blacklist,
+      initramfs y reinicie el host.
+  when:
+    - nvidia_cuda_validate | bool
+    - "'nouveau' in (_nvidia_lsmod_check.stdout | default(''))"
+
+- name: NVIDIA/CUDA | Fallar si no se cargan modulos nvidia
+  ansible.builtin.fail:
+    msg: >-
+      No se detectan modulos nvidia cargados. Revise el estado del driver y reinicie si aplica.
+  when:
+    - nvidia_cuda_validate | bool
+    - "'nvidia' not in (_nvidia_lsmod_check.stdout | default(''))"
+
+- name: NVIDIA/CUDA | Verificar comando nvidia-smi
+  ansible.builtin.command: /bin/sh -c "command -v nvidia-smi"
+  register: _nvidia_smi_path
+  changed_when: false
+  failed_when: false
+
+- name: NVIDIA/CUDA | Fallar si nvidia-smi sigue ausente
+  ansible.builtin.fail:
+    msg: >-
+      nvidia-smi sigue ausente despues de instalar el stack NVIDIA/CUDA.
+      Verifique repositorios y paquetes instalados para el stream {{ nvidia_driver_stream }}.
+  when:
+    - _nvidia_smi_path.rc != 0
+
+- name: NVIDIA/CUDA | Buscar libnvidia-ml.so.1 (NVML)
+  ansible.builtin.find:
+    paths:
+      - /lib64
+      - /usr/lib64
+      - /usr/lib64/nvidia
+      - /usr/lib/x86_64-linux-gnu
+      - /usr/lib
+    patterns: "libnvidia-ml.so.1"
+    file_type: any
+  register: _nvml_libs
+  changed_when: false
+  failed_when: false
+  when: _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Verificar symlink libnvidia-ml.so
+  ansible.builtin.stat:
+    path: "{{ item.path | dirname }}/libnvidia-ml.so"
+    follow: false
+  loop: "{{ _nvml_libs.files | default([]) }}"
+  register: _nvml_symlink_stats
+  changed_when: false
+  when: _nvidia_gpu_present
+
+- name: NVIDIA/CUDA | Asegurar symlink libnvidia-ml.so
+  ansible.builtin.file:
+    src: "{{ item.item.path }}"
+    dest: "{{ item.item.path | dirname }}/libnvidia-ml.so"
+    state: link
+    force: true
+  loop: "{{ _nvml_symlink_stats.results | default([]) }}"
+  register: _nvml_symlink_create
+  when:
+    - _nvidia_gpu_present
+    - not item.stat.exists or item.stat.islnk
+
+- name: NVIDIA/CUDA | Marcar cambio de symlink NVML
+  ansible.builtin.set_fact:
+    slurm_nvml_symlink_changed: true
+  when: >
+    (_nvml_symlink_create.results | default([]) | selectattr('changed') | list | length) > 0
+
+- name: NVIDIA/CUDA | Ejecutar ldconfig si se creo symlink NVML
+  ansible.builtin.command: ldconfig
+  changed_when: false
+  when: >
+    (_nvml_symlink_create.results | default([]) | selectattr('changed') | list | length) > 0
+
+- name: NVIDIA/CUDA | Ejecutar nvidia-smi
+  ansible.builtin.command: nvidia-smi
+  register: _nvidia_smi_full
+  changed_when: false
+  failed_when: false
+  when: nvidia_cuda_validate | bool
+
+- name: NVIDIA/CUDA | Capturar dmesg cuando nvidia-smi falla
+  ansible.builtin.shell: |
+    set -euo pipefail
+    dmesg -T | egrep -i 'NVRM|nvidia|nouveau' | tail -n 80 || true
+  args:
+    executable: /bin/bash
+  register: _nvidia_dmesg
+  changed_when: false
+  failed_when: false
+  when:
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc != 0
+  tags: [debug, debug_cuda]
+
+- name: NVIDIA/CUDA | Capturar paquetes NVIDIA/CUDA cuando falla nvidia-smi
+  ansible.builtin.shell: "rpm -qa | grep -Ei 'nvidia|cuda' || true"
+  register: _nvidia_pkg_list
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc != 0
+  tags: [debug, debug_cuda]
+
+- name: NVIDIA/CUDA | Capturar paquetes NVIDIA/CUDA cuando falla nvidia-smi (Ubuntu)
+  ansible.builtin.shell: "dpkg-query -W -f='${Package}\n' | grep -Ei 'nvidia|cuda' || true"
+  register: _nvidia_pkg_list
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc != 0
+  tags: [debug, debug_cuda]
+
+- name: NVIDIA/CUDA | Fallar si nvidia-smi no responde
+  ansible.builtin.fail:
+    msg: >-
+      nvidia-smi fallo (rc={{ _nvidia_smi_full.rc }}). stdout: {{ _nvidia_smi_full.stdout | default('') }}
+      stderr: {{ _nvidia_smi_full.stderr | default('') }}. dmesg tail:
+      {{ _nvidia_dmesg.stdout | default('') }}. paquetes:
+      {{ _nvidia_pkg_list.stdout | default('') }}
+  when:
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc != 0
+
+- name: NVIDIA/CUDA | Verificar nodos de dispositivo NVIDIA
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ls -1 /dev/nvidiactl /dev/nvidia[0-9]* >/dev/null
+  args:
+    executable: /bin/bash
+  register: _nvidia_dev_nodes
+  changed_when: false
+  failed_when: false
+  when:
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc == 0
+
+- name: NVIDIA/CUDA | Fallar si faltan nodos /dev/nvidia*
+  ansible.builtin.fail:
+    msg: >-
+      nvidia-smi responde pero faltan nodos de dispositivo NVIDIA (/dev/nvidiactl, /dev/nvidia*).
+      Revise carga de módulos y udev.
+  when:
+    - nvidia_cuda_validate | bool
+    - _nvidia_smi_full.rc == 0
+    - _nvidia_dev_nodes.rc != 0
+
+- name: NVIDIA/CUDA | Instalar plugin versionlock para DNF
   ansible.builtin.dnf:
-    name:
-      - "{{ nvidia_cuda_driver_pkg }}"
-      - "{{ nvidia_cuda_toolkit_pkg }}"
+    name: "{{ nvidia_cuda_versionlock_plugin_package }}"
     state: present
-  register: _cuda_install
-  when: nvidia_cuda_enabled | bool
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
 
-- name: NVIDIA/CUDA | Add CUDA profile script
-  ansible.builtin.copy:
-    dest: /etc/profile.d/cuda.sh
+- name: NVIDIA/CUDA | Comprobar plugin versionlock para DNF
+  ansible.builtin.command: dnf -q versionlock list
+  register: _nvidia_versionlock_check
+  changed_when: false
+  failed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Fallar si el plugin versionlock no esta disponible
+  ansible.builtin.fail:
+    msg: >-
+      El plugin de congelacion DNF no esta disponible tras instalar
+      {{ nvidia_cuda_versionlock_plugin_package }}.
+      stdout: {{ _nvidia_versionlock_check.stdout | default('') }}
+      stderr: {{ _nvidia_versionlock_check.stderr | default('') }}
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+    - _nvidia_versionlock_check.rc != 0
+
+- name: NVIDIA/CUDA | Obtener paquetes NVIDIA instalados para versionlock (RHEL)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    rpm -qa --qf '%{NAME}-%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n' |
+    grep -E '{{ nvidia_cuda_hold_package_regex_redhat }}' |
+    sort -u || true
+  args:
+    executable: /bin/bash
+  register: _nvidia_hold_packages_redhat
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Asegurar directorio de versionlock
+  ansible.builtin.file:
+    path: "{{ nvidia_cuda_versionlock_file | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Congelar paquetes NVIDIA instalados con versionlock (RHEL)
+  ansible.builtin.lineinfile:
+    path: "{{ nvidia_cuda_versionlock_file }}"
+    line: "{{ item }}"
+    state: present
+    create: true
     owner: root
     group: root
     mode: "0644"
-    content: |
-      # Managed by Ansible (nvidia_cuda role)
-      if [ -d /usr/local/cuda/bin ]; then
-        export PATH=/usr/local/cuda/bin:$PATH
-      fi
-      if [ -d /usr/local/cuda/lib64 ]; then
-        export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-      fi
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Flush handlers (initramfs) if any
-  ansible.builtin.meta: flush_handlers
-  when: nvidia_cuda_enabled | bool
-
-- name: NVIDIA/CUDA | Auto reboot when enabled and driver/initramfs changed
-  ansible.builtin.reboot:
-    reboot_timeout: 1800
+  loop: "{{ _nvidia_hold_packages_redhat.stdout_lines | default([]) }}"
   when:
-    - nvidia_cuda_enabled | bool
-    - nvidia_cuda_auto_reboot | bool
-    - (_cuda_install is changed) or (_nouveau is changed)
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_hold_drivers | bool
 
-- name: NVIDIA/CUDA | Check nvidia-smi
-  ansible.builtin.command: nvidia-smi -L
-  register: _nvidia_smi
+- name: NVIDIA/CUDA | Obtener paquetes NVIDIA instalados para hold (Ubuntu)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    dpkg-query -W -f='${Package}\n' |
+    grep -E '{{ nvidia_cuda_hold_package_regex_debian }}' |
+    sort -u || true
+  args:
+    executable: /bin/bash
+  register: _nvidia_hold_packages_debian
+  changed_when: false
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Congelar paquetes NVIDIA instalados con hold (Ubuntu)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ _nvidia_hold_packages_debian.stdout_lines | default([]) }}"
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_hold_drivers | bool
+
+- name: NVIDIA/CUDA | Obtener version de driver y nombre GPU desde nvidia-smi
+  ansible.builtin.command: nvidia-smi --query-gpu=driver_version,name --format=csv,noheader
+  register: _nvidia_smi_query
+  changed_when: false
+  when: nvidia_cuda_validate | bool
+
+- name: NVIDIA/CUDA | Normalizar datos de nvidia-smi
+  ansible.builtin.set_fact:
+    _nvidia_smi_first: "{{ _nvidia_smi_query.stdout_lines | first | default('') }}"
+    _nvidia_driver_version: "{{ (_nvidia_smi_query.stdout_lines | first | default('')) | split(',') | first | trim }}"
+    _nvidia_gpu_name_smi: >-
+      {{
+        (_nvidia_smi_query.stdout_lines | first | default(''))
+        | regex_replace('^[^,]+,\s*', '')
+        | trim
+      }}
+  when: nvidia_cuda_validate | bool
+
+- name: NVIDIA/CUDA | Releer stream habilitado
+  ansible.builtin.command: dnf -q module list --enabled nvidia-driver
+  register: _nvidia_module_enabled_after
   changed_when: false
   failed_when: false
-  when: nvidia_cuda_enabled | bool
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_validate | bool
 
-- name: NVIDIA/CUDA | Show nvidia-smi output
+- name: NVIDIA/CUDA | Resumen final
   ansible.builtin.debug:
-    var: _nvidia_smi.stdout_lines
-  when: nvidia_cuda_enabled | bool
+    msg:
+      - "stream habilitado: {{ _nvidia_module_enabled_after.stdout | default('desconocido') | trim }}"
+      - "driver version: {{ _nvidia_driver_version | default('desconocido') }}"
+      - "gpu detectada: {{ _nvidia_gpu_name_smi | default(_nvidia_gpu_name | default('desconocido')) }}"
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - nvidia_cuda_validate | bool
+  tags: [debug, debug_cuda]
+
+- name: NVIDIA/CUDA | Resumen final (Ubuntu)
+  ansible.builtin.debug:
+    msg:
+      - "driver version: {{ _nvidia_driver_version | default('desconocido') }}"
+      - "gpu detectada: {{ _nvidia_gpu_name_smi | default(_nvidia_gpu_name | default('desconocido')) }}"
+  when:
+    - ansible_facts['os_family'] == 'Debian'
+    - nvidia_cuda_validate | bool
+  tags: [debug, debug_cuda]

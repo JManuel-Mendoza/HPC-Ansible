@@ -1,10 +1,23 @@
----
-validate_nfs: true
-validate_cuda: true
-validate_llm: true
+# Proposito:
+# - Declarar valores por defecto del rol 'validate' para mantener comportamiento reproducible y sobrescribible.
+# Supuestos/prerrequisitos:
+# - Los valores pueden ser sobreescritos por group_vars/host_vars sin editar tareas del rol.
+# Variables clave consumidas:
+# - Variables definidas en este archivo; origen de override: group_vars/* y host_vars/*.
+# Tags relevantes:
+# - N/A directo en este archivo; consumidas por tasks/handlers del rol.
 
-validate_nfs_mount_path: "{{ llm_nfs_mount_dir | default('/mnt/llm-project') }}"
-validate_nfs_export_path: "{{ llm_nfs_export_dir | default('/export/llm-project') }}"
+---
+# Validaciones por defecto (para `--tags validate`).
+# Ajusta a nivel de host/grupo si tu clúster no cumple alguno de estos supuestos.
+validate_slurm: true
+
+# CUDA se autodetecta (nvidia-smi) para evitar falsos positivos en hosts sin GPU.
+validate_cuda: true
+
+# Validacion del entorno LLM (micromamba + torch). Por defecto se deja deshabilitada
+# para que `--tags validate` no requiera que el entorno LLM haya sido aprovisionado.
+validate_llm: false
 
 llm_micromamba_root: "/opt/micromamba"
 llm_micromamba_bin: "/opt/micromamba/bin/micromamba"

@@ -1,10 +1,54 @@
+# Proposito:
+# - Declarar valores por defecto del rol 'nvidia_cuda' para mantener comportamiento reproducible y sobrescribible.
+# Supuestos/prerrequisitos:
+# - Los valores pueden ser sobreescritos por group_vars/host_vars sin editar tareas del rol.
+# Variables clave consumidas:
+# - Variables definidas en este archivo; origen de override: group_vars/* y host_vars/*.
+# Tags relevantes:
+# - N/A directo en este archivo; consumidas por tasks/handlers del rol.
+
 ---
-nvidia_cuda_enabled: true
+nvidia_driver_stream: "580-dkms"
+nvidia_cuda_reboot: false
+nvidia_cuda_repo_enabled: true
+nvidia_cuda_validate: true
+nvidia_cuda_hold_drivers: true
+nvidia_cuda_hold_package_regex_redhat: "^(nvidia|kmod-nvidia|dkms-nvidia)"
+nvidia_cuda_hold_package_regex_debian: "^(nvidia|libnvidia|cuda-drivers)"
+nvidia_cuda_versionlock_plugin_package: "python3-dnf-plugin-versionlock"
+nvidia_cuda_versionlock_file: "/etc/dnf/plugins/versionlock.list"
+
 nvidia_cuda_repo_file: "/etc/yum.repos.d/cuda-rhel9.repo"
 nvidia_cuda_repo_url: "https://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo"
 
-nvidia_cuda_toolkit_pkg: "cuda-toolkit-12-4"
-nvidia_cuda_driver_pkg: "cuda-drivers"
+nvidia_cuda_driver_packages:
+  - nvidia-driver
 
-# Si true, reinicia el nodo cuando se instalen drivers o se cambie initramfs
-nvidia_cuda_auto_reboot: false
+nvidia_cuda_prereq_packages:
+  - dkms
+  - gcc
+  - gcc-c++
+  - make
+  - elfutils-libelf-devel
+  - pciutils
+
+nvidia_cuda_repo_ubuntu_distro: "ubuntu{{ ansible_distribution_version | default('22.04') | regex_replace('\\.', '') }}"
+nvidia_cuda_repo_ubuntu_baseurl: "https://developer.download.nvidia.com/compute/cuda/repos/{{ nvidia_cuda_repo_ubuntu_distro }}/x86_64/"
+nvidia_cuda_repo_ubuntu_key_url: "{{ nvidia_cuda_repo_ubuntu_baseurl }}cuda-archive-keyring.gpg"
+nvidia_cuda_repo_ubuntu_keyring: "/usr/share/keyrings/cuda-archive-keyring.gpg"
+nvidia_cuda_repo_ubuntu_pin_url: "{{ nvidia_cuda_repo_ubuntu_baseurl }}cuda-{{ nvidia_cuda_repo_ubuntu_distro }}.pin"
+nvidia_cuda_repo_ubuntu_pin_file: "/etc/apt/preferences.d/cuda-repository-pin-600"
+nvidia_cuda_repo_file_ubuntu: "/etc/apt/sources.list.d/cuda-{{ nvidia_cuda_repo_ubuntu_distro }}.list"
+
+nvidia_cuda_driver_packages_ubuntu:
+  - "nvidia-driver-{{ nvidia_driver_stream.split('-')[0] }}"
+
+nvidia_cuda_prereq_packages_ubuntu:
+  - dkms
+  - gcc
+  - g++
+  - gcc-12
+  - g++-12
+  - make
+  - libelf-dev
+  - pciutils

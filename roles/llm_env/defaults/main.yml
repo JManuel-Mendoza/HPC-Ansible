@@ -1,7 +1,17 @@
+# Proposito:
+# - Declarar valores por defecto del rol 'llm_env' para mantener comportamiento reproducible y sobrescribible.
+# Supuestos/prerrequisitos:
+# - Los valores pueden ser sobreescritos por group_vars/host_vars sin editar tareas del rol.
+# Variables clave consumidas:
+# - Variables definidas en este archivo; origen de override: group_vars/* y host_vars/*.
+# Tags relevantes:
+# - N/A directo en este archivo; consumidas por tasks/handlers del rol.
+
 ---
 llm_micromamba_root: "/opt/micromamba"
 llm_micromamba_bin: "/opt/micromamba/bin/micromamba"
 llm_env_name: "llm"
+llm_pytorch_python_version: "3.11"
 
 llm_conda_channels:
   - "pytorch"

@@ -1,0 +1,129 @@
+# Proposito:
+# - Implementar tareas del rol 'slurm_controller' para configurar servicios Slurm de control y accounting.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/slurm_controller/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+- name: Slurm | Ensure log dir exists (master)
+  ansible.builtin.file:
+    path: "{{ slurm_log_dir }}"
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Ensure slurmctld spool dir exists (master)
+  ansible.builtin.file:
+    path: /var/spool/slurmctld
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Touch controller/db logs (master)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: touch
+    owner: slurm
+    group: slurm
+    mode: "0644"
+  loop:
+    - "{{ slurm_log_dir }}/slurmctld.log"
+    - "{{ slurm_log_dir }}/slurm_jobacct.log"
+    - "{{ slurm_log_dir }}/slurm_jobcomp.log"
+    - "{{ slurm_log_dir }}/slurmdbd.log"
+  tags: [slurm, slurm_config]
+
+- name: Slurm | Install slurmdbd.conf (master)
+  ansible.builtin.template:
+    src: slurmdbd.conf.j2
+    dest: "{{ slurm_etc_dir }}/slurmdbd.conf"
+    owner: slurm
+    group: slurm
+    mode: "0600"
+  notify: SlurmDBD | Reiniciar slurmdbd
+  register: _slurmdbd_conf
+  tags: [slurm, slurmdbd]
+
+- name: Slurm | Enable and start slurmdbd (master)
+  ansible.builtin.systemd:
+    name: slurmdbd
+    enabled: true
+    state: started
+  tags: [slurm, slurmdbd]
+
+- name: Slurm | Enable and start slurmctld (master)
+  ansible.builtin.systemd:
+    name: slurmctld
+    enabled: true
+    state: started
+  tags: [slurm, slurmctld]
+
+- name: Slurm | Aplicar reinicios pendientes antes de reconfigurar (master)
+  ansible.builtin.meta: flush_handlers
+  tags: [slurm]
+
+- name: Slurm | Reconfigurar controlador al finalizar configuracion (master)
+  ansible.builtin.command: scontrol reconfigure
+  changed_when: false
+  become: true
+  when:
+    - slurm_controller_reconfigure_on_change | bool
+    - slurm_controller_reconfigure_always | default(false) or
+      (slurm_conf_changed | default(false)) or
+      (slurm_gres_conf_changed | default(false)) or
+      (slurm_nvml_symlink_changed | default(false))
+  tags: [slurm]
+
+- name: Slurm | Obtener estado de nodos (master)
+  ansible.builtin.command: scontrol show node -o
+  register: _slurm_nodes
+  changed_when: false
+  become: true
+  when:
+    - slurm_controller_autoresume_enabled | bool
+    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
+  tags: [slurm]
+
+- name: Slurm | Determinar nodos a reanudar por GRES (master)
+  ansible.builtin.set_fact:
+    slurm_nodes_to_resume: >-
+      {%- set nodes = [] -%}
+      {%- for line in _slurm_nodes.stdout_lines | default([]) -%}
+      {%- set name = (line | regex_findall('NodeName=([^ ]+)') | first | default('')) -%}
+      {%- set state = (line | regex_findall('State=([^ ]+)') | first | default('')) -%}
+      {%- set reason = (line | regex_findall('Reason=([^ ]+)') | first | default('')) -%}
+      {%- if name and state -%}
+      {%- set state_tokens = state.split('+') -%}
+      {%- if (state_tokens | intersect(slurm_controller_autoresume_states | default([]))) | length > 0 -%}
+      {%- set reason_ok = true -%}
+      {%- if (slurm_controller_autoresume_reason_regex | default('') | length) > 0 -%}
+      {%- set reason_ok = (reason is match(slurm_controller_autoresume_reason_regex)) -%}
+      {%- endif -%}
+      {%- if reason_ok -%}
+      {%- set _ = nodes.append(name) -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ nodes | unique }}
+  when:
+    - slurm_controller_autoresume_enabled | bool
+    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
+  tags: [slurm]
+
+- name: Slurm | Reanudar nodos con GRES corregido (master)
+  ansible.builtin.command: "scontrol update NodeName={{ item }} State=resume"
+  become: true
+  loop: "{{ slurm_nodes_to_resume | default([]) }}"
+  when:
+    - slurm_controller_autoresume_enabled | bool
+    - (slurm_conf_changed | default(false)) or (slurm_gres_conf_changed | default(false)) or (slurm_nvml_symlink_changed | default(false))
+    - (slurm_nodes_to_resume | default([]) | length) > 0
+  tags: [slurm]

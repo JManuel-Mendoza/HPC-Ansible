@@ -1,0 +1,168 @@
+# Proposito:
+# - Implementar tareas del rol 'validate' para ejecutar validaciones generales de salud del cluster.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/validate/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+# Valida:
+# - Puertos escuchando (master: 6817/6819, workers: 6818)
+# - Conectividad TCP (workers -> slurmctld:6817 usando hostname "master")
+# - Conectividad TCP (master -> workers:6818 usando ansible_host de cada worker_r)
+# - (Opcional) presencia de rich rules esperadas
+
+- name: Validate | Firewall | Detectar firewall-cmd
+  ansible.builtin.stat:
+    path: /usr/bin/firewall-cmd
+  register: _validate_firewall_cmd
+  changed_when: false
+  tags: [validate, validate_slurm, validate_firewall]
+
+- name: Validate | Master listens on Slurmctld (6817) and SlurmDBD (6819)
+  ansible.builtin.shell: "ss -lntp | egrep ':(6817|6819)\\b' || true"
+  args:
+    executable: /bin/bash
+  register: _master_listen
+  changed_when: false
+  failed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+  tags: [validate, validate_slurm]
+
+- name: Validate | Slurm | Fallar si el master no escucha en 6817/6819
+  ansible.builtin.assert:
+    that:
+      - _master_listen.stdout is search('(:|\\.)6817\\b')
+      - _master_listen.stdout is search('(:|\\.)6819\\b')
+    fail_msg: >-
+      El master no parece estar escuchando en los puertos esperados de Slurm (6817=slurmctld, 6819=slurmdbd).
+      Accion: verificar servicios `slurmctld`/`slurmdbd` en el master y la configuracion de Slurm (`--tags slurm`).
+      Evidencia: ss={{ _master_listen.stdout | default('') | trim }}
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+  tags: [validate, validate_slurm]
+
+- name: Validate | Workers listen on slurmd port (6818)
+  ansible.builtin.shell: "ss -lntp | egrep ':(6818)\\b' || true"
+  args:
+    executable: /bin/bash
+  register: _worker_listen
+  changed_when: false
+  failed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
+  tags: [validate, validate_slurm]
+
+- name: Validate | Slurm | Fallar si el worker no escucha en 6818
+  ansible.builtin.assert:
+    that:
+      - _worker_listen.stdout is search('(:|\\.)6818\\b')
+    fail_msg: >-
+      El worker no parece estar escuchando en 6818/tcp (slurmd).
+      Accion: verificar servicio `slurmd` en el nodo y configuracion Slurm.
+      Evidencia: ss={{ _worker_listen.stdout | default('') | trim }}
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
+  tags: [validate, validate_slurm]
+
+# Clave: NO fijar IPs del enlace interno en el check.
+# Usar el host de control configurado en slurm.conf:
+# SlurmctldHost={{ slurm_control_machine }} (nombre de inventario del controller)
+- name: Validate | Workers can reach slurmctld on TCP/6817 (using slurm_control_machine hostname)
+  ansible.builtin.wait_for:
+    host: "{{ slurm_control_machine }}"
+    port: 6817
+    timeout: 2
+  changed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
+  tags: [validate, validate_slurm]
+
+# Desde el master hacia cada worker real (workers_r), usando su `ansible_host` en inventario.
+- name: Validate | Master can reach slurmd on workers_r (TCP/6818)
+  ansible.builtin.wait_for:
+    host: "{{ hostvars[item].ansible_host | default(item) }}"
+    port: 6818
+    timeout: 2
+  loop: "{{ groups.get('workers_r', []) }}"
+  changed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+  tags: [validate, validate_slurm]
+
+# (Opcional) Validar firewall/rules mínimas, según tu patrón:
+# - master: rich rule 6817 + port range srun
+# - workers: 6818
+- name: Validate | Master firewalld rich rules present (6817)
+  ansible.builtin.command: firewall-cmd --zone={{ slurm_firewalld_zone | default('public') }} --list-rich-rules
+  register: _fw_master_rules
+  changed_when: false
+  failed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+    - (_validate_firewall_cmd.stat.exists | default(false))
+  tags: [validate, validate_slurm, validate_firewall]
+
+- name: Validate | Master firewalld port present (srun range)
+  ansible.builtin.command: >-
+    firewall-cmd --zone={{ slurm_firewalld_zone | default('public') }}
+    --query-port={{ slurm_srun_port_range | default('60001-60100') }}/tcp
+  register: _fw_master_srun_port
+  changed_when: false
+  failed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+    - (_validate_firewall_cmd.stat.exists | default(false))
+  tags: [validate, validate_slurm, validate_firewall]
+
+- name: Validate | Firewall | Fallar si faltan reglas esperadas en master (6817 y rango srun)
+  ansible.builtin.assert:
+    that:
+      - _fw_master_rules.stdout is search('port=\"' ~ (slurmctld_port | default(6817) | string) ~ '\"')
+      - _fw_master_srun_port.rc == 0
+    fail_msg: >-
+      Faltan reglas esperadas en el master para Slurm (6817 rich-rule y/o rango srun).
+      Accion: ejecutar `--tags firewall,slurm_firewall` y verificar zona/puertos.
+      Evidencia: rules={{ _fw_master_rules.stdout | default('') | trim }};
+      srun_query_rc={{ _fw_master_srun_port.rc | default('n/a') }}
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+    - (_validate_firewall_cmd.stat.exists | default(false))
+  tags: [validate, validate_slurm, validate_firewall]
+
+- name: Validate | Workers firewalld rich rules present (6818)
+  ansible.builtin.command: firewall-cmd --zone=public --list-rich-rules
+  register: _fw_worker_rules
+  changed_when: false
+  failed_when: false
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
+    - (_validate_firewall_cmd.stat.exists | default(false))
+  tags: [validate, validate_slurm, validate_firewall]
+
+- name: Validate | Firewall | Fallar si faltan rich rules en workers (6818)
+  ansible.builtin.assert:
+    that:
+      - _fw_worker_rules.stdout is search('port=\"6818\"')
+    fail_msg: >-
+      Faltan rich rules esperadas en workers para Slurm (6818).
+      Accion: ejecutar `--tags firewall,slurm_firewall` y verificar zona/puertos.
+      Evidencia: rules={{ _fw_worker_rules.stdout | default('') | trim }}
+  when:
+    - _validate_slurm_present | default(false) | bool
+    - inventory_hostname in groups.get('workers_r', [])
+    - (_validate_firewall_cmd.stat.exists | default(false))
+  tags: [validate, validate_slurm, validate_firewall]

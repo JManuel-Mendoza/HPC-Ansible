@@ -1,0 +1,250 @@
+# Proposito:
+# - Definir variables de inventario para el alcance 'all' con impacto transversal en roles/playbooks.
+# Supuestos/prerrequisitos:
+# - Las claves aqui declaradas deben ser compatibles con defaults de roles y grupos existentes en inventario.
+# Variables clave consumidas:
+# - Variables globales de cluster (red, Slurm, NFS, CUDA, validaciones) y sus overrides por host.
+# Tags relevantes:
+# - N/A directo en este archivo; las tags se evalúan en playbooks/tasks consumidoras.
+
+# Variables globales del cluster (baseline + topologia/red/firewall/slurm).
+# Objetivo: tener un único lugar para defaults globales y replicabilidad.
+#
+# Nota de precedencia:
+# - host_vars/<host>.yml sobreescribe group_vars/*
+# - group_vars/<grupo>.yml sobreescribe group_vars/all/*
+
+# =====================
+# Baseline (paquetes/tiempo)
+# =====================
+
+common_packages:
+  - git
+  - curl
+  - wget
+  - vim
+  - rsync
+  - tar
+  - unzip
+  - htop
+  - iftop
+  - nload
+  - bmon
+  - btop
+  - tmux
+  - jq
+  - tree
+  - mpich
+  - mpich-devel
+
+enable_chrony: true
+
+# =====================
+# SSH (password habilitado)
+# =====================
+ssh_port: 22
+ssh_permit_root_login: "yes"
+ssh_password_authentication: "yes"
+
+# =====================
+# LLM env (micromamba)
+# =====================
+llm_conda_packages:
+  - python
+  - pip
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pytorch-cuda
+  - numba
+  - cudatoolkit
+  - transformers
+  - datasets
+  - accelerate
+  - peft
+  - safetensors
+  - sentencepiece
+
+llm_pip_packages:
+  - transformers
+  - datasets
+  - accelerate
+  - peft
+  - safetensors
+  - sentencepiece
+
+llm_python_packages:
+  - numpy
+  - torch
+  - transformers
+
+# =====================
+# NFS (share HPC)
+# =====================
+# Export en el master (server) y punto de montaje en workers (clients).
+# Importante: el montaje en clientes debe usar IP del master (no el hostname literal "master").
+nfs_export_path: "/data/nfs"
+nfs_client_mountpoint: "/data/nfs"
+
+# IP del server NFS (master) que usarán los clientes.
+# Este cluster tiene enlaces punto-a-punto master<->worker; por eso se prioriza la IP del master
+# correspondiente a CADA worker, definida en `network_internal_links[<worker>].master_ip`.
+# Fallback (si no hay mapa para el host): `ansible_host` del master (inventario) y luego facts.
+nfs_server_ip: >-
+  {{
+    (
+      (network_internal_links | default({}))[inventory_hostname].master_ip
+      | default(hostvars[groups['hpc_master'][0]].ansible_host | default(hostvars[groups['hpc_master'][0]].ansible_default_ipv4.address))
+    )
+    | regex_replace('/.*$', '')
+  }}
+
+# Variables consumidas por el rol `roles/nfs_hpc` (compatibilidad):
+nfs_hpc_share_dir: "{{ nfs_export_path }}"
+nfs_hpc_mount_point: "{{ nfs_client_mountpoint }}"
+nfs_hpc_server_host: "{{ nfs_server_ip }}"
+
+# =====================
+# Firewall Rules
+# =====================
+
+# Slurm firewall
+slurm_firewalld_zone: "public"
+slurm_internal_cidr: "192.168.34.0/24"
+slurmctld_port: 6817
+slurmd_port: 6818
+
+
+# =====================
+# SLURM-Munge settings
+# =====================
+
+munge_uid: 1011
+munge_gid: 1011
+slurm_uid: 1012
+slurm_gid: 1012
+
+munge_key_host: master   # nombre de inventario del master
+munge_key_size_mb: 4
+
+# =====================
+# --- Slurm core ---
+# =====================
+slurm_version: "23.11.3"
+slurm_tarball_url: "https://download.schedmd.com/slurm/slurm-{{ slurm_version }}.tar.bz2"
+
+slurm_etc_dir: /etc/slurm
+slurm_log_dir: /var/log/slurm
+
+# cgroup
+slurm_cgroup_conf: |
+  CgroupPlugin=autodetect
+  CgroupAutomount=yes
+  ConstrainCores=yes
+  ConstrainRAMSpace=yes
+  ConstrainDevices=yes
+
+
+# control machine
+# Para construir slurm.conf a partir de facts
+slurm_control_machine: "master"     # nombre de inventario del master
+slurm_mem_reserve_mb: 1024          # reserva RAM para el SO (MB)
+
+# Define particiones por grupos de inventario
+slurm_partitions:
+  - name: debug
+    groups: ["slurm_compute"]
+    default: true
+    max_time: "INFINITE"
+    state: "UP"
+  - name: gpu
+    groups: ["slurm_gpu"]
+    default: false
+    max_time: "INFINITE"
+    state: "UP"
+    shared: "YES"
+
+slurm_srun_port_range: "60001-60100"
+
+# =====================
+# Slurm - Overwrites simples de recursos (por host o por grupo)
+# =====================
+# Para ajustar recursos visibles a Slurm en cualquier nodo o grupo, define
+# variables en:
+# - host_vars/<hostname>.yml (override por nodo)
+# - group_vars/<group>.yml  (override por grupo: p.ej. slurm_gpu, slurm_compute)
+#
+# Variables soportadas:
+#   slurm_cpus, slurm_sockets, slurm_cores_per_socket, slurm_threads_per_core,
+#   slurm_real_memory, slurm_node_gres
+#   slurm_core_spec_count (cores reservados), slurm_mem_spec_limit_mb (mem reservada)
+#
+# Ejemplo por nodo (host_vars/worker1.yml):
+#   # Opcion A: limitar recursos visibles (puede causar INVALID_REG si no coincide con slurmd)
+#   slurm_cpus: 12
+#   slurm_real_memory: 48000
+#   slurm_node_gres: "gpu:quadro_p1000:1"
+#   # Opcion B (recomendada): reservar recursos sin mismatch
+#   slurm_core_spec_count: 2
+#   slurm_mem_spec_limit_mb: 8000
+#
+# Ejemplo por grupo (group_vars/slurm_gpu.yml):
+#   slurm_real_memory: 56000
+#   slurm_node_gres: "gpu:quadro_p1000:1"
+#
+# Nota: si defines slurm_node_gres manualmente, Slurm usara ese valor aunque
+# NVML detecte mas GPUs. AutoDetect=nvml sigue habilitado para detalles.
+
+# Slurm validate: activar micromamba y entorno llm para pruebas de torch
+slurm_validate_torch:
+  enabled: "auto"
+  python: "python3"
+  prelude: |
+    set +u
+    eval "$(micromamba shell hook --shell bash)"
+    micromamba activate llm
+    set -u
+
+# Red interna HPC (superred usada para confianza en firewall)
+hpc_internal_supernet: "192.168.34.0/24"
+
+# Segmentación actual por enlaces punto-a-punto al master (cada NIC del master es un /28)
+# Agregar/quitar subredes según cambie el cluster.
+hpc_internal_subnets:
+  - "192.168.34.0/28"
+  - "192.168.34.16/28"
+  - "192.168.34.32/28"
+  - "192.168.34.48/28"
+
+# =====================
+# Red interna (roles/network_internal)
+# =====================
+# Mapa declarativo de enlaces master<->worker (NIC + IP por extremo).
+# Este bloque reemplaza hardcodes que antes vivían en defaults del rol.
+
+network_internal_keep_if: "eno1"
+network_internal_exclude_ifaces:
+  - "tailscale0"
+network_internal_exclude_conn_regex: ".*tailscale.*"
+
+network_internal_links:
+  worker1:
+    master_if: "enp3s0f1"
+    master_ip: "192.168.34.1/28"
+    worker_if: "enp3s0f1"
+    worker_ip: "192.168.34.2/28"
+  worker2:
+    master_if: "enp3s0f2"
+    master_ip: "192.168.34.17/28"
+    worker_if: "enp3s0f2"
+    worker_ip: "192.168.34.18/28"
+  worker3:
+    master_if: "enp3s0f3"
+    master_ip: "192.168.34.33/28"
+    worker_if: "enp3s0f3"
+    worker_ip: "192.168.34.34/28"
+  worker4:
+    master_if: "enp3s0f0"
+    master_ip: "192.168.34.49/28"
+    worker_if: "enp3s0f0"
+    worker_ip: "192.168.34.50/28"

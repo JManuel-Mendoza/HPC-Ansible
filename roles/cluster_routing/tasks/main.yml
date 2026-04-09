@@ -1,0 +1,164 @@
+# Proposito:
+# - Implementar tareas del rol 'cluster_routing' para gestionar rutas persistentes para la red interna del cluster.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/cluster_routing/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+# Rol: cluster_routing
+# Objetivo:
+#  - master: habilitar routing IPv4 + confiar interfaces internas (firewalld trusted)
+#  - workers: confiar red interna (firewalld trusted) + rutas persistentes a otras subredes vía el master
+
+- name: "MASTER | Habilitar IPv4 forwarding"
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    reload: true
+  when: inventory_hostname == "master"
+  tags: [routing, sysctl]
+
+- name: "MASTER | Poner interfaces internas en zona trusted"
+  ansible.posix.firewalld:
+    zone: trusted
+    interface: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop: "{{ hpc_router_internal_ifaces | default([]) }}"
+  when: inventory_hostname == "master"
+  tags: [routing, firewall]
+
+- name: "WORKERS | Confiar superred interna en zona trusted"
+  ansible.posix.firewalld:
+    zone: trusted
+    source: "{{ hpc_internal_supernet }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  when: inventory_hostname != "master"
+  tags: [routing, firewall]
+
+# ---------- RUTAS PERSISTENTES EN WORKERS ----------
+# Estrategia:
+#  - Tomar ansible_host (IP interna del nodo)
+#  - Calcular la red /28 donde cae
+#  - Gateway = (network_address + 1) => IP del master en esa subred
+#  - Añadir rutas a todas las demás subredes vía gateway, persistentes con nmcli
+
+- name: "WORKERS | Detectar interfaz cuyo IPv4 coincide con ansible_host"
+  ansible.builtin.set_fact:
+    hpc_internal_iface: "{{ item }}"
+  loop: "{{ ansible_facts.interfaces }}"
+  when:
+    - inventory_hostname != "master"
+    - ansible_facts[item] is defined
+    - ansible_facts[item].ipv4 is defined
+    - ansible_facts[item].ipv4.address is defined
+    - ansible_facts[item].ipv4.address == hostvars[inventory_hostname].ansible_host
+  tags: [routing, nmcli]
+
+- name: "WORKERS | Obtener nombre de conexión NetworkManager para la interfaz interna"
+  ansible.builtin.command: nmcli -g GENERAL.CONNECTION device show {{ hpc_internal_iface }}
+  register: _nm_conn
+  changed_when: false
+  when:
+    - inventory_hostname != "master"
+    - hpc_internal_iface is defined
+  tags: [routing, nmcli]
+
+- name: "WORKERS | Calcular subnet local, gateway (master) y rutas destino"
+  ansible.builtin.command: python3 -
+  args:
+    stdin: |
+      import ipaddress, os, json
+      ip = ipaddress.ip_address(os.environ["NODE_IP"])
+      subnets = [ipaddress.ip_network(s) for s in json.loads(os.environ["SUBNETS_JSON"])]
+      local = None
+      for n in subnets:
+        if ip in n:
+          local = n
+          break
+      if local is None:
+        raise SystemExit("NODE_IP no cae en hpc_internal_subnets")
+      gw = ipaddress.ip_address(int(local.network_address) + 1)
+      dest = [str(n) for n in subnets if n != local]
+      print(str(local))
+      print(str(gw))
+      for n in dest:
+        print(n)
+  environment:
+    NODE_IP: "{{ hostvars[inventory_hostname].ansible_host }}"
+    SUBNETS_JSON: "{{ hpc_internal_subnets | to_json }}"
+  register: _route_calc
+  changed_when: false
+  when:
+    - inventory_hostname != "master"
+    - _nm_conn.stdout is defined
+    - hpc_internal_subnets is defined
+  tags: [routing, nmcli]
+
+- name: "WORKERS | Set facts de rutas"
+  ansible.builtin.set_fact:
+    hpc_local_subnet: "{{ _route_calc.stdout_lines[0] }}"
+    hpc_gateway: "{{ _route_calc.stdout_lines[1] }}"
+    hpc_route_targets: "{{ _route_calc.stdout_lines[2:] }}"
+    hpc_nm_conn: "{{ _nm_conn.stdout | trim }}"
+  when:
+    - inventory_hostname != "master"
+    - _route_calc.stdout_lines | length >= 2
+  tags: [routing, nmcli]
+
+- name: "WORKERS | Leer rutas actuales en NetworkManager"
+  ansible.builtin.command: nmcli -g ipv4.routes connection show "{{ hpc_nm_conn }}"
+  register: _nm_current_routes
+  changed_when: false
+  when:
+    - inventory_hostname != "master"
+    - hpc_nm_conn is defined
+  tags: [routing, nmcli]
+
+- name: "WORKERS | Preparar rutas deseadas"
+  ansible.builtin.set_fact:
+    hpc_current_routes: >-
+      {{
+        (_nm_current_routes.stdout | trim)
+        | ternary((_nm_current_routes.stdout | trim).split(','), [])
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+    hpc_desired_routes: "{{ hpc_route_targets | map('regex_replace','^(.*)$','\\1 ' ~ hpc_gateway) | list }}"
+  when:
+    - inventory_hostname != "master"
+    - hpc_nm_conn is defined
+    - hpc_gateway is defined
+    - hpc_route_targets is defined
+  tags: [routing, nmcli]
+
+- name: "WORKERS | Añadir rutas persistentes a otras subredes vía gateway"
+  ansible.builtin.command: >
+    nmcli connection modify "{{ hpc_nm_conn }}"
+    +ipv4.routes "{{ item }}"
+  loop: "{{ hpc_desired_routes | difference(hpc_current_routes | default([])) }}"
+  register: _nm_routes
+  failed_when: _nm_routes.rc != 0
+  when:
+    - inventory_hostname != "master"
+    - hpc_nm_conn is defined
+    - hpc_gateway is defined
+    - hpc_route_targets is defined
+  tags: [routing, nmcli]
+
+- name: "WORKERS | Activar conexión para aplicar rutas"
+  ansible.builtin.command: nmcli connection up "{{ hpc_nm_conn }}"
+  changed_when: true
+  when:
+    - inventory_hostname != "master"
+    - hpc_nm_conn is defined
+    - _nm_routes is defined and _nm_routes is changed
+  tags: [routing, nmcli]

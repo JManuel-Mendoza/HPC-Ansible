@@ -1,3 +1,6 @@
 ---
 collections:
+  # Usado por tasks con `ansible.posix.*` (ej.: firewalld, sysctl).
   - name: ansible.posix
+    # Pin por compatibilidad con ansible-core 2.14 (Rocky 9/Python 3.9).
+    version: "1.5.4"

@@ -1,0 +1,25 @@
+# Proposito:
+# - Declarar valores por defecto del rol 'slurm_validate' para mantener comportamiento reproducible y sobrescribible.
+# Supuestos/prerrequisitos:
+# - Los valores pueden ser sobreescritos por group_vars/host_vars sin editar tareas del rol.
+# Variables clave consumidas:
+# - Variables definidas en este archivo; origen de override: group_vars/* y host_vars/*.
+# Tags relevantes:
+# - N/A directo en este archivo; consumidas por tasks/handlers del rol.
+
+slurm_validate_partitions:
+  cpu: "debug"
+  gpu: "gpu"
+
+slurm_validate_smoke:
+  enabled: true
+  workdir: "/tmp"
+  timeout_seconds: 180
+  poll_delay_seconds: 3
+
+# torch.enabled: "auto" intenta import torch; si falla, omite el test (no falla el rol)
+slurm_validate_torch:
+  enabled: "auto"   # auto|true|false
+  python: "python3"
+  # Si necesitas activar un env (micromamba/conda/module), colócalo aquí:
+  prelude: ""

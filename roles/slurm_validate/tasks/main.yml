@@ -1,0 +1,375 @@
+# Proposito:
+# - Implementar tareas del rol 'slurm_validate' para ejecutar validaciones read-only de Slurm y smoke jobs.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/slurm_validate/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+# Nota: este rol asume que corre en el master (controller) para ejecutar sinfo/srun/sbatch.
+# No cambia configuración. Todo es "changed_when: false".
+
+- name: Validar CLI de Slurm (sinfo)
+  ansible.builtin.command: sinfo --version
+  register: _sinfo_ver
+  changed_when: false
+  tags: [slurm_validate]
+
+- name: Listar particiones (normalizado)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    sinfo -h -o "%P" | tr -d '*' | tr ' ' '\n' | sed '/^$/d' | sort -u
+  args:
+    executable: /bin/bash
+  register: _parts
+  changed_when: false
+  tags: [slurm_validate]
+
+- name: Verificar particion CPU
+  ansible.builtin.assert:
+    that:
+      - slurm_validate_partitions.cpu in _parts.stdout_lines
+    fail_msg: "Missing CPU partition '{{ slurm_validate_partitions.cpu }}'. Got: {{ _parts.stdout_lines }}"
+  tags: [slurm_validate]
+
+- name: Verificar particion GPU
+  ansible.builtin.assert:
+    that:
+      - slurm_validate_partitions.gpu in _parts.stdout_lines
+    fail_msg: "Missing GPU partition '{{ slurm_validate_partitions.gpu }}'. Got: {{ _parts.stdout_lines }}"
+  tags: [slurm_validate]
+
+- name: Obtener estados de nodos (basico)
+  ansible.builtin.command: sinfo -N -h -o "%N %t"
+  register: _node_states
+  changed_when: false
+  failed_when: _node_states.rc != 0
+  tags: [slurm_validate]
+
+- name: Asegurar que no hay nodos DOWN/DRAIN/FAIL (basico)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    printf '%s\n' "{{ _node_states.stdout | default('') }}" | awk '{print $2}' | egrep -i 'down|drain|fail'
+  args:
+    executable: /bin/bash
+  register: _bad_states
+  changed_when: false
+  failed_when: _bad_states.rc == 0
+  tags: [slurm_validate]
+
+- name: srun hostname (particion CPU)
+  ansible.builtin.command: >
+    srun -N1 -n1 -p {{ slurm_validate_partitions.cpu }} hostname
+  register: _srun_cpu_hostname
+  changed_when: false
+  tags: [slurm_validate]
+
+- name: srun nvidia-smi -L (particion GPU)
+  ansible.builtin.command: >
+    srun -N1 -n1 -p {{ slurm_validate_partitions.gpu }} --gres=gpu:1 nvidia-smi -L
+  register: _srun_gpu_nvsmi_l
+  changed_when: false
+  tags: [slurm_validate]
+
+- name: Sonda de importacion de Torch en nodo GPU (auto)
+  ansible.builtin.command:
+    argv:
+      - srun
+      - -N1
+      - -n1
+      - -p
+      - "{{ slurm_validate_partitions.gpu }}"
+      - --gres=gpu:1
+      - bash
+      - -lc
+      - |
+          set -euo pipefail
+          {{ slurm_validate_torch.prelude }}
+          {{ slurm_validate_torch.python }} -c "import torch; print('torch:', torch.__version__)"
+  register: _torch_probe
+  changed_when: false
+  failed_when: false
+  when: slurm_validate_torch.enabled in ["auto", "true"]
+  tags: [slurm_validate]
+
+- name: Mostrar salida de sonda Torch (auto)
+  ansible.builtin.debug:
+    msg: |
+      torch_probe rc={{ _torch_probe.rc | default('n/a') }}
+      stdout:
+      {{ _torch_probe.stdout | default('') }}
+      stderr:
+      {{ _torch_probe.stderr | default('') }}
+  when: _torch_probe is defined
+  tags: [slurm_validate]
+
+- name: Smoke PyTorch CUDA (solo si sonda OK o enabled=true)
+  ansible.builtin.command:
+    argv:
+      - srun
+      - -N1
+      - -n1
+      - -p
+      - "{{ slurm_validate_partitions.gpu }}"
+      - --gres=gpu:1
+      - bash
+      - -lc
+      - |
+          set -euo pipefail
+          {{ slurm_validate_torch.prelude }}
+          {{ slurm_validate_torch.python }} -c "import torch; print('torch:', torch.__version__); print('torch.version.cuda:', torch.version.cuda); print('cuda_available:', torch.cuda.is_available()); torch.cuda.is_available() and print('gpu:', torch.cuda.get_device_name(0))"
+  register: _torch_smoke
+  changed_when: false
+  when: >
+    slurm_validate_torch.enabled == "true"
+    or (slurm_validate_torch.enabled == "auto" and _torch_probe is defined and _torch_probe.rc == 0)
+  tags: [slurm_validate]
+
+- name: Mostrar salida de smoke Torch (CUDA)
+  ansible.builtin.debug:
+    msg: |
+      torch_smoke rc={{ _torch_smoke.rc | default('n/a') }}
+      stdout:
+      {{ _torch_smoke.stdout | default('') }}
+      stderr:
+      {{ _torch_smoke.stderr | default('') }}
+  when: _torch_smoke is defined
+  tags: [slurm_validate]
+
+- name: Renderizar scripts smoke (CPU/GPU)
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ slurm_validate_smoke.workdir }}/{{ item.dest }}"
+    mode: "0755"
+  loop:
+    - { src: "slurm-smoke-cpu.sbatch.j2", dest: "slurm-smoke-cpu.sbatch" }
+    - { src: "slurm-smoke-gpu.sbatch.j2", dest: "slurm-smoke-gpu.sbatch" }
+  changed_when: false
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Enviar job smoke CPU
+  ansible.builtin.command: >
+    sbatch --parsable {{ slurm_validate_smoke.workdir }}/slurm-smoke-cpu.sbatch
+  register: _cpu_jobid
+  changed_when: false
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Esperar salida de cola del job CPU
+  ansible.builtin.shell: |
+    set -euo pipefail
+    squeue -h -j {{ _cpu_jobid.stdout }} | wc -l
+  args:
+    executable: /bin/bash
+  register: _cpu_in_queue
+  changed_when: false
+  until: _cpu_in_queue.stdout | int == 0
+  retries: "{{ (slurm_validate_smoke.timeout_seconds // slurm_validate_smoke.poll_delay_seconds) | int }}"
+  delay: "{{ slurm_validate_smoke.poll_delay_seconds }}"
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar estado sacct del job CPU
+  ansible.builtin.shell: |
+    set -euo pipefail
+    sacct -n -P -j {{ _cpu_jobid.stdout }} -o JobID,State,ExitCode | awk -F'|' '$1=="{{ _cpu_jobid.stdout }}" {print $2"|" $3; exit}'
+  args:
+    executable: /bin/bash
+  register: _cpu_sacct
+  changed_when: false
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Obtener detalles del job CPU (stdout/stderr/host)
+  ansible.builtin.command: "scontrol show job -o {{ _cpu_jobid.stdout | trim }}"
+  register: _cpu_job_detail
+  changed_when: false
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Parsear salida y host del job CPU
+  ansible.builtin.set_fact:
+    slurm_cpu_job_stdout_path: "{{ _cpu_job_detail.stdout | regex_findall('StdOut=([^ ]+)') | first | default('') }}"
+    slurm_cpu_job_stderr_path: "{{ _cpu_job_detail.stdout | regex_findall('StdErr=([^ ]+)') | first | default('') }}"
+    slurm_cpu_job_batch_host: "{{ _cpu_job_detail.stdout | regex_findall('BatchHost=([^ ]+)') | first | default('') }}"
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar stdout del job CPU en el batch host
+  ansible.builtin.stat:
+    path: "{{ slurm_cpu_job_stdout_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
+  register: _cpu_job_out_stat
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - slurm_cpu_job_stdout_path | length > 0
+    - slurm_cpu_job_batch_host | length > 0
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar stderr del job CPU en el batch host
+  ansible.builtin.stat:
+    path: "{{ slurm_cpu_job_stderr_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
+  register: _cpu_job_err_stat
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - slurm_cpu_job_stderr_path | length > 0
+    - slurm_cpu_job_batch_host | length > 0
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Leer salida del job CPU (stdout)
+  ansible.builtin.command: "cat {{ slurm_cpu_job_stdout_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
+  register: _cpu_job_out
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - (_cpu_job_out_stat.stat.exists | default(false))
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Leer salida del job CPU (stderr)
+  ansible.builtin.command: "cat {{ slurm_cpu_job_stderr_path }}"
+  delegate_to: "{{ slurm_cpu_job_batch_host }}"
+  register: _cpu_job_err
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - (_cpu_job_err_stat.stat.exists | default(false))
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Mostrar salida del job CPU
+  ansible.builtin.debug:
+    msg: |
+      cpu_job stdout:
+      {{ _cpu_job_out.stdout | default('') }}
+      cpu_job stderr:
+      {{ _cpu_job_err.stdout | default('') }}
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - _cpu_job_out is defined or _cpu_job_err is defined
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Validar job CPU COMPLETED con 0:0
+  ansible.builtin.assert:
+    that:
+      - _cpu_sacct.stdout is match("^COMPLETED\\|0:0")
+    fail_msg: "CPU smoke failed. sacct={{ _cpu_sacct.stdout }}"
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Enviar job smoke GPU
+  ansible.builtin.command: >
+    sbatch --parsable {{ slurm_validate_smoke.workdir }}/slurm-smoke-gpu.sbatch
+  register: _gpu_jobid
+  changed_when: false
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Esperar salida de cola del job GPU
+  ansible.builtin.shell: |
+    set -euo pipefail
+    squeue -h -j {{ _gpu_jobid.stdout }} | wc -l
+  args:
+    executable: /bin/bash
+  register: _gpu_in_queue
+  changed_when: false
+  until: _gpu_in_queue.stdout | int == 0
+  retries: "{{ (slurm_validate_smoke.timeout_seconds // slurm_validate_smoke.poll_delay_seconds) | int }}"
+  delay: "{{ slurm_validate_smoke.poll_delay_seconds }}"
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar estado sacct del job GPU
+  ansible.builtin.shell: |
+    set -euo pipefail
+    sacct -n -P -j {{ _gpu_jobid.stdout }} -o JobID,State,ExitCode | awk -F'|' '$1=="{{ _gpu_jobid.stdout }}" {print $2"|" $3; exit}'
+  args:
+    executable: /bin/bash
+  register: _gpu_sacct
+  changed_when: false
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Obtener detalles del job GPU (stdout/stderr/host)
+  ansible.builtin.command: "scontrol show job -o {{ _gpu_jobid.stdout | trim }}"
+  register: _gpu_job_detail
+  changed_when: false
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Parsear salida y host del job GPU
+  ansible.builtin.set_fact:
+    slurm_gpu_job_stdout_path: "{{ _gpu_job_detail.stdout | regex_findall('StdOut=([^ ]+)') | first | default('') }}"
+    slurm_gpu_job_stderr_path: "{{ _gpu_job_detail.stdout | regex_findall('StdErr=([^ ]+)') | first | default('') }}"
+    slurm_gpu_job_batch_host: "{{ _gpu_job_detail.stdout | regex_findall('BatchHost=([^ ]+)') | first | default('') }}"
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar stdout del job GPU en el batch host
+  ansible.builtin.stat:
+    path: "{{ slurm_gpu_job_stdout_path }}"
+  delegate_to: "{{ slurm_gpu_job_batch_host }}"
+  register: _gpu_job_out_stat
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - slurm_gpu_job_stdout_path | length > 0
+    - slurm_gpu_job_batch_host | length > 0
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Verificar stderr del job GPU en el batch host
+  ansible.builtin.stat:
+    path: "{{ slurm_gpu_job_stderr_path }}"
+  delegate_to: "{{ slurm_gpu_job_batch_host }}"
+  register: _gpu_job_err_stat
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - slurm_gpu_job_stderr_path | length > 0
+    - slurm_gpu_job_batch_host | length > 0
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Leer salida del job GPU (stdout)
+  ansible.builtin.command: "cat {{ slurm_gpu_job_stdout_path }}"
+  delegate_to: "{{ slurm_gpu_job_batch_host }}"
+  register: _gpu_job_out
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - (_gpu_job_out_stat.stat.exists | default(false))
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Leer salida del job GPU (stderr)
+  ansible.builtin.command: "cat {{ slurm_gpu_job_stderr_path }}"
+  delegate_to: "{{ slurm_gpu_job_batch_host }}"
+  register: _gpu_job_err
+  changed_when: false
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - (_gpu_job_err_stat.stat.exists | default(false))
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Mostrar salida del job GPU
+  ansible.builtin.debug:
+    msg: |
+      gpu_job stdout:
+      {{ _gpu_job_out.stdout | default('') }}
+      gpu_job stderr:
+      {{ _gpu_job_err.stdout | default('') }}
+  when:
+    - slurm_validate_smoke.enabled | bool
+    - _gpu_job_out is defined or _gpu_job_err is defined
+  tags: [slurm_validate, slurm_validate_smoke]
+
+- name: Validar job GPU COMPLETED con 0:0
+  ansible.builtin.assert:
+    that:
+      - _gpu_sacct.stdout is match("^COMPLETED\\|0:0")
+    fail_msg: "GPU smoke failed. sacct={{ _gpu_sacct.stdout }}"
+  when: slurm_validate_smoke.enabled | bool
+  tags: [slurm_validate, slurm_validate_smoke]

@@ -1,0 +1,26 @@
+# Proposito:
+# - Declarar valores por defecto del rol 'network_internal' para mantener comportamiento reproducible y sobrescribible.
+# Supuestos/prerrequisitos:
+# - Los valores pueden ser sobreescritos por group_vars/host_vars sin editar tareas del rol.
+# Variables clave consumidas:
+# - Variables definidas en este archivo; origen de override: group_vars/* y host_vars/*.
+# Tags relevantes:
+# - N/A directo en este archivo; consumidas por tasks/handlers del rol.
+
+---
+# Defaults neutros (P11c): este rol es HIGH-RISK y no debe operar sin topología explícita.
+#
+# Define la topología real (NICs/IPs por enlace) en:
+# - group_vars/all/vars.yml
+#
+# El rol hace `assert` temprano para evitar ejecuciones peligrosas si faltan estas variables.
+
+# Interfaz "principal" que NO se debe tocar al limpiar conexiones NM.
+network_internal_keep_if: ""
+
+# Exclusiones (p. ej. tailscale).
+network_internal_exclude_ifaces: []
+network_internal_exclude_conn_regex: ""
+
+# Mapa worker->(master_if/master_ip/worker_if/worker_ip). Debe ser un dict no vacío.
+network_internal_links: {}

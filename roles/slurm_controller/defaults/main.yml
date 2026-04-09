@@ -1,0 +1,18 @@
+# Proposito:
+# - Declarar valores por defecto del rol 'slurm_controller' para mantener comportamiento reproducible y sobrescribible.
+# Supuestos/prerrequisitos:
+# - Los valores pueden ser sobreescritos por group_vars/host_vars sin editar tareas del rol.
+# Variables clave consumidas:
+# - Variables definidas en este archivo; origen de override: group_vars/* y host_vars/*.
+# Tags relevantes:
+# - N/A directo en este archivo; consumidas por tasks/handlers del rol.
+
+---
+slurm_controller_reconfigure_on_change: true
+slurm_controller_reconfigure_always: true
+
+slurm_controller_autoresume_enabled: true
+slurm_controller_autoresume_states:
+  - DRAIN
+  - INVALID_REG
+slurm_controller_autoresume_reason_regex: ".*"

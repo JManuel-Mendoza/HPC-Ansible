@@ -1,0 +1,16 @@
+---
+profile: basic
+verbosity: 1
+exclude_paths:
+  - .git/
+  - .cache/
+  - .secrets/
+  - group_vars/all/vault.yml
+  - docs/docs_old/
+skip_list:
+  - experimental
+  - yaml[line-length]
+  - name[casing]
+  - name[missing]
+  - risky-file-permissions
+warn_list: []

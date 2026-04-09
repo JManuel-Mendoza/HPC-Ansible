@@ -1,0 +1,273 @@
+# Proposito:
+# - Implementar tareas del rol 'nfs_hpc' para provisionar export y montaje NFS para datos compartidos.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/nfs_hpc/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+- name: NFS | Determinar familia de SO
+  ansible.builtin.set_fact:
+    nfs_hpc_os_family: "{{ ansible_facts.os_family | default('RedHat') }}"
+  changed_when: false
+  tags: [nfs]
+
+- name: NFS | Asegurar grupo de escritura en todos los nodos
+  ansible.builtin.group:
+    name: "{{ nfs_hpc_write_group }}"
+    gid: "{{ (nfs_hpc_write_group_gid is number) | ternary(nfs_hpc_write_group_gid, omit) }}"
+    state: present
+  when: nfs_hpc_server_enabled | bool or nfs_hpc_client_enabled | bool
+  tags: [nfs, nfs_permissions]
+
+- name: NFS | Agregar usuarios al grupo de escritura
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: "{{ nfs_hpc_write_group }}"
+    append: true
+  loop: "{{ nfs_hpc_write_group_users }}"
+  when:
+    - nfs_hpc_write_group_users | length > 0
+    - nfs_hpc_server_enabled | bool or nfs_hpc_client_enabled | bool
+  tags: [nfs, nfs_permissions]
+
+- name: NFS | Instalar paquetes del servidor
+  ansible.builtin.package:
+    name: "{{ nfs_hpc_server_packages.get(nfs_hpc_os_family, nfs_hpc_server_packages['RedHat']) }}"
+    state: present
+  when: nfs_hpc_server_enabled | bool
+  tags: [nfs, nfs_server]
+
+- name: NFS | Crear directorio del share en servidor
+  ansible.builtin.file:
+    path: "{{ nfs_hpc_share_dir }}"
+    state: directory
+    owner: root
+    group: "{{ nfs_hpc_write_group }}"
+    mode: "{{ nfs_hpc_share_mode }}"
+  when: nfs_hpc_server_enabled | bool
+  tags: [nfs, nfs_server, nfs_permissions]
+
+- name: NFS | Server | Buscar archivos de exports (posibles duplicados)
+  ansible.builtin.find:
+    paths:
+      - /etc/exports.d
+    file_type: file
+  register: _nfs_exportsd_files
+  changed_when: false
+  when: nfs_hpc_server_enabled | bool
+  tags: [nfs, nfs_server]
+
+- name: NFS | Server | Quitar entradas duplicadas del export (preflight)
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    # Match: "<share_dir> <allowed_clients>(...)" o "<share_dir> <allowed_clients>"
+    regexp: "^\\s*{{ nfs_hpc_share_dir | regex_escape }}\\s+{{ nfs_hpc_allowed_clients | regex_escape }}(\\s*\\(|\\s*$)"
+    state: absent
+  loop: >-
+    {{
+      (
+        ['/etc/exports']
+        + (_nfs_exportsd_files.files | default([]) | map(attribute='path') | list)
+      )
+      | unique
+      | reject('equalto', nfs_hpc_export_file)
+      | list
+    }}
+  when: nfs_hpc_server_enabled | bool
+  tags: [nfs, nfs_server]
+
+- name: NFS | Configurar exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: "{{ nfs_hpc_export_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: nfs_hpc_server_enabled | bool
+  notify: NFS | Recargar exports
+  tags: [nfs, nfs_server]
+
+- name: NFS | Habilitar y arrancar servicio NFS
+  ansible.builtin.service:
+    name: "{{ nfs_hpc_server_service.get(nfs_hpc_os_family, nfs_hpc_server_service['RedHat']) }}"
+    state: started
+    enabled: true
+  when: nfs_hpc_server_enabled | bool
+  tags: [nfs, nfs_server]
+
+- name: NFS | Verificar firewalld activo (server)
+  ansible.builtin.command: systemctl is-active firewalld
+  register: _nfs_firewalld_active
+  changed_when: false
+  failed_when: false
+  when:
+    - nfs_hpc_server_enabled | bool
+    - nfs_hpc_firewall_manage | bool
+  tags: [nfs, nfs_firewall]
+
+- name: NFS | Consultar puerto 2049/tcp en firewalld
+  ansible.builtin.command: "firewall-cmd --permanent --query-port=2049/tcp"
+  register: _nfs_firewalld_port
+  changed_when: false
+  failed_when: _nfs_firewalld_port.rc not in [0, 1]
+  when:
+    - nfs_hpc_server_enabled | bool
+    - nfs_hpc_firewall_manage | bool
+    - _nfs_firewalld_active.rc == 0
+  tags: [nfs, nfs_firewall]
+
+- name: NFS | Abrir puerto 2049/tcp en firewalld
+  ansible.builtin.command: "firewall-cmd --permanent --add-port=2049/tcp"
+  when:
+    - nfs_hpc_server_enabled | bool
+    - nfs_hpc_firewall_manage | bool
+    - _nfs_firewalld_active.rc == 0
+    - _nfs_firewalld_port.rc == 1
+  notify: NFS | Recargar firewalld
+  tags: [nfs, nfs_firewall]
+
+- name: NFS | Instalar paquetes del cliente
+  ansible.builtin.package:
+    name: "{{ nfs_hpc_client_packages.get(nfs_hpc_os_family, nfs_hpc_client_packages['RedHat']) }}"
+    state: present
+  when:
+    - nfs_hpc_client_enabled | bool
+    - not (nfs_hpc_server_enabled | bool)
+  tags: [nfs, nfs_client]
+
+- name: NFS | Cliente | Limpiar montajes legacy (migración)
+  ansible.builtin.mount:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/nfs-hpc"
+    - "/srv/nfs/llm"
+  when:
+    - nfs_hpc_client_enabled | bool
+    - not (nfs_hpc_server_enabled | bool)
+    - item != nfs_hpc_mount_point
+  tags: [nfs, nfs_client]
+
+- name: NFS | Verificar si el punto de montaje ya está montado (cliente)
+  ansible.builtin.command: "mountpoint -q {{ nfs_hpc_mount_point }}"
+  register: _nfs_mountpoint
+  changed_when: false
+  failed_when: false
+  when:
+    - nfs_hpc_client_enabled | bool
+    - not (nfs_hpc_server_enabled | bool)
+  tags: [nfs, nfs_client]
+
+- name: NFS | Crear punto de montaje en cliente
+  ansible.builtin.file:
+    path: "{{ nfs_hpc_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - nfs_hpc_client_enabled | bool
+    - not (nfs_hpc_server_enabled | bool)
+    - _nfs_mountpoint.rc != 0
+  tags: [nfs, nfs_client]
+
+- name: NFS | Montar share en cliente
+  ansible.builtin.mount:
+    path: "{{ nfs_hpc_mount_point }}"
+    src: "{{ nfs_hpc_server_host }}:{{ nfs_hpc_share_dir }}"
+    fstype: "{{ nfs_hpc_fstype }}"
+    opts: "{{ nfs_hpc_mount_opts }}"
+    state: mounted
+  when:
+    - nfs_hpc_client_enabled | bool
+    - not (nfs_hpc_server_enabled | bool)
+  tags: [nfs, nfs_client]
+
+# ==========================================================
+# Remoción segura (NO borra datos del export en el server).
+# Solo corre si se invoca explícitamente con `--tags del_nfs`.
+# ==========================================================
+
+- name: NFS | Server | Quitar archivo de exports (del_nfs)
+  ansible.builtin.file:
+    path: "{{ nfs_hpc_export_file }}"
+    state: absent
+  when:
+    - "'del_nfs' in ansible_run_tags"
+    - nfs_hpc_server_enabled | bool
+  notify: NFS | Recargar exports
+  tags: [del_nfs]
+
+- name: NFS | Server | Verificar firewalld activo (del_nfs)
+  ansible.builtin.command: systemctl is-active firewalld
+  register: _del_nfs_firewalld_active
+  changed_when: false
+  failed_when: false
+  when:
+    - "'del_nfs' in ansible_run_tags"
+    - nfs_hpc_server_enabled | bool
+    - nfs_hpc_firewall_manage | bool
+  tags: [del_nfs]
+
+- name: NFS | Server | Consultar puerto 2049/tcp en firewalld (del_nfs)
+  ansible.builtin.command: "firewall-cmd --permanent --query-port=2049/tcp"
+  register: _del_nfs_firewalld_port
+  changed_when: false
+  failed_when: _del_nfs_firewalld_port.rc not in [0, 1]
+  when:
+    - "'del_nfs' in ansible_run_tags"
+    - nfs_hpc_server_enabled | bool
+    - nfs_hpc_firewall_manage | bool
+    - _del_nfs_firewalld_active.rc == 0
+  tags: [del_nfs]
+
+- name: NFS | Server | Cerrar puerto 2049/tcp en firewalld (del_nfs)
+  ansible.builtin.command: "firewall-cmd --permanent --remove-port=2049/tcp"
+  when:
+    - "'del_nfs' in ansible_run_tags"
+    - nfs_hpc_server_enabled | bool
+    - nfs_hpc_firewall_manage | bool
+    - _del_nfs_firewalld_active.rc == 0
+    - _del_nfs_firewalld_port.rc == 0
+  notify: NFS | Recargar firewalld
+  tags: [del_nfs]
+
+- name: NFS | Client | Quitar mount y fstab (del_nfs)
+  ansible.builtin.mount:
+    path: "{{ nfs_hpc_mount_point }}"
+    state: absent
+  when:
+    - "'del_nfs' in ansible_run_tags"
+    - not (nfs_hpc_server_enabled | bool)
+  tags: [del_nfs]
+
+- name: NFS | Client | Quitar montajes legacy y fstab (del_nfs)
+  ansible.builtin.mount:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/nfs-hpc"
+    - "/srv/nfs/llm"
+  when:
+    - "'del_nfs' in ansible_run_tags"
+    - not (nfs_hpc_server_enabled | bool)
+    - item != nfs_hpc_mount_point
+  tags: [del_nfs]
+
+- name: NFS | Client | Limpiar directorios de montaje si están vacíos (del_nfs)
+  ansible.builtin.command: "rmdir {{ item }}"
+  register: _del_nfs_rmdir
+  changed_when: _del_nfs_rmdir.rc == 0
+  failed_when: false
+  loop:
+    - "{{ nfs_hpc_mount_point }}"
+    - "/nfs-hpc"
+    - "/srv/nfs/llm"
+  when:
+    - "'del_nfs' in ansible_run_tags"
+    - not (nfs_hpc_server_enabled | bool)
+    - item != nfs_hpc_share_dir
+  tags: [del_nfs]

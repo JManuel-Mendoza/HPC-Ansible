@@ -1,0 +1,23 @@
+{# Proposito: Renderizar plantilla del rol 'slurm_controller' para configurar servicios Slurm de control y accounting. #}
+{# Supuestos/prerrequisitos: El archivo destino debe existir con permisos definidos por la task de template en el rol. #}
+{# Variables clave consumidas: slurmdbd_host, slurmdbd_port, slurmdbd_storage_host, slurmdbd_storage_loc, slurmdbd_storage_user, slurmdbd_storage_pass. #}
+{# Estructura de salida y ramas condicionales: El render respeta condicionales y bucles Jinja para adaptar configuracion por host/grupo. #}
+{# Tags relevantes: Heredadas del task que invoca template dentro del rol. #}
+
+AuthType=auth/munge
+
+DbdAddr={{ slurmdbd_host }}
+DbdHost={{ slurmdbd_host }}
+DbdPort={{ slurmdbd_port }}
+
+SlurmUser=slurm
+LogFile=/var/log/slurm/slurmdbd.log
+PidFile=/run/slurm/slurmdbd.pid
+
+StorageType=accounting_storage/mysql
+StorageHost={{ slurmdbd_storage_host }}
+StorageLoc={{ slurmdbd_storage_loc }}
+StorageUser={{ slurmdbd_storage_user }}
+StoragePass={{ slurmdbd_storage_pass }}
+
+DebugLevel=info

@@ -1,0 +1,47 @@
+# Proposito:
+# - Implementar tareas del rol 'mariadb_server' para provisionar MariaDB para servicios de accounting.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/mariadb_server/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+- name: MariaDB | Install base packages (Rocky/RHEL)
+  ansible.builtin.dnf:
+    name:
+      - mariadb-server
+      - mariadb-devel
+      - mariadb-connector-c-devel
+      - readline-devel
+    state: present
+  when: ansible_facts['os_family'] == 'RedHat'
+  tags: [mariadb]
+
+- name: MariaDB | Enable and start service
+  ansible.builtin.service:
+    name: mariadb
+    enabled: true
+    state: started
+  tags: [mariadb]
+
+- name: MariaDB | Check server version
+  ansible.builtin.command: mariadb -N -B -e 'SELECT VERSION();'
+  register: mariadb_version
+  changed_when: false
+  tags: [verify]
+
+- name: MariaDB | Parse major version
+  ansible.builtin.set_fact:
+    mariadb_version_major: "{{ (mariadb_version.stdout | default('0') | trim | regex_search('^[0-9]+')) | default('0') | int }}"
+  tags: [verify]
+
+- name: MariaDB | Assert minimum version
+  ansible.builtin.assert:
+    that:
+      - (mariadb_version_major | int) >= (mariadb_min_version_major | int)
+    fail_msg: >-
+      MariaDB version {{ mariadb_version.stdout | default('unknown') }} is below
+      required major {{ mariadb_min_version_major }}.
+  tags: [verify]

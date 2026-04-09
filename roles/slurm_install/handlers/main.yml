@@ -1,0 +1,41 @@
+# Proposito:
+# - Definir handlers del rol 'slurm_install' para aplicar cambios diferidos solo cuando hay notify.
+# Supuestos/prerrequisitos:
+# - Los handlers se ejecutan al final del play o tras flush_handlers; requieren servicios instalados previamente.
+# Variables clave consumidas:
+# - Parametros definidos en defaults/vars del rol y estados calculados por tasks que notifican.
+# Tags relevantes:
+# - No aplican tags directas; se activan por notify desde tasks etiquetadas.
+
+---
+- name: SlurmDBD | Aplicar tmpfiles
+  ansible.builtin.command: systemd-tmpfiles --create
+  changed_when: false
+
+- name: SlurmDBD | Reiniciar slurmdbd
+  ansible.builtin.service:
+    name: slurmdbd
+    enabled: true
+    state: restarted
+  when: inventory_hostname in groups.get('hpc_master', [])
+
+- name: Slurm | Reiniciar slurmctld
+  ansible.builtin.systemd:
+    name: slurmctld
+    enabled: true
+    state: restarted
+  when: inventory_hostname in groups.get('hpc_master', [])
+
+- name: Slurm | Reiniciar slurmd
+  ansible.builtin.systemd:
+    name: slurmd
+    enabled: true
+    state: restarted
+    no_block: true
+  when:
+    - inventory_hostname in (groups.get('slurm_compute', []) + groups.get('hpc_master', []))
+    - "'slurmd.service' in (ansible_facts.services | default({}))"
+
+- name: Slurm | Recargar systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true

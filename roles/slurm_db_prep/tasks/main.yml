@@ -1,0 +1,74 @@
+# Proposito:
+# - Implementar tareas del rol 'slurm_db_prep' para preparar base de datos y permisos para SlurmDB.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/slurm_db_prep/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+- name: SlurmDB | Normalizar usuarios objetivo
+  ansible.builtin.set_fact:
+    _slurmdb_mysql_users: >-
+      {{
+        (slurmdb_mysql_user is string)
+        | ternary([slurmdb_mysql_user], (slurmdb_mysql_user | default([]) | list))
+      }}
+  changed_when: false
+  tags: [mariadb, slurmdb]
+
+- name: SlurmDB | Ensure MariaDB tuning file
+  ansible.builtin.copy:
+    dest: /etc/my.cnf.d/slurm.cnf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [mysqld]
+      innodb_buffer_pool_size={{ mariadb_slurm_tuning.innodb_buffer_pool_size }}
+      innodb_log_file_size={{ mariadb_slurm_tuning.innodb_log_file_size }}
+      innodb_lock_wait_timeout={{ mariadb_slurm_tuning.innodb_lock_wait_timeout }}
+      max_allowed_packet={{ mariadb_slurm_tuning.max_allowed_packet }}
+  notify: Restart mariadb
+  tags: [mariadb, slurmdb]
+
+- name: SlurmDB | Create database
+  ansible.builtin.command: >-
+    mariadb -N -B -e "CREATE DATABASE IF NOT EXISTS {{ slurmdb_mysql_db }};"
+  changed_when: false
+  tags: [mariadb, slurmdb]
+
+- name: SlurmDB | Create users
+  ansible.builtin.command: >-
+    mariadb -N -B -e "CREATE USER IF NOT EXISTS '{{ item.0 }}'@'{{ item.1 }}' IDENTIFIED BY '{{ slurmdb_mysql_password }}';"
+  loop: "{{ _slurmdb_mysql_users | product(slurmdb_mysql_hosts | unique) | list }}"
+  changed_when: false
+  no_log: true
+  tags: [mariadb, slurmdb]
+
+- name: SlurmDB | Grant privileges
+  ansible.builtin.command: >-
+    mariadb -N -B -e "GRANT ALL PRIVILEGES ON {{ slurmdb_mysql_db }}.* TO '{{ item.0 }}'@'{{ item.1 }}' WITH GRANT OPTION;"
+  loop: "{{ _slurmdb_mysql_users | product(slurmdb_mysql_hosts | unique) | list }}"
+  changed_when: false
+  tags: [mariadb, slurmdb]
+
+- name: SlurmDB | Flush privileges
+  ansible.builtin.command: mariadb -N -B -e "FLUSH PRIVILEGES;"
+  changed_when: false
+  tags: [mariadb, slurmdb]
+
+- name: SlurmDB | Verify innodb_buffer_pool_size
+  ansible.builtin.command: mariadb -N -B -e "SHOW VARIABLES LIKE 'innodb_buffer_pool_size';"
+  register: slurmdb_verify_buffer
+  changed_when: false
+  tags: [verify]
+
+- name: Verify | Slurm DB exists and grants are readable
+  ansible.builtin.command: >
+    mariadb -u {{ (_slurmdb_mysql_users | first | default('slurm')) }} -p{{ slurmdb_mysql_password }} -N -B -e "SHOW DATABASES LIKE '{{ slurmdb_mysql_db }}'; SHOW GRANTS;"
+  register: _slurmdb_verify
+  changed_when: false
+  no_log: true
+  tags: [verify, mariadb, slurmdb]

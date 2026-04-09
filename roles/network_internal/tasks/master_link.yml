@@ -1,0 +1,61 @@
+# Proposito:
+# - Implementar tareas del rol 'network_internal' para configurar enlaces y direccionamiento de red interna.
+# Supuestos/prerrequisitos:
+# - El play debe ejecutar con privilegios adecuados y facts disponibles; se asume conectividad al host objetivo.
+# Variables clave consumidas:
+# - roles/network_internal/defaults/main.yml (si existe), group_vars/* y host_vars/* segun alcance.
+# Tags relevantes:
+# - Heredadas desde site.yml y/o invocaciones parciales por --tags.
+
+---
+- name: Red Interna | Verificar conexion int-{{ link_item.key }}
+  ansible.builtin.set_fact:
+    master_link_exists: "{{ ('int-' ~ link_item.key) in (nmcli_conn_names.stdout_lines | default([])) }}"
+
+- name: Red Interna | Crear conexion int-{{ link_item.key }}
+  ansible.builtin.command: >-
+    nmcli con add type ethernet ifname {{ link_item.value.master_if }} con-name int-{{ link_item.key }}
+    ipv4.method manual ipv4.addresses {{ link_item.value.master_ip }} ipv6.method ignore
+  when: not (master_link_exists | bool)
+  register: _master_link_created
+
+- name: Red Interna | Leer ipv4.addresses int-{{ link_item.key }}
+  ansible.builtin.command: nmcli -g ipv4.addresses con show int-{{ link_item.key }}
+  register: master_link_ipv4
+  changed_when: false
+
+- name: Red Interna | Leer ipv4.method int-{{ link_item.key }}
+  ansible.builtin.command: nmcli -g ipv4.method con show int-{{ link_item.key }}
+  register: master_link_ipv4_method
+  changed_when: false
+
+- name: Red Interna | Leer ipv6.method int-{{ link_item.key }}
+  ansible.builtin.command: nmcli -g ipv6.method con show int-{{ link_item.key }}
+  register: master_link_ipv6_method
+  changed_when: false
+
+- name: Red Interna | Calcular ajustes int-{{ link_item.key }}
+  ansible.builtin.set_fact:
+    _master_link_needs_mod: >-
+      {%- set _ipv4 = (master_link_ipv4.stdout_lines | select('match', '.+') | list | first | default('')) -%}
+      {%- set _ipv4_method = (master_link_ipv4_method.stdout_lines | select('match', '.+') | list | first | default('')) -%}
+      {%- set _ipv6_method = (master_link_ipv6_method.stdout_lines | select('match', '.+') | list | first | default('')) -%}
+      {{ _ipv4 != (link_item.value.master_ip | regex_replace('/.*$', ''))
+         or _ipv4_method != 'manual'
+         or _ipv6_method != 'ignore' }}
+
+- name: Red Interna | Ajustar int-{{ link_item.key }}
+  ansible.builtin.command: >-
+    nmcli con mod int-{{ link_item.key }} ipv4.addresses {{ link_item.value.master_ip }} ipv4.method manual ipv6.method ignore
+  when: _master_link_needs_mod
+  register: _master_link_modified
+
+- name: Red Interna | Definir si la conexion int-{{ link_item.key }} cambio
+  ansible.builtin.set_fact:
+    _master_link_changed: >-
+      {{ (not (master_link_exists | bool)) or (_master_link_needs_mod | default(false)) }}
+
+- name: Red Interna | Activar int-{{ link_item.key }}
+  ansible.builtin.command: nmcli con up int-{{ link_item.key }}
+  changed_when: false
+  when: _master_link_changed | default(false)

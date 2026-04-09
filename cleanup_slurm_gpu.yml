@@ -1,0 +1,231 @@
+---
+- name: Limpieza de Slurm y GPU/CUDA para reprovision desde cero
+  hosts: all
+  become: true
+  gather_facts: true
+  serial: 1
+
+  vars:
+    cleanup_preserve_ssh: true
+    cleanup_srun_port_range: "{{ slurm_srun_port_range | default('60001-60100') }}"
+    cleanup_firewalld_zone: "{{ slurm_firewalld_zone | default('public') }}"
+    cleanup_internal_cidr: "{{ slurm_internal_cidr | default('192.168.34.0/24') }}"
+    cleanup_slurmctld_port: "{{ slurmctld_port | default(6817) }}"
+    cleanup_slurmd_port: "{{ slurmd_port | default(6818) }}"
+    cleanup_package_name_regex: '^(slurm|munge|nvidia|cuda|libnvidia|kmod-nvidia)(-|$)'
+
+  tasks:
+    - name: Limpieza | Definir servicio SSH por sistema operativo
+      ansible.builtin.set_fact:
+        cleanup_ssh_service: "{{ 'sshd' if ansible_facts.os_family == 'RedHat' else 'ssh' }}"
+      changed_when: false
+      tags: [cleanup, cleanup_safety]
+
+    - name: Limpieza | Asegurar SSH activo para no perder acceso remoto
+      ansible.builtin.systemd:
+        name: "{{ cleanup_ssh_service }}"
+        enabled: true
+        state: started
+      when: cleanup_preserve_ssh | bool
+      tags: [cleanup, cleanup_safety]
+
+    - name: Limpieza | Verificar estado de firewalld
+      ansible.builtin.command: systemctl is-active firewalld
+      register: cleanup_firewalld_active
+      changed_when: false
+      failed_when: false
+      when:
+        - ansible_facts.os_family == 'RedHat'
+      tags: [cleanup, cleanup_safety, cleanup_firewall]
+
+    - name: Limpieza | Mantener servicio SSH permitido en firewalld (antes)
+      ansible.posix.firewalld:
+        zone: "{{ cleanup_firewalld_zone }}"
+        service: ssh
+        state: enabled
+        permanent: true
+        immediate: true
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_preserve_ssh | bool
+        - cleanup_firewalld_active.rc == 0
+      tags: [cleanup, cleanup_safety, cleanup_firewall]
+
+    - name: Limpieza | Detener y deshabilitar servicios de Slurm/Munge/NVIDIA
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: false
+        state: stopped
+      loop:
+        - slurmctld
+        - slurmd
+        - slurmdbd
+        - munge
+        - nvidia-persistenced
+      failed_when: false
+      tags: [cleanup, cleanup_services]
+
+    - name: Limpieza | Recopilar paquetes instalados
+      ansible.builtin.package_facts:
+        manager: auto
+      tags: [cleanup, cleanup_packages]
+
+    - name: Limpieza | Calcular paquetes instalados a remover
+      ansible.builtin.set_fact:
+        cleanup_installed_target_packages: >-
+          {{
+            ansible_facts.packages.keys()
+            | select('match', cleanup_package_name_regex)
+            | list
+          }}
+      changed_when: false
+      tags: [cleanup, cleanup_packages]
+
+    - name: Limpieza | Remover paquetes instalados Slurm/Munge/NVIDIA/CUDA (RHEL)
+      ansible.builtin.dnf:
+        name: "{{ cleanup_installed_target_packages }}"
+        state: absent
+        autoremove: true
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_installed_target_packages | length > 0
+      tags: [cleanup, cleanup_packages]
+
+    - name: Limpieza | Remover paquetes instalados Slurm/Munge/NVIDIA/CUDA (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: "{{ cleanup_installed_target_packages }}"
+        state: absent
+        purge: true
+        autoremove: true
+        update_cache: true
+      when:
+        - ansible_facts.os_family == 'Debian'
+        - cleanup_installed_target_packages | length > 0
+      tags: [cleanup, cleanup_packages]
+
+    - name: Limpieza | Eliminar archivos y directorios de Slurm/Munge/CUDA
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/slurm
+        - /var/log/slurm
+        - /var/spool/slurmctld
+        - /var/spool/slurmd
+        - /run/slurm
+        - /etc/munge
+        - /var/log/munge
+        - /var/lib/munge
+        - /run/munge
+        - /etc/tmpfiles.d/munge.conf
+        - /etc/tmpfiles.d/slurm-run.conf
+        - /etc/profile.d/slurm-defaults.sh
+        - /etc/yum.repos.d/cuda-rhel9.repo
+        - /root/rpmbuild
+        - /root/slurm-*.tar.bz2
+      tags: [cleanup, cleanup_files]
+
+    - name: Limpieza | Eliminar repo CUDA en Ubuntu
+      ansible.builtin.file:
+        path: "/etc/apt/sources.list.d/cuda-ubuntu{{ ansible_distribution_version | regex_replace('\\.', '') }}.list"
+        state: absent
+      when: ansible_facts.os_family == 'Debian'
+      tags: [cleanup, cleanup_files]
+
+    - name: Limpieza | Eliminar pin y keyring CUDA en Ubuntu
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/preferences.d/cuda-repository-pin-600
+        - /usr/share/keyrings/cuda-archive-keyring.gpg
+      when: ansible_facts.os_family == 'Debian'
+      tags: [cleanup, cleanup_files]
+
+    - name: Limpieza | Remover reglas rich de Slurm en firewalld (slurmctld 6817)
+      ansible.posix.firewalld:
+        zone: "{{ cleanup_firewalld_zone }}"
+        rich_rule: >-
+          rule family="ipv4"
+          source address="{{ cleanup_internal_cidr }}"
+          port port="{{ cleanup_slurmctld_port }}" protocol="tcp"
+          accept
+        state: disabled
+        permanent: true
+        immediate: true
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_firewalld_active is defined
+        - cleanup_firewalld_active.rc == 0
+      tags: [cleanup, cleanup_firewall]
+
+    - name: Limpieza | Remover reglas rich de Slurm en firewalld (slurmd 6818)
+      ansible.posix.firewalld:
+        zone: "{{ cleanup_firewalld_zone }}"
+        rich_rule: >-
+          rule family="ipv4"
+          source address="{{ cleanup_internal_cidr }}"
+          port port="{{ cleanup_slurmd_port }}" protocol="tcp"
+          accept
+        state: disabled
+        permanent: true
+        immediate: true
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_firewalld_active is defined
+        - cleanup_firewalld_active.rc == 0
+      tags: [cleanup, cleanup_firewall]
+
+    - name: Limpieza | Remover SrunPortRange en firewalld
+      ansible.posix.firewalld:
+        zone: "{{ cleanup_firewalld_zone }}"
+        port: "{{ cleanup_srun_port_range }}/tcp"
+        state: disabled
+        permanent: true
+        immediate: true
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_firewalld_active is defined
+        - cleanup_firewalld_active.rc == 0
+      tags: [cleanup, cleanup_firewall]
+
+    - name: Limpieza | Mantener SSH permitido en firewalld (después)
+      ansible.posix.firewalld:
+        zone: "{{ cleanup_firewalld_zone }}"
+        service: ssh
+        state: enabled
+        permanent: true
+        immediate: true
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_preserve_ssh | bool
+        - cleanup_firewalld_active is defined
+        - cleanup_firewalld_active.rc == 0
+      tags: [cleanup, cleanup_safety, cleanup_firewall]
+
+    - name: Limpieza | Verificar SSH activo al finalizar
+      ansible.builtin.command: systemctl is-active "{{ cleanup_ssh_service }}"
+      register: cleanup_ssh_active
+      changed_when: false
+      failed_when: cleanup_ssh_active.stdout | trim != 'active'
+      when: cleanup_preserve_ssh | bool
+      tags: [cleanup, cleanup_safety]
+
+    - name: Limpieza | Reportar paquetes residuales Slurm/Munge/NVIDIA/CUDA (RHEL)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rpm -qa | grep -Ei '{{ cleanup_package_name_regex }}' || true
+      args:
+        executable: /bin/bash
+      register: cleanup_residual_pkgs
+      changed_when: false
+      when: ansible_facts.os_family == 'RedHat'
+      tags: [cleanup, cleanup_verify]
+
+    - name: Limpieza | Mostrar paquetes residuales
+      ansible.builtin.debug:
+        var: cleanup_residual_pkgs.stdout_lines
+      when:
+        - ansible_facts.os_family == 'RedHat'
+        - cleanup_residual_pkgs is defined
+      tags: [cleanup, cleanup_verify]
