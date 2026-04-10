@@ -8,7 +8,7 @@
 # - N/A directo en este archivo; consumidas por tasks/handlers del rol.
 
 ---
-nfs_hpc_share_dir: "/nfs-hpc"
+nfs_hpc_share_dir: "/data/nfs-hpc"
 
 # Habilitacion por nodo/grupo:
 # - Por defecto todos los nodos montan el share (client_enabled: true).
