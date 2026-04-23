@@ -64,6 +64,7 @@ llm_conda_packages:
   - peft
   - safetensors
   - sentencepiece
+  - evaluate
 
 llm_pip_packages:
   - transformers

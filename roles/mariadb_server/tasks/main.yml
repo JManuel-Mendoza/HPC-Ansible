@@ -8,6 +8,11 @@
 # - Heredadas desde site.yml y/o invocaciones parciales por --tags.
 
 ---
+- name: MariaDB | Enable DNF module stream
+  ansible.builtin.command:
+    cmd: dnf module enable mariadb -y
+  changed_when: false
+
 - name: MariaDB | Install base packages (Rocky/RHEL)
   ansible.builtin.dnf:
     name:
