@@ -24,3 +24,15 @@
   ansible.builtin.reboot:
     reboot_timeout: 1800
   when: nvidia_cuda_reboot | bool
+    and inventory_hostname not in groups.get('hpc_master', [])
+
+- name: NVIDIA/CUDA | Informar reinicio manual en master
+  ansible.builtin.debug:
+    msg: >-
+      El nodo master requiere reinicio manual. Ejecute: sudo reboot
+      Después del reinicio del master ejecute nuevamente: 
+      ansible-playbook site.yml -t cuda
+  when:
+    - nvidia_cuda_reboot | bool
+    - inventory_hostname in groups.get('hpc_master', [])
+  listen: Reboot node

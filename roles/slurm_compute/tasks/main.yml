@@ -59,6 +59,10 @@
     name: slurmd
     enabled: true
     state: started
+  register: _slurmd_start
+  retries: 3
+  delay: 10
+  until: _slurmd_start is succeeded
   when: slurm_manage_slurmd | bool
   tags: [slurm, slurmd]
 
