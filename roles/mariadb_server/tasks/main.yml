@@ -31,6 +31,12 @@
     state: started
   tags: [mariadb]
 
+- name: MariaDB | Ejecutar mysql_upgrade para inicializar tablas internas del sistema
+  ansible.builtin.command:
+    cmd: mysql_upgrade --force
+  changed_when: false
+  notify: Restart mariadb
+
 - name: MariaDB | Check server version
   ansible.builtin.command: mariadb -N -B -e 'SELECT VERSION();'
   register: mariadb_version

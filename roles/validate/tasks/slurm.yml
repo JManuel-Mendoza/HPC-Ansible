@@ -86,13 +86,13 @@
     - inventory_hostname in groups.get('workers_r', [])
   tags: [validate, validate_slurm]
 
-# Desde el master hacia cada worker real (workers_r), usando su `ansible_host` en inventario.
+# Desde el master hacia cada worker, usando su `ansible_host` en inventario.
 - name: Validate | Master can reach slurmd on workers_r (TCP/6818)
   ansible.builtin.wait_for:
     host: "{{ hostvars[item].ansible_host | default(item) }}"
     port: 6818
     timeout: 2
-  loop: "{{ groups.get('workers_r', []) }}"
+  loop: "{{ groups.get('slurm_all', []) }}"
   changed_when: false
   when:
     - _validate_slurm_present | default(false) | bool
