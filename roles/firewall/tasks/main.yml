@@ -77,6 +77,80 @@
     - inventory_hostname in (groups.get('hpc_master', []) + groups.get('workers_r', []) + groups.get('workers', []))
   tags: [firewall, slurm, slurm_firewall, slurm_validate, debug, debug_firewall]
 
+- name: Firewall | NCCL | Allow NCCL port range (20000-20100/tcp) from internal network (master)
+  ansible.posix.firewalld:
+    zone: "{{ slurm_firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+    rich_rule: >-
+      rule family="ipv4"
+      source address="{{ slurm_internal_cidr }}"
+      port port="20000-20100" protocol="tcp"
+      accept
+  notify: Firewall | Recargar firewalld
+  when:
+    - slurm_internal_cidr is defined
+    - inventory_hostname in groups.get('hpc_master', [])
+  tags: [firewall, nccl, nccl_firewall]
+
+- name: Firewall | NCCL | Allow torchrun rendezvous port (29500/tcp) from internal network (master)
+  ansible.posix.firewalld:
+    zone: "{{ slurm_firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+    rich_rule: >-
+      rule family="ipv4"
+      source address="{{ slurm_internal_cidr }}"
+      port port="29500" protocol="tcp"
+      accept
+  notify: Firewall | Recargar firewalld
+  when:
+    - slurm_internal_cidr is defined
+    - inventory_hostname in groups.get('hpc_master', [])
+  tags: [firewall, nccl, nccl_firewall]
+
+# -------------------------------------------------------------------
+# NCCL (PyTorch DDP) - allow inter-worker GPU communication
+# Port range 20000-20100/tcp on the internal cluster network
+# Only needed on compute/worker nodes
+# -------------------------------------------------------------------
+
+- name: Firewall | NCCL | Allow NCCL port range (20000-20100/tcp) from internal network
+  ansible.posix.firewalld:
+    zone: "{{ slurm_firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+    rich_rule: >-
+      rule family="ipv4"
+      source address="{{ slurm_internal_cidr }}"
+      port port="20000-20100" protocol="tcp"
+      accept
+  notify: Firewall | Recargar firewalld
+  when:
+    - slurm_internal_cidr is defined
+    - inventory_hostname in (groups.get('workers_r', []) + groups.get('workers', []))
+  tags: [firewall, nccl, nccl_firewall]
+
+- name: Firewall | NCCL | Allow torchrun rendezvous port (29500/tcp) from internal network
+  ansible.posix.firewalld:
+    zone: "{{ slurm_firewalld_zone }}"
+    permanent: true
+    immediate: true
+    state: enabled
+    rich_rule: >-
+      rule family="ipv4"
+      source address="{{ slurm_internal_cidr }}"
+      port port="29500" protocol="tcp"
+      accept
+  notify: Firewall | Recargar firewalld
+  when:
+    - slurm_internal_cidr is defined
+    - inventory_hostname in (groups.get('workers_r', []) + groups.get('workers', []))
+  tags: [firewall, nccl, nccl_firewall]
+
 - name: Firewall | Aplicar recargas pendientes antes de continuar
   ansible.builtin.meta: flush_handlers
   tags: [firewall]

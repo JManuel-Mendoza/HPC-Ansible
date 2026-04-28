@@ -36,6 +36,7 @@ common_packages:
   - tree
   - mpich
   - mpich-devel
+  - netcat
 
 enable_chrony: true
 
